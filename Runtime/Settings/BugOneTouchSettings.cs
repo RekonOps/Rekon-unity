@@ -79,6 +79,9 @@ namespace RekonOps.BugOneTouch
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
 
         [Header("Jira")]
+        [Tooltip("Jira 사이트 기본 URL (예: https://yourcompany.atlassian.net)")]
+        public string jiraSiteUrl = "";
+
         [Tooltip("Default Jira labels")]
         public string[] defaultLabels = new string[] { "bug-onetouch-unity", "unity" };
     }

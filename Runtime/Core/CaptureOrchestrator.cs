@@ -211,6 +211,9 @@ namespace RekonOps.BugOneTouch
                 await Task.Run(() => File.WriteAllText(path, json, System.Text.Encoding.UTF8), token);
                 result.StatePath = path;
 
+                // 수집된 스냅샷 객체를 결과에 세팅 (ManifestGenerator가 환경 정보 추출에 사용)
+                result.StateSnapshot = snapshot;
+
                 ReportProgress("state", 0.75f);
             }
             catch (OperationCanceledException) { throw; }

@@ -491,12 +491,20 @@ namespace GaoZombie.BugOneTouch.Editor
 
         /// <summary>
         /// Jira 이슈를 기본 브라우저에서 엽니다.
+        /// Settings의 jiraSiteUrl을 사용하여 URL을 구성합니다.
         /// </summary>
         private static void OpenJiraIssue(string issueKey)
         {
-            // Jira URL은 설정에서 읽어야 하지만,
-            // 현재는 플레이스홀더로 처리합니다.
-            Debug.Log($"[BugOneTouch] Jira 이슈 열기: {issueKey} (설정에서 URL 구성 필요)");
+            var settings = BugOneTouchSettingsProvider.Settings;
+            if (settings != null && !string.IsNullOrEmpty(settings.jiraSiteUrl))
+            {
+                string url = $"{settings.jiraSiteUrl}/browse/{issueKey}";
+                Application.OpenURL(url);
+            }
+            else
+            {
+                Debug.LogWarning($"[BugOneTouch] Jira 사이트 URL이 설정되지 않았습니다. Settings에서 구성하세요. 이슈 키: {issueKey}");
+            }
         }
 
         // ──────────────────────────────────────────────────────────────

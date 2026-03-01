@@ -71,6 +71,8 @@ namespace GaoZombie.BugOneTouch
         /// 보존 정책을 적용합니다.
         ///   1. 기간 초과 번들 삭제 (retentionDays 이상 경과)
         ///   2. 최대 개수 초과 번들 삭제 (오래된 것부터 FIFO)
+        ///
+        /// 미등록 번들(registered == false) 삭제 전 경고 로그를 출력합니다 (AC-25).
         /// </summary>
         /// <returns>삭제된 번들 수</returns>
         public int Apply()
@@ -88,6 +90,9 @@ namespace GaoZombie.BugOneTouch
                 var expiredBundles = FindExpiredBundles(bundles);
                 foreach (var manifest in expiredBundles)
                 {
+                    // 미등록 번들 삭제 전 경고 (AC-25)
+                    WarnIfUnregistered(manifest, "기간 초과");
+
                     if (TryDeleteBundle(manifest.id))
                     {
                         deletedCount++;
@@ -102,6 +107,10 @@ namespace GaoZombie.BugOneTouch
                     // ScanAllBundles()는 created_at 오름차순으로 정렬되어 있으므로
                     // 첫 번째 항목이 가장 오래된 것
                     var oldest = bundles[0];
+
+                    // 미등록 번들 삭제 전 경고 (AC-25)
+                    WarnIfUnregistered(oldest, "최대 개수 초과 FIFO");
+
                     if (TryDeleteBundle(oldest.id))
                     {
                         deletedCount++;
@@ -119,6 +128,21 @@ namespace GaoZombie.BugOneTouch
             }
 
             return deletedCount;
+        }
+
+        /// <summary>
+        /// 현재 전체 크래시 번들 목록에서 미등록 번들 수를 반환합니다 (AC-25).
+        /// </summary>
+        public int GetUnregisteredCount()
+        {
+            var bundles = CrashBundleWriter.ScanAllBundles();
+            int count = 0;
+            foreach (var manifest in bundles)
+            {
+                if (!manifest.registered)
+                    count++;
+            }
+            return count;
         }
 
         /// <summary>
@@ -168,6 +192,20 @@ namespace GaoZombie.BugOneTouch
             return DateTime.TryParse(createdAt, null,
                 System.Globalization.DateTimeStyles.RoundtripKind,
                 out result);
+        }
+
+        /// <summary>
+        /// 미등록 번들인 경우 삭제 전 경고 로그를 출력합니다 (AC-25).
+        /// </summary>
+        private static void WarnIfUnregistered(CrashBundleManifest manifest, string deleteReason)
+        {
+            if (!manifest.registered)
+            {
+                Debug.LogWarning(
+                    $"[BugOneTouch] 미등록 크래시 번들이 삭제됩니다: {manifest.id} " +
+                    $"(사유: {deleteReason}, 생성: {manifest.created_at}). " +
+                    $"Jira에 등록되지 않은 크래시 데이터가 영구 삭제됩니다.");
+            }
         }
 
         /// <summary>

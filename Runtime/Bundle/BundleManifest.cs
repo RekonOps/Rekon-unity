@@ -81,6 +81,46 @@ namespace GaoZombie.BugOneTouch
         /// <summary>Unity 버전.</summary>
         public string unity_version;
 
+        // ── PRD 필수 필드 (AC-17) ────────────────────────────────────────
+
+        /// <summary>엔진 이름 (항상 "Unity").</summary>
+        public string engine = "Unity";
+
+        /// <summary>Unity 엔진 버전 (Application.unityVersion).</summary>
+        public string engine_version;
+
+        /// <summary>앱 버전 (Application.version).</summary>
+        public string app_version;
+
+        /// <summary>빌드 번호 (Application.buildGUID).</summary>
+        public string build_number;
+
+        /// <summary>실행 플랫폼 (Application.platform.ToString()).</summary>
+        public string platform;
+
+        /// <summary>디바이스 모델 (SystemInfo.deviceModel).</summary>
+        public string device;
+
+        /// <summary>운영체제 정보 (SystemInfo.operatingSystem).</summary>
+        public string os;
+
+        /// <summary>현재 씬 이름 (SceneManager.GetActiveScene().name).</summary>
+        public string scene;
+
+        /// <summary>재현 단계 (사용자 입력, BugReportForm에서 설정).</summary>
+        public string repro_steps;
+
+        /// <summary>예상 결과 (사용자 입력, nullable).</summary>
+        public string expected;
+
+        /// <summary>실제 결과 (사용자 입력, nullable).</summary>
+        public string actual;
+
+        /// <summary>심각도: "critical"/"major"/"minor"/"trivial". 기본값 "major".</summary>
+        public string severity = "major";
+
+        // ──────────────────────────────────────────────────────────────────
+
         /// <summary>버그 제목 (사용자 입력용, 초기값 빈 문자열).</summary>
         public string title;
 

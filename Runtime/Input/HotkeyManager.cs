@@ -59,10 +59,15 @@ namespace RekonOps.BugOneTouch
             if (_provider == null)
                 return;
 
-            if (_provider.IsTriggered(_settings.captureHotkey))
-            {
-                OnCaptureTrigger?.Invoke();
-            }
+            // 메인 키 트리거 확인
+            if (!_provider.IsTriggered(_settings.captureHotkey)) return;
+
+            // 수식키 조합 확인
+            if (_settings.hotkeyCtrlOrCmd && !_provider.IsCtrlOrCmdHeld()) return;
+            if (_settings.hotkeyShift && !_provider.IsShiftHeld()) return;
+            if (_settings.hotkeyAlt && !_provider.IsAltHeld()) return;
+
+            OnCaptureTrigger?.Invoke();
         }
 
         /// <summary>

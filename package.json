@@ -1,0 +1,18 @@
+{
+  "name": "com.rekonops.bug-onetouch",
+  "version": "0.1.0",
+  "displayName": "Bug-OneTouch",
+  "description": "Local-first bug reporting plugin for Unity with Jira Cloud integration",
+  "unity": "2022.3",
+  "unityRelease": "22f1",
+  "author": {
+    "name": "RekonOps",
+    "url": "https://github.com/RekonOps"
+  },
+  "keywords": ["bug-report", "jira", "qa", "testing", "capture"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RekonOps/Bug-OneTouch-unity.git"
+  }
+}

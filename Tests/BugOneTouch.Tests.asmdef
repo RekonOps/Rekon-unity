@@ -1,0 +1,19 @@
+{
+  "name": "BugOneTouch.Tests",
+  "rootNamespace": "RekonOps.BugOneTouch.Tests",
+  "references": [
+    "BugOneTouch.Runtime",
+    "BugOneTouch.Editor",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

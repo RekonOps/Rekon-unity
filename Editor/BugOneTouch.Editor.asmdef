@@ -1,0 +1,14 @@
+{
+  "name": "BugOneTouch.Editor",
+  "rootNamespace": "RekonOps.BugOneTouch.Editor",
+  "references": ["BugOneTouch.Runtime"],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

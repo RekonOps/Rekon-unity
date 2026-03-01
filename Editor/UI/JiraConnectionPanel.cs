@@ -94,14 +94,21 @@ namespace GaoZombie.BugOneTouch.Editor
         /// </summary>
         public void OnGUI()
         {
-            DrawConnectionStatus();
+            // 비동기 콜백이 OnGUI 렌더링 도중 _state를 변경하면
+            // Layout 이벤트와 Repaint 이벤트 사이에 Begin/End 쌍이 어긋나는
+            // GUILayout 상태 에러가 발생합니다.
+            // OnGUI 시작 시점에 상태를 스냅샷으로 캡처하여
+            // 이 프레임 렌더링 내내 동일한 상태를 사용합니다.
+            ConnectionState currentState = _state;
+
+            DrawConnectionStatus(currentState);
             EditorGUILayout.Space(8f);
-            DrawConnectionActions();
+            DrawConnectionActions(currentState);
             EditorGUILayout.Space(8f);
             DrawErrorMessage();
 
             // 연결 중일 때 주기적 리페인트 (폴링 진행 상황 반영)
-            if (_state == ConnectionState.Connecting)
+            if (currentState == ConnectionState.Connecting)
             {
                 double now = EditorApplication.timeSinceStartup;
                 if (now - _lastRepaintTime > 0.5)
@@ -119,13 +126,13 @@ namespace GaoZombie.BugOneTouch.Editor
 
         // ─── 연결 상태 표시 ───────────────────────────────────────────────────────
 
-        private void DrawConnectionStatus()
+        private void DrawConnectionStatus(ConnectionState currentState)
         {
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.LabelField("연결 상태:", GUILayout.Width(70f));
 
-                switch (_state)
+                switch (currentState)
                 {
                     case ConnectionState.Disconnected:
                         DrawStatusBadge("● 미연결", new Color(0.6f, 0.6f, 0.6f));
@@ -142,7 +149,7 @@ namespace GaoZombie.BugOneTouch.Editor
             }
 
             // 연결 중 진행 표시
-            if (_state == ConnectionState.Connecting && !string.IsNullOrEmpty(_statusMessage))
+            if (currentState == ConnectionState.Connecting && !string.IsNullOrEmpty(_statusMessage))
             {
                 EditorGUILayout.Space(4f);
                 EditorGUI.ProgressBar(
@@ -152,7 +159,7 @@ namespace GaoZombie.BugOneTouch.Editor
             }
 
             // 연결됨 안내
-            if (_state == ConnectionState.Connected)
+            if (currentState == ConnectionState.Connected)
             {
                 EditorGUILayout.HelpBox("Jira 토큰이 저장되어 있습니다.", MessageType.Info);
             }
@@ -160,9 +167,9 @@ namespace GaoZombie.BugOneTouch.Editor
 
         // ─── 액션 버튼 ────────────────────────────────────────────────────────────
 
-        private void DrawConnectionActions()
+        private void DrawConnectionActions(ConnectionState currentState)
         {
-            switch (_state)
+            switch (currentState)
             {
                 case ConnectionState.Disconnected:
                     DrawDisconnectedActions();

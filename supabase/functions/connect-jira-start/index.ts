@@ -74,7 +74,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         // Tenant 존재 확인 (없으면 생성)
         let { data: tenant, error: tenantError } = await db
-            .schema("private")
             .from("tenants")
             .select("id")
             .eq("id", tenant_id)
@@ -87,7 +86,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         if (!tenant) {
             const { data: newTenant, error: createTenantError } = await db
-                .schema("private")
                 .from("tenants")
                 .insert({ id: tenant_id, name: `tenant_${tenant_id}` })
                 .select("id")
@@ -103,7 +101,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         // User 존재 확인 (없으면 생성)
         let { data: user, error: userError } = await db
-            .schema("private")
             .from("users")
             .select("id")
             .eq("tenant_id", tenant_id)
@@ -117,7 +114,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         if (!user) {
             const { data: newUser, error: createUserError } = await db
-                .schema("private")
                 .from("users")
                 .insert({ tenant_id, external_id: user_id })
                 .select("id")
@@ -137,7 +133,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         // oauth_connections 레코드 생성 (기존 pending 있으면 갱신)
         const { data: connection, error: connectionError } = await db
-            .schema("private")
             .from("oauth_connections")
             .upsert(
                 {

@@ -61,16 +61,33 @@ namespace RekonOps.BugOneTouch
         private Coroutine _videoCoroutine;
 
         // ──────────────────────────────────────────────────────────────
+        // 내부 캐시 (지연 초기화)
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// CrashRecoveryDir 캐시.
+        /// Application.persistentDataPath는 메인 스레드에서만 접근 가능하므로
+        /// 필드 초기화자 대신 처음 접근 시점에 초기화합니다.
+        /// </summary>
+        private static string _crashRecoveryDir;
+
+        /// <summary>
+        /// ActiveDir 캐시.
+        /// CrashRecoveryDir와 동일한 이유로 지연 초기화합니다.
+        /// </summary>
+        private static string _activeDir;
+
+        // ──────────────────────────────────────────────────────────────
         // 공개 프로퍼티
         // ──────────────────────────────────────────────────────────────
 
         /// <summary>플러시 데이터 저장 루트 디렉토리 경로</summary>
         public static string CrashRecoveryDir =>
-            Path.Combine(Application.persistentDataPath, "BugOneTouch", "crash_recovery");
+            _crashRecoveryDir ??= Path.Combine(Application.persistentDataPath, "BugOneTouch", "crash_recovery");
 
         /// <summary>active/ 디렉토리 경로 (플러시 데이터 저장 위치)</summary>
         public static string ActiveDir =>
-            Path.Combine(CrashRecoveryDir, ActiveDirName);
+            _activeDir ??= Path.Combine(CrashRecoveryDir, ActiveDirName);
 
         /// <summary>마지막 로그 플러시 시각 (UTC)</summary>
         public DateTime LastLogFlushTime { get; private set; }

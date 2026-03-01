@@ -30,6 +30,17 @@ namespace RekonOps.BugOneTouch
         public const string FlagFileName = "abnormal_exit.flag";
 
         // ──────────────────────────────────────────────────────────────
+        // 내부 캐시 (지연 초기화)
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// FlagFilePath 캐시.
+        /// Application.persistentDataPath는 메인 스레드에서만 접근 가능하므로
+        /// 필드 초기화자 대신 처음 접근 시점에 초기화합니다.
+        /// </summary>
+        private static string _flagFilePath;
+
+        // ──────────────────────────────────────────────────────────────
         // 공개 프로퍼티
         // ──────────────────────────────────────────────────────────────
 
@@ -38,7 +49,7 @@ namespace RekonOps.BugOneTouch
         /// {persistentDataPath}/BugOneTouch/crash_recovery/abnormal_exit.flag
         /// </summary>
         public static string FlagFilePath =>
-            Path.Combine(
+            _flagFilePath ??= Path.Combine(
                 Application.persistentDataPath,
                 "BugOneTouch",
                 "crash_recovery",

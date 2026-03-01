@@ -22,6 +22,17 @@ namespace RekonOps.BugOneTouch
     {
         private readonly ManifestGenerator _manifestGenerator;
 
+        // ──────────────────────────────────────────────────────────────
+        // 내부 캐시 (지연 초기화)
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 번들 루트 디렉토리 캐시.
+        /// Application.persistentDataPath는 메인 스레드에서만 접근 가능하므로
+        /// 필드 초기화자 대신 처음 접근 시점에 초기화합니다.
+        /// </summary>
+        private static string _bundlesRootDirectory;
+
         /// <summary>
         /// BundleWriter를 초기화합니다.
         /// </summary>
@@ -72,11 +83,7 @@ namespace RekonOps.BugOneTouch
         /// </summary>
         public static string GetBundleDirectory(string bundleId)
         {
-            return Path.Combine(
-                Application.persistentDataPath,
-                "BugOneTouch",
-                "bundles",
-                bundleId);
+            return Path.Combine(GetBundlesRootDirectory(), bundleId);
         }
 
         /// <summary>
@@ -84,7 +91,7 @@ namespace RekonOps.BugOneTouch
         /// </summary>
         public static string GetBundlesRootDirectory()
         {
-            return Path.Combine(Application.persistentDataPath, "BugOneTouch", "bundles");
+            return _bundlesRootDirectory ??= Path.Combine(Application.persistentDataPath, "BugOneTouch", "bundles");
         }
 
         // ──────────────────────────────────────────────────────────────

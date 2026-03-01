@@ -9,6 +9,15 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("Key to trigger bug capture")]
         public KeyCode captureHotkey = KeyCode.F12;
 
+        [Tooltip("Require Ctrl (Windows) / Cmd (Mac)")]
+        public bool hotkeyCtrlOrCmd = true;
+
+        [Tooltip("Require Shift")]
+        public bool hotkeyShift = true;
+
+        [Tooltip("Require Alt (Windows) / Option (Mac)")]
+        public bool hotkeyAlt = false;
+
         [Header("Screenshot")]
         [Tooltip("Downscale factor (1 = original resolution)")]
         [Range(1, 4)]

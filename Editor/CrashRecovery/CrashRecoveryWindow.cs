@@ -267,7 +267,7 @@ namespace RekonOps.BugOneTouch.Editor
 
             switch (integrity.overall)
             {
-                case "ok":
+                case "complete": // PRD 스펙 AC-26: "ok" 대신 "complete" 사용
                     DrawColoredBadge("●", ColorOk, 20f);
                     break;
                 case "partial":

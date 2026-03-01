@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace RekonOps.BugOneTouch
 {
@@ -18,6 +19,7 @@ namespace RekonOps.BugOneTouch
         /// <summary>
         /// CaptureResult를 기반으로 BundleManifest 초안을 생성합니다.
         /// SHA-256 해시는 BundleWriter에서 파일 복사 후 채워집니다.
+        /// StateSnapshotCollector 데이터를 활용하여 환경 정보를 자동으로 채웁니다.
         /// </summary>
         /// <param name="captureResult">캡처 파이프라인 실행 결과.</param>
         /// <returns>생성된 BundleManifest. captureResult가 null이면 예외를 던집니다.</returns>
@@ -33,12 +35,32 @@ namespace RekonOps.BugOneTouch
 
             var artifacts = BuildArtifactList(captureResult);
 
+            // StateSnapshotCollector 데이터에서 환경 정보 추출 (AC-17)
+            var snapshot = captureResult.StateSnapshot;
+
             var manifest = new BundleManifest
             {
                 id              = Guid.NewGuid().ToString("D"),
                 created_at      = captureResult.Timestamp.ToUniversalTime().ToString("O"),
                 plugin_version  = PluginVersion,
                 unity_version   = Application.unityVersion,
+
+                // PRD 필수 필드 자동 채우기 (AC-17)
+                engine          = "Unity",
+                engine_version  = snapshot?.engine_version ?? Application.unityVersion,
+                app_version     = snapshot?.app_version ?? Application.version,
+                build_number    = snapshot?.build_number ?? Application.buildGUID,
+                platform        = snapshot?.platform ?? Application.platform.ToString(),
+                device          = snapshot?.device ?? SystemInfo.deviceModel,
+                os              = snapshot?.os ?? SystemInfo.operatingSystem,
+                scene           = snapshot?.scene ?? GetActiveSceneName(),
+
+                // 사용자 입력 필드 (초기값)
+                repro_steps     = string.Empty,
+                expected        = null,
+                actual          = null,
+                severity        = "major",
+
                 title           = string.Empty,
                 description     = string.Empty,
                 artifacts       = artifacts,
@@ -135,6 +157,23 @@ namespace RekonOps.BugOneTouch
                 Debug.LogWarning($"[BugOneTouch] 디렉토리 크기 계산 실패: {ex.Message}");
             }
             return total;
+        }
+
+        /// <summary>
+        /// 현재 활성 씬 이름을 반환합니다.
+        /// 씬 정보를 읽지 못한 경우 빈 문자열을 반환합니다.
+        /// </summary>
+        private static string GetActiveSceneName()
+        {
+            try
+            {
+                var activeScene = SceneManager.GetActiveScene();
+                return activeScene.IsValid() ? activeScene.name : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

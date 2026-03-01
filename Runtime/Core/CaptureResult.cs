@@ -33,6 +33,12 @@ namespace RekonOps.BugOneTouch
         public string VideoPath { get; set; }
 
         /// <summary>
+        /// 캡처 시점에 수집된 상태 스냅샷.
+        /// ManifestGenerator에서 환경 정보(platform, device, os, scene 등)를 추출하는 데 사용됩니다.
+        /// </summary>
+        public StateSnapshot StateSnapshot { get; set; }
+
+        /// <summary>
         /// 캡처가 완료된 UTC 시각.
         /// </summary>
         public DateTime Timestamp { get; set; }

@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "name": "전화번호 (한국)",
+      "pattern": "\\b0\\d{1,2}-\\d{3,4}-\\d{4}\\b",
+      "replacement": "[MASKED:PHONE]",
+      "enabled": true
+    },
+    {
+      "name": "주민등록번호",
+      "pattern": "\\b\\d{6}-[1-4]\\d{6}\\b",
+      "replacement": "[MASKED:SSN]",
+      "enabled": true
+    },
+    {
+      "name": "신용카드 번호",
+      "pattern": "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b",
+      "replacement": "[MASKED:CARD]",
+      "enabled": true
+    },
+    {
+      "name": "JWT 토큰",
+      "pattern": "eyJ[a-zA-Z0-9_-]{10,}\\.eyJ[a-zA-Z0-9_-]{10,}\\.[a-zA-Z0-9_-]{10,}",
+      "replacement": "[MASKED:JWT]",
+      "enabled": true
+    }
+  ]
+}

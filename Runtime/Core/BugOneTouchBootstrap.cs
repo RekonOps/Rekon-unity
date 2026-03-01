@@ -1,0 +1,110 @@
+using UnityEngine;
+
+namespace RekonOps.BugOneTouch
+{
+    /// <summary>
+    /// Play Mode 진입 시 BugOneTouch 시스템 전체를 자동 초기화하는 부트스트랩 클래스.
+    ///
+    /// 초기화 순서:
+    ///   1. BugOneTouchSettings 로드 (없으면 경고 후 중단)
+    ///   2. DontDestroyOnLoad GameObject 생성
+    ///   3. 의존성 객체 생성 (LogRingBuffer, LogSerializer, ScreenshotCapturer 등)
+    ///   4. 영상 녹화 활성화 시 FrameRingBuffer, VideoEncoder, FrameCapturer 초기화
+    ///   5. CaptureOrchestrator 생성 및 모든 의존성 주입
+    ///   6. HotkeyManager MonoBehaviour 생성 및 설정 주입
+    ///   7. HotkeyManager ↔ CaptureOrchestrator 바인딩
+    ///   8. CaptureOverlay 초기화 및 오케스트레이터 바인딩
+    /// </summary>
+    public static class BugOneTouchBootstrap
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void Initialize()
+        {
+            // ── 1. Settings 로드 ───────────────────────────────────────────────────
+            BugOneTouchSettings settings = BugOneTouchSettingsProvider.Settings;
+
+            if (settings == null)
+            {
+                Debug.LogWarning("[BugOneTouch] BugOneTouchSettings를 찾을 수 없습니다. " +
+                                 "Resources/BugOneTouchSettings.asset을 생성하세요. 시스템 초기화를 건너뜁니다.");
+                return;
+            }
+
+            try
+            {
+                // ── 2. 루트 GameObject 생성 (씬 전환 후에도 유지) ─────────────────
+                var root = new GameObject("[BugOneTouch]");
+                Object.DontDestroyOnLoad(root);
+
+                Debug.Log("[BugOneTouch] 부트스트랩 시작...");
+
+                // ── 3. 공통 의존성 생성 ───────────────────────────────────────────
+
+                // 로그 링버퍼: Application.logMessageReceivedThreaded 구독 시작
+                var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
+
+                // 로그 직렬화기: 생성자 파라미터 없음
+                var logSerializer = new LogSerializer();
+
+                // 스크린샷 캡처기: settings 주입
+                var screenshotCapturer = new ScreenshotCapturer(settings);
+
+                // 커스텀 컨텍스트 레지스트리: 생성자 파라미터 없음
+                var contextRegistry = new ContextProviderRegistry();
+
+                // 상태 스냅샷 수집기: contextRegistry 주입
+                var stateCollector = new StateSnapshotCollector(contextRegistry);
+
+                // ── 4. 영상 녹화 관련 컴포넌트 (videoEnabled 시에만) ───────────────
+                FrameRingBuffer frameRingBuffer = null;
+                IVideoEncoder videoEncoder = null;
+                VideoEncoderConfig videoConfig = null;
+                FrameCapturer frameCapturer = null;
+
+                if (settings.videoEnabled)
+                {
+                    int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
+                    frameRingBuffer = new FrameRingBuffer(frameCapacity);
+
+                    videoEncoder = new VideoEncoder();
+                    videoConfig = VideoEncoderConfig.FromSettings(settings);
+
+                    // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
+                    frameCapturer = root.AddComponent<FrameCapturer>();
+                    frameCapturer.Initialize(frameRingBuffer, videoConfig);
+                    frameCapturer.StartCapturing();
+
+                    Debug.Log($"[BugOneTouch] 영상 녹화 활성화: {videoConfig}");
+                }
+
+                // ── 5. CaptureOrchestrator 생성 ───────────────────────────────────
+                var orchestrator = new CaptureOrchestrator(
+                    screenshotCapturer: screenshotCapturer,
+                    logCollector: logRingBuffer,
+                    logSerializer: logSerializer,
+                    stateCollector: stateCollector,
+                    frameBuffer: frameRingBuffer,    // null 허용 (영상 비활성 시)
+                    videoEncoder: videoEncoder,       // null 허용
+                    videoConfig: videoConfig,         // null 허용
+                    settings: settings);
+
+                // ── 6. HotkeyManager 생성 및 설정 주입 ───────────────────────────
+                var hotkeyManager = root.AddComponent<HotkeyManager>();
+                hotkeyManager.SetSettings(settings);
+
+                // ── 7. HotkeyManager ↔ CaptureOrchestrator 바인딩 ────────────────
+                orchestrator.BindHotkeyManager(hotkeyManager);
+
+                // ── 8. CaptureOverlay 초기화 ──────────────────────────────────────
+                var overlay = CaptureOverlay.EnsureInstance();
+                overlay.BindOrchestrator(orchestrator);
+
+                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[BugOneTouch] 부트스트랩 초기화 실패: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+    }
+}

@@ -7,7 +7,7 @@ namespace GaoZombie.BugOneTouch
     {
         [Header("Hotkey")]
         [Tooltip("Key to trigger bug capture")]
-        public KeyCode captureHotkey = KeyCode.F12;
+        public KeyCode captureHotkey = KeyCode.B;
 
         [Tooltip("Require Ctrl (Windows) / Cmd (Mac)")]
         public bool hotkeyCtrlOrCmd = true;
@@ -17,6 +17,25 @@ namespace GaoZombie.BugOneTouch
 
         [Tooltip("Require Alt (Windows) / Option (Mac)")]
         public bool hotkeyAlt = false;
+
+        /// <summary>
+        /// ScriptableObject Reset 시 플랫폼별 기본 핫키를 설정합니다.
+        /// Mac: ⌘ + Shift + B, Windows: Ctrl + Shift + F12
+        /// </summary>
+        private void Reset()
+        {
+#if UNITY_EDITOR_OSX
+            captureHotkey    = KeyCode.B;
+            hotkeyCtrlOrCmd  = true;
+            hotkeyShift      = true;
+            hotkeyAlt        = false;
+#else
+            captureHotkey    = KeyCode.F12;
+            hotkeyCtrlOrCmd  = true;
+            hotkeyShift      = true;
+            hotkeyAlt        = false;
+#endif
+        }
 
         [Header("Screenshot")]
         [Tooltip("Downscale factor (1 = original resolution)")]

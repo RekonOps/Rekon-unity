@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -19,6 +20,44 @@ namespace GaoZombie.BugOneTouch.Editor
     /// </summary>
     public class BugOneTouchSettingsWindow : EditorWindow
     {
+        // ─── 플랫폼별 메인 키 목록 ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Mac 추천 메인 키 목록.
+        /// Function 키(F1~F12)는 macOS 시스템 기능에 할당될 수 있으므로 제외.
+        /// </summary>
+        private static readonly KeyCode[] s_MacKeys =
+        {
+            // 알파벳 (Bug/Report/Debug 등 연상 키 우선)
+            KeyCode.B, KeyCode.D, KeyCode.G, KeyCode.K, KeyCode.R,
+            // 숫자
+            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
+            KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
+            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0,
+            // 특수
+            KeyCode.BackQuote, KeyCode.Backslash, KeyCode.Slash,
+        };
+
+        /// <summary>
+        /// Windows 추천 메인 키 목록.
+        /// Function 키(F1~F12)가 핫키로 자주 사용되므로 포함.
+        /// </summary>
+        private static readonly KeyCode[] s_WindowsKeys =
+        {
+            // Function 키
+            KeyCode.F1,  KeyCode.F2,  KeyCode.F3,  KeyCode.F4,
+            KeyCode.F5,  KeyCode.F6,  KeyCode.F7,  KeyCode.F8,
+            KeyCode.F9,  KeyCode.F10, KeyCode.F11, KeyCode.F12,
+            // 알파벳 (Bug/Report/Debug 등 연상 키 우선)
+            KeyCode.B, KeyCode.D, KeyCode.G, KeyCode.K, KeyCode.R,
+            // 숫자
+            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
+            KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
+            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0,
+            // 특수
+            KeyCode.BackQuote, KeyCode.Pause, KeyCode.ScrollLock,
+        };
+
         // ─── 탭 정의 ──────────────────────────────────────────────────────────────
 
         private static readonly string[] TabLabels =
@@ -243,8 +282,21 @@ namespace GaoZombie.BugOneTouch.Editor
 
             EditorGUILayout.EndHorizontal();
 
-            // 메인 키 선택
-            EditorGUILayout.PropertyField(hotkey, new GUIContent("메인 키", "버그 캡처를 트리거하는 기본 키"));
+            // 메인 키 선택 (플랫폼별 추천 키 드롭다운)
+            KeyCode[] keyList     = isMac ? s_MacKeys : s_WindowsKeys;
+            string[]  displayNames = keyList.Select(k => GetKeyDisplayName(k)).ToArray();
+
+            int currentIndex = Array.IndexOf(keyList, (KeyCode)hotkey.intValue);
+            // 목록에 없는 키(이전 설정값 등)면 첫 번째 항목으로 대체
+            if (currentIndex < 0) currentIndex = 0;
+
+            EditorGUI.BeginChangeCheck();
+            int newIndex = EditorGUILayout.Popup(
+                new GUIContent("메인 키", "버그 캡처를 트리거하는 기본 키"),
+                currentIndex,
+                displayNames);
+            if (EditorGUI.EndChangeCheck())
+                hotkey.intValue = (int)keyList[newIndex];
         }
 
         private string BuildHotkeyPreview(bool isMac)
@@ -264,6 +316,23 @@ namespace GaoZombie.BugOneTouch.Editor
             parts.Add(((KeyCode)hotkey.intValue).ToString());
 
             return string.Join(" + ", parts);
+        }
+
+        /// <summary>
+        /// 드롭다운에 표시할 키 이름을 반환합니다.
+        /// Alpha0~Alpha9는 숫자 문자로, 특수 키는 기호로 표시합니다.
+        /// </summary>
+        private static string GetKeyDisplayName(KeyCode key)
+        {
+            return key switch
+            {
+                KeyCode.BackQuote   => "`",
+                KeyCode.Backslash   => "\\",
+                KeyCode.Slash       => "/",
+                >= KeyCode.Alpha0 and <= KeyCode.Alpha9
+                    => ((int)key - (int)KeyCode.Alpha0).ToString(),
+                _ => key.ToString(),
+            };
         }
 
         // ─── Video 탭 ─────────────────────────────────────────────────────────────

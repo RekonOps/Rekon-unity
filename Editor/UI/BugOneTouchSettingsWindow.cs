@@ -28,14 +28,19 @@ namespace RekonOps.BugOneTouch.Editor
         /// </summary>
         private static readonly KeyCode[] s_MacKeys =
         {
-            // 알파벳 (Bug/Report/Debug 등 연상 키 우선)
-            KeyCode.B, KeyCode.D, KeyCode.G, KeyCode.K, KeyCode.R,
-            // 숫자
-            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
+            // 알파벳 A-Z
+            KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E,
+            KeyCode.F, KeyCode.G, KeyCode.H, KeyCode.I, KeyCode.J,
+            KeyCode.K, KeyCode.L, KeyCode.M, KeyCode.N, KeyCode.O,
+            KeyCode.P, KeyCode.Q, KeyCode.R, KeyCode.S, KeyCode.T,
+            KeyCode.U, KeyCode.V, KeyCode.W, KeyCode.X, KeyCode.Y, KeyCode.Z,
+            // 숫자 0-9
+            KeyCode.Alpha0, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
             KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
-            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0,
+            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9,
             // 특수
             KeyCode.BackQuote, KeyCode.Backslash, KeyCode.Slash,
+            KeyCode.Minus, KeyCode.Equals, KeyCode.LeftBracket, KeyCode.RightBracket,
         };
 
         /// <summary>
@@ -48,14 +53,21 @@ namespace RekonOps.BugOneTouch.Editor
             KeyCode.F1,  KeyCode.F2,  KeyCode.F3,  KeyCode.F4,
             KeyCode.F5,  KeyCode.F6,  KeyCode.F7,  KeyCode.F8,
             KeyCode.F9,  KeyCode.F10, KeyCode.F11, KeyCode.F12,
-            // 알파벳 (Bug/Report/Debug 등 연상 키 우선)
-            KeyCode.B, KeyCode.D, KeyCode.G, KeyCode.K, KeyCode.R,
-            // 숫자
-            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
+            // 알파벳 A-Z
+            KeyCode.A, KeyCode.B, KeyCode.C, KeyCode.D, KeyCode.E,
+            KeyCode.F, KeyCode.G, KeyCode.H, KeyCode.I, KeyCode.J,
+            KeyCode.K, KeyCode.L, KeyCode.M, KeyCode.N, KeyCode.O,
+            KeyCode.P, KeyCode.Q, KeyCode.R, KeyCode.S, KeyCode.T,
+            KeyCode.U, KeyCode.V, KeyCode.W, KeyCode.X, KeyCode.Y, KeyCode.Z,
+            // 숫자 0-9
+            KeyCode.Alpha0, KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3,
             KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
-            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0,
+            KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9,
             // 특수
-            KeyCode.BackQuote, KeyCode.Pause, KeyCode.ScrollLock,
+            KeyCode.BackQuote, KeyCode.Minus, KeyCode.Equals,
+            KeyCode.LeftBracket, KeyCode.RightBracket,
+            KeyCode.Backslash, KeyCode.Slash,
+            KeyCode.Pause, KeyCode.ScrollLock,
         };
 
         // ─── 탭 정의 ──────────────────────────────────────────────────────────────
@@ -326,9 +338,15 @@ namespace RekonOps.BugOneTouch.Editor
         {
             return key switch
             {
-                KeyCode.BackQuote   => "`",
-                KeyCode.Backslash   => "\\",
-                KeyCode.Slash       => "/",
+                KeyCode.BackQuote    => "`  (Backtick)",
+                KeyCode.Backslash    => "\\  (Backslash)",
+                KeyCode.Slash        => "/  (Slash)",
+                KeyCode.Minus        => "-  (Minus)",
+                KeyCode.Equals       => "=  (Equals)",
+                KeyCode.LeftBracket  => "[  (Left Bracket)",
+                KeyCode.RightBracket => "]  (Right Bracket)",
+                KeyCode.Pause        => "Pause",
+                KeyCode.ScrollLock   => "ScrollLock",
                 >= KeyCode.Alpha0 and <= KeyCode.Alpha9
                     => ((int)key - (int)KeyCode.Alpha0).ToString(),
                 _ => key.ToString(),

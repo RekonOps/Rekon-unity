@@ -41,12 +41,23 @@ namespace GaoZombie.BugOneTouch
         private readonly MappedFileWriter _fileWriter;
 
         // ──────────────────────────────────────────────────────────────
+        // 내부 캐시 (지연 초기화)
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// CrashBundlesDir 캐시.
+        /// Application.persistentDataPath는 메인 스레드에서만 접근 가능하므로
+        /// 필드 초기화자 대신 처음 접근 시점에 초기화합니다.
+        /// </summary>
+        private static string _crashBundlesDir;
+
+        // ──────────────────────────────────────────────────────────────
         // 공개 프로퍼티
         // ──────────────────────────────────────────────────────────────
 
         /// <summary>크래시 번들 저장 루트 디렉토리 경로</summary>
         public static string CrashBundlesDir =>
-            Path.Combine(Application.persistentDataPath, "BugOneTouch", CrashBundlesDirName);
+            _crashBundlesDir ??= Path.Combine(Application.persistentDataPath, "BugOneTouch", CrashBundlesDirName);
 
         // ──────────────────────────────────────────────────────────────
         // 생성자

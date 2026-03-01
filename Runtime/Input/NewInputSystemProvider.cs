@@ -92,6 +92,40 @@ namespace GaoZombie.BugOneTouch
 
             return keyboard[inputKey].wasPressedThisFrame;
         }
+
+        /// <summary>
+        /// Ctrl(Windows) 또는 Cmd(Mac) 키가 현재 눌려있는지 반환합니다.
+        /// </summary>
+        public bool IsCtrlOrCmdHeld()
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard == null) return false;
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+            return keyboard.leftCommandKey.isPressed || keyboard.rightCommandKey.isPressed;
+#else
+            return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+#endif
+        }
+
+        /// <summary>
+        /// Shift 키가 현재 눌려있는지 반환합니다.
+        /// </summary>
+        public bool IsShiftHeld()
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard == null) return false;
+            return keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
+        }
+
+        /// <summary>
+        /// Alt(Windows) 또는 Option(Mac) 키가 현재 눌려있는지 반환합니다.
+        /// </summary>
+        public bool IsAltHeld()
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard == null) return false;
+            return keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed;
+        }
     }
 #else
     /// <summary>
@@ -101,6 +135,21 @@ namespace GaoZombie.BugOneTouch
     public class NewInputSystemProvider : IHotkeyProvider
     {
         public bool IsTriggered(KeyCode key)
+        {
+            return false;
+        }
+
+        public bool IsCtrlOrCmdHeld()
+        {
+            return false;
+        }
+
+        public bool IsShiftHeld()
+        {
+            return false;
+        }
+
+        public bool IsAltHeld()
         {
             return false;
         }

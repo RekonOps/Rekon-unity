@@ -221,12 +221,26 @@ namespace RekonOps.BugOneTouch.Editor
             SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
 
             EditorGUILayout.BeginHorizontal();
-            ctrlCmd.boolValue = EditorGUILayout.ToggleLeft(
+
+            // EditorGUI.PropertyField 방식으로 변경 사항이 SerializedObject를 통해 올바르게 추적되도록 수정
+            EditorGUI.BeginChangeCheck();
+            bool newCtrlCmd = EditorGUILayout.ToggleLeft(
                 isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(80));
-            shift.boolValue = EditorGUILayout.ToggleLeft(
+            if (EditorGUI.EndChangeCheck())
+                ctrlCmd.boolValue = newCtrlCmd;
+
+            EditorGUI.BeginChangeCheck();
+            bool newShift = EditorGUILayout.ToggleLeft(
                 isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(80));
-            alt.boolValue = EditorGUILayout.ToggleLeft(
+            if (EditorGUI.EndChangeCheck())
+                shift.boolValue = newShift;
+
+            EditorGUI.BeginChangeCheck();
+            bool newAlt = EditorGUILayout.ToggleLeft(
                 isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(80));
+            if (EditorGUI.EndChangeCheck())
+                alt.boolValue = newAlt;
+
             EditorGUILayout.EndHorizontal();
 
             // 메인 키 선택
@@ -245,7 +259,9 @@ namespace RekonOps.BugOneTouch.Editor
             if (ctrlCmd.boolValue) parts.Add(isMac ? "⌘" : "Ctrl");
             if (shift.boolValue)   parts.Add(isMac ? "⇧" : "Shift");
             if (alt.boolValue)     parts.Add(isMac ? "⌥" : "Alt");
-            parts.Add(((KeyCode)hotkey.enumValueIndex).ToString());
+            // enumValueIndex 대신 intValue를 사용해야 실제 KeyCode 정수값으로 올바르게 변환됨
+            // enumValueIndex는 enum 배열에서의 순서(0,1,2...)를 반환하므로 KeyCode 값과 다름
+            parts.Add(((KeyCode)hotkey.intValue).ToString());
 
             return string.Join(" + ", parts);
         }

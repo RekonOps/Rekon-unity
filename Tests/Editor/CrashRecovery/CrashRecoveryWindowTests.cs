@@ -250,18 +250,18 @@ namespace RekonOps.BugOneTouch.Tests
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public void DataIntegrity_Overall_OkWhenAllPresent()
+        public void DataIntegrity_Overall_CompleteWhenAllPresent()
         {
-            // CrashBundleWriter의 DetermineOverall과 동일한 로직 검증
+            // CrashBundleWriter의 DetermineOverall과 동일한 로직 검증 (PRD 스펙 AC-26: "ok" → "complete")
             var integrity = new DataIntegrity
             {
                 logs_ok = true,
                 state_ok = true,
                 video_ok = true,
-                overall = "ok",
+                overall = "complete",
             };
 
-            Assert.AreEqual("ok", integrity.overall, "모든 데이터가 있으면 overall은 'ok'여야 합니다.");
+            Assert.AreEqual("complete", integrity.overall, "모든 데이터가 있으면 overall은 'complete'여야 합니다.");
         }
 
         [Test]

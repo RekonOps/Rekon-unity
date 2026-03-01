@@ -144,15 +144,16 @@ namespace RekonOps.BugOneTouch.Tests
         }
 
         [UnityTest]
-        public IEnumerator BuildAsync_WithLogsAndState_IntegrityIsOkOrPartial()
+        public IEnumerator BuildAsync_WithLogsAndState_IntegrityIsCompleteOrPartial()
         {
             var task = _writer.BuildAsync();
             yield return new WaitUntil(() => task.IsCompleted);
 
             var overall = task.Result.data_integrity.overall;
             Assert.IsTrue(
-                overall == "ok" || overall == "partial",
-                $"플러시 데이터가 있을 때 overall은 'ok' 또는 'partial'이어야 합니다. 실제: {overall}");
+                overall == "complete" || overall == "partial",
+                // PRD 스펙 AC-26: "ok" 대신 "complete" 사용
+                $"플러시 데이터가 있을 때 overall은 'complete' 또는 'partial'이어야 합니다. 실제: {overall}");
         }
 
         [UnityTest]

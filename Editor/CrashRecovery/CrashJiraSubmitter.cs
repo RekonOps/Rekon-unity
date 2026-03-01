@@ -12,20 +12,29 @@ namespace RekonOps.BugOneTouch.Editor
     ///
     /// 기능:
     ///   - 크래시 번들 → Jira 이슈 자동 채움
-    ///   - 제목: "[Crash] {timestamp} - {exception_type}"
+    ///   - 제목: "[Crash] {crash_type}: {crash_message 첫 50자}" (AC-23)
     ///   - 설명: 크래시 로그 + 시스템 정보 + 재현 단계(빈 템플릿)
-    ///   - 제출 후 manifest.json의 jira_issue_key + registered_at 갱신
+    ///   - 제출 후 manifest.json의 jira_issue_key + registered_at + registered 갱신
     ///   - JiraSubmissionService 활용 (실제 API 호출은 Runtime 레이어로 위임)
+    ///   - auto-crash-report 레이블 자동 추가 (AC-23)
     ///
     /// 주의: Editor 전용. Runtime 환경에서는 사용 불가.
     /// </summary>
     public class CrashJiraSubmitter
     {
         // ──────────────────────────────────────────────────────────────
+        // 상수
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>크래시 번들 자동 제출 시 항상 추가되는 레이블 (AC-23)</summary>
+        private const string AutoCrashReportLabel = "auto-crash-report";
+
+        // ──────────────────────────────────────────────────────────────
         // 내부 상태
         // ──────────────────────────────────────────────────────────────
 
         private readonly MappedFileWriter _fileWriter;
+        private readonly JiraSubmissionService _submissionService;
 
         // ──────────────────────────────────────────────────────────────
         // 제출 결과 모델
@@ -51,9 +60,11 @@ namespace RekonOps.BugOneTouch.Editor
         /// <summary>
         /// CrashJiraSubmitter를 초기화합니다.
         /// </summary>
-        public CrashJiraSubmitter()
+        /// <param name="submissionService">실제 Jira API 호출에 사용할 서비스 (null이면 API 미연동 모드)</param>
+        public CrashJiraSubmitter(JiraSubmissionService submissionService = null)
         {
             _fileWriter = new MappedFileWriter();
+            _submissionService = submissionService;
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -63,11 +74,12 @@ namespace RekonOps.BugOneTouch.Editor
         /// <summary>
         /// 크래시 번들을 Jira 이슈로 제출합니다.
         ///
-        /// 주의: 이 메서드는 실제 Jira API 호출을 위해 JiraSubmissionService와
-        /// 인증 정보가 필요합니다. 현재 구현은 Editor에서 직접 설정 파일을 읽어
-        /// 제출 요청을 빌드하고, 제출 결과로 manifest를 갱신합니다.
+        /// JiraSubmissionService가 주입된 경우 실제 Jira API를 호출하여:
+        ///   1. JiraIssueCreator로 이슈 생성
+        ///   2. JiraAttachmentUploader로 크래시 번들 첨부파일 업로드
+        ///   3. 성공 시 manifest에 jira_issue_key + registered_at + registered=true 갱신
         ///
-        /// 실제 API 호출은 별도 JiraSubmissionService 주입이 필요합니다.
+        /// JiraSubmissionService가 없는 경우(null) 시뮬레이션 모드로 동작합니다.
         /// </summary>
         /// <param name="manifest">제출할 크래시 번들 매니페스트</param>
         /// <param name="projectKey">Jira 프로젝트 키</param>
@@ -86,7 +98,7 @@ namespace RekonOps.BugOneTouch.Editor
 
             try
             {
-                // 이슈 제목 생성
+                // 이슈 제목 생성 (AC-23: "[Crash] {crash_type}: {crash_message 첫 50자}" 형식)
                 string summary = BuildIssueSummary(manifest);
 
                 // 이슈 설명 생성
@@ -94,28 +106,32 @@ namespace RekonOps.BugOneTouch.Editor
 
                 Debug.Log($"[BugOneTouch] 크래시 Jira 제출 시작: {summary}");
 
-                // 실제 Jira API 호출
-                // 여기서는 JiraSubmissionService를 직접 호출하는 대신
-                // 설정을 로드하여 제출 요청을 빌드합니다.
-                //
-                // 전체 인증 파이프라인(OAuth → TokenRefreshManager → JiraApiClient)은
-                // Runtime에 구현되어 있으므로, Editor에서는 설정 파일로부터
-                // 토큰을 읽어 직접 API를 호출합니다.
-                //
-                // MVP 구현: 실제 API 호출 없이 manifest만 갱신하여 UI 흐름 검증
-                var simulatedIssueKey = await SimulateJiraSubmission(projectKey, summary, description, cancellationToken);
+                string issueKey;
 
-                if (!string.IsNullOrEmpty(simulatedIssueKey))
+                if (_submissionService != null)
                 {
-                    // manifest 갱신
-                    await UpdateManifestAsync(manifest, simulatedIssueKey);
+                    // 실제 Jira API 호출 (Critical 3 구현)
+                    issueKey = await SubmitViaServiceAsync(
+                        manifest, projectKey, summary, description, cancellationToken);
+                }
+                else
+                {
+                    // 시뮬레이션 모드 (JiraSubmissionService 미주입 시 폴백)
+                    Debug.LogWarning("[BugOneTouch] JiraSubmissionService가 주입되지 않아 시뮬레이션 모드로 동작합니다.");
+                    issueKey = await SimulateJiraSubmission(projectKey, summary, description, cancellationToken);
+                }
 
-                    Debug.Log($"[BugOneTouch] 크래시 Jira 제출 완료: {simulatedIssueKey}");
+                if (!string.IsNullOrEmpty(issueKey))
+                {
+                    // manifest 갱신 (jira_issue_key + registered_at + registered=true)
+                    await UpdateManifestAsync(manifest, issueKey);
+
+                    Debug.Log($"[BugOneTouch] 크래시 Jira 제출 완료: {issueKey}");
 
                     return new SubmitResult
                     {
                         Success = true,
-                        IssueKey = simulatedIssueKey,
+                        IssueKey = issueKey,
                     };
                 }
 
@@ -144,23 +160,129 @@ namespace RekonOps.BugOneTouch.Editor
             }
         }
 
+        /// <summary>
+        /// JiraSubmissionService를 통해 실제 Jira API로 크래시 이슈를 제출합니다.
+        ///   1. JiraIssueCreator로 이슈 생성
+        ///   2. 크래시 번들 첨부파일 업로드
+        /// </summary>
+        private async Task<string> SubmitViaServiceAsync(
+            CrashBundleManifest manifest,
+            string projectKey,
+            string summary,
+            string description,
+            CancellationToken cancellationToken)
+        {
+            // 크래시 번들 디렉토리에서 첨부파일 목록 수집
+            var attachments = CollectCrashBundleAttachments(manifest);
+
+            var submissionRequest = new JiraSubmissionService.SubmissionRequest
+            {
+                BundleId = manifest.id,
+                IssueRequest = new JiraIssueCreator.CreateIssueRequest
+                {
+                    ProjectKey = projectKey,
+                    IssueType  = "Bug",
+                    Summary    = summary,
+                    Description = description,
+                    // AC-23: auto-crash-report 레이블을 기본으로 추가
+                    AdditionalLabels = new[] { AutoCrashReportLabel },
+                    Priority   = "High",
+                },
+                Attachments = attachments,
+            };
+
+            var result = await _submissionService.SubmitAsync(submissionRequest, cancellationToken);
+
+            if (!result.Success)
+                throw new InvalidOperationException(result.ErrorMessage ?? "Jira 이슈 생성에 실패했습니다.");
+
+            if (result.IsPartialSuccess)
+                Debug.LogWarning($"[BugOneTouch] 크래시 Jira 제출 부분 성공: 이슈 {result.IssueKey} 생성됨, 일부 첨부파일 업로드 실패.");
+
+            return result.IssueKey;
+        }
+
+        /// <summary>
+        /// 크래시 번들 디렉토리에서 첨부파일 목록을 수집합니다.
+        /// </summary>
+        private static System.Collections.Generic.List<JiraAttachmentUploader.AttachmentItem> CollectCrashBundleAttachments(
+            CrashBundleManifest manifest)
+        {
+            var attachments = new System.Collections.Generic.List<JiraAttachmentUploader.AttachmentItem>();
+            string bundleDir = Path.Combine(CrashBundleWriter.CrashBundlesDir, manifest.id);
+
+            if (!Directory.Exists(bundleDir))
+                return attachments;
+
+            // 파일 첨부 (logs_flush.zip, state_flush.json, crash_info.json)
+            foreach (string filePath in Directory.GetFiles(bundleDir))
+            {
+                try
+                {
+                    var data = File.ReadAllBytes(filePath);
+                    var fileName = Path.GetFileName(filePath);
+                    attachments.Add(new JiraAttachmentUploader.AttachmentItem
+                    {
+                        FileName    = fileName,
+                        Data        = data,
+                        ContentType = GuessContentType(fileName),
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[BugOneTouch] 첨부파일 로드 실패 ({filePath}): {ex.Message}");
+                }
+            }
+
+            return attachments;
+        }
+
+        /// <summary>
+        /// 파일 확장자로 MIME 타입을 추측합니다.
+        /// </summary>
+        private static string GuessContentType(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return "application/octet-stream";
+
+            var ext = Path.GetExtension(fileName).ToLowerInvariant();
+            return ext switch
+            {
+                ".json" => "application/json",
+                ".zip"  => "application/zip",
+                ".log"  => "text/plain",
+                ".txt"  => "text/plain",
+                ".png"  => "image/png",
+                _       => "application/octet-stream",
+            };
+        }
+
         // ──────────────────────────────────────────────────────────────
         // 이슈 내용 빌드
         // ──────────────────────────────────────────────────────────────
 
         /// <summary>
         /// Jira 이슈 제목을 생성합니다.
-        /// 형식: "[Crash] {timestamp} - {exception_type}"
+        /// 형식: "[Crash] {crash_type}: {crash_message 첫 50자}" (AC-23)
         /// </summary>
         public static string BuildIssueSummary(CrashBundleManifest manifest)
         {
-            string exceptionType = !string.IsNullOrEmpty(manifest.exception_type)
+            // crash_type 결정: exception_type 우선, 없으면 crash_type 사용
+            string crashType = !string.IsNullOrEmpty(manifest.exception_type)
                 ? manifest.exception_type
                 : manifest.crash_type ?? "UnknownCrash";
 
-            string timestamp = FormatTimestampForTitle(manifest.created_at);
+            // crash_message 첫 50자 추출 (AC-23)
+            string crashMessage = manifest.exception_message ?? string.Empty;
+            if (crashMessage.Length > 50)
+                crashMessage = crashMessage.Substring(0, 50);
 
-            return $"[Crash] {timestamp} - {exceptionType}";
+            // 줄바꿈 문자를 공백으로 대체하여 제목에서 사용 가능하게 처리
+            crashMessage = crashMessage.Replace('\n', ' ').Replace('\r', ' ').Trim();
+
+            if (string.IsNullOrEmpty(crashMessage))
+                return $"[Crash] {crashType}";
+
+            return $"[Crash] {crashType}: {crashMessage}";
         }
 
         /// <summary>
@@ -232,12 +354,8 @@ namespace RekonOps.BugOneTouch.Editor
         // ──────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Jira 제출을 시뮬레이션합니다.
-        /// 실제 구현 시 JiraSubmissionService를 통해 API를 호출해야 합니다.
-        ///
-        /// 현재 구현은 Editor 환경에서 인증 파이프라인 없이도 UI 흐름을 검증할 수 있도록
-        /// 더미 이슈 키를 생성합니다.
-        /// 실제 배포 시 이 메서드를 JiraSubmissionService 호출로 교체해야 합니다.
+        /// Jira 제출을 시뮬레이션합니다 (JiraSubmissionService 미주입 시 폴백).
+        /// Editor 환경에서 인증 파이프라인 없이도 UI 흐름을 검증할 수 있도록 더미 이슈 키를 생성합니다.
         /// </summary>
         private static async Task<string> SimulateJiraSubmission(
             string projectKey,
@@ -248,21 +366,22 @@ namespace RekonOps.BugOneTouch.Editor
             // 실제 API 호출을 시뮬레이션 (네트워크 지연)
             await Task.Delay(500, cancellationToken);
 
-            // 더미 이슈 키 생성 (실제 구현에서는 Jira API 응답에서 받아야 함)
-            string issueNumber = DateTime.UtcNow.Ticks % 1000;
+            // 더미 이슈 키 생성 (실제 구현에서는 Jira API 응답에서 받음)
+            long issueNumber = DateTime.UtcNow.Ticks % 1000;
             return $"{projectKey}-{issueNumber}";
         }
 
         /// <summary>
         /// 크래시 번들 manifest.json을 갱신합니다.
-        /// jira_issue_key와 registered_at 필드를 업데이트합니다.
+        /// jira_issue_key, registered_at, registered 필드를 업데이트합니다 (AC-20/24).
         /// </summary>
         private async Task UpdateManifestAsync(CrashBundleManifest manifest, string issueKey)
         {
             manifest.jira_issue_key = issueKey;
-            manifest.registered_at = DateTime.UtcNow.ToString("O");
+            manifest.registered_at  = DateTime.UtcNow.ToString("O");
+            manifest.registered     = true; // Jira 등록 완료 표시 (AC-20/24)
 
-            string bundleDir = Path.Combine(CrashBundleWriter.CrashBundlesDir, manifest.id);
+            string bundleDir    = Path.Combine(CrashBundleWriter.CrashBundlesDir, manifest.id);
             string manifestPath = Path.Combine(bundleDir, "manifest.json");
 
             if (!Directory.Exists(bundleDir))
@@ -275,7 +394,7 @@ namespace RekonOps.BugOneTouch.Editor
             bool ok = await _fileWriter.WriteTextAsync(manifestPath, json);
 
             if (ok)
-                Debug.Log($"[BugOneTouch] 크래시 번들 manifest 갱신 완료: {manifest.id} → {issueKey}");
+                Debug.Log($"[BugOneTouch] 크래시 번들 manifest 갱신 완료: {manifest.id} → {issueKey} (registered=true)");
             else
                 Debug.LogWarning($"[BugOneTouch] 크래시 번들 manifest 갱신 실패: {manifest.id}");
         }

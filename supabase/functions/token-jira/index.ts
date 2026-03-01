@@ -71,11 +71,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         const db = getServiceClient();
 
-        // oauth_connections 조회
+        // oauth_connections 조회 (refresh_token 컬럼 포함)
         const { data: connection, error: connError } = await db
-            .schema("private")
             .from("oauth_connections")
-            .select("id, cloud_id, refreshing_at, status")
+            .select("id, cloud_id, refreshing_at, status, refresh_token")
             .eq("user_id", user_id)
             .eq("tenant_id", tenant_id)
             .eq("provider", "jira")
@@ -108,7 +107,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         // refreshing_at 락 설정
         const { error: lockError } = await db
-            .schema("private")
             .from("oauth_connections")
             .update({ refreshing_at: new Date().toISOString() })
             .eq("id", connection.id);
@@ -119,16 +117,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
 
         try {
-            // Vault에서 refresh_token 조회
-            const { data: refreshToken, error: vaultError } = await db.rpc("get_refresh_token", {
-                p_tenant_id: tenant_id,
-                p_user_id: user_id,
-            }, { schema: "private" });
+            // oauth_connections 테이블에서 refresh_token 직접 조회
+            // Vault pgsodium 권한 문제로 인해 DB 컬럼에서 직접 읽기 (MVP)
+            const refreshToken = connection.refresh_token;
 
-            if (vaultError || !refreshToken) {
-                safeLog("error", "Vault에서 refresh_token 조회 실패", {
-                    error: vaultError?.message,
-                    has_token: !!refreshToken,
+            if (!refreshToken) {
+                safeLog("error", "oauth_connections에서 refresh_token 조회 실패", {
+                    connection_id: connection.id,
+                    has_token: false,
                 });
                 throw new AppError(500, "Failed to retrieve refresh token");
             }
@@ -155,7 +151,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
                 // refresh_token이 만료된 경우 연결 상태를 error로 변경
                 if (tokenResponse.status === 400 || tokenResponse.status === 401) {
                     await db
-                        .schema("private")
                         .from("oauth_connections")
                         .update({ status: "error", refreshing_at: null })
                         .eq("id", connection.id);
@@ -167,25 +162,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
             const newTokens: AtlassianTokenResponse = await tokenResponse.json();
 
-            // 회전 refresh token 처리: 새 refresh_token이 있으면 Vault 원자적 갱신
+            // 회전 refresh token 처리: 새 refresh_token이 있으면 DB 직접 업데이트
+            // Vault pgsodium 권한 문제로 인해 oauth_connections 테이블에 직접 저장 (MVP)
             if (newTokens.refresh_token) {
-                safeLog("info", "refresh_token 로테이션 감지, Vault 갱신", { tenant_id });
+                safeLog("info", "refresh_token 로테이션 감지, DB 갱신", { tenant_id });
 
-                const { error: updateVaultError } = await db.rpc("store_refresh_token", {
-                    p_tenant_id: tenant_id,
-                    p_user_id: user_id,
-                    p_token: newTokens.refresh_token,
-                }, { schema: "private" });
+                const { error: updateTokenError } = await db
+                    .from("oauth_connections")
+                    .update({ refresh_token: newTokens.refresh_token })
+                    .eq("id", connection.id);
 
-                if (updateVaultError) {
-                    // Vault 갱신 실패는 로그만 남기고 access_token은 반환 (다음 갱신 시 재시도)
-                    safeLog("error", "회전 refresh_token Vault 갱신 실패", { error: updateVaultError.message });
+                if (updateTokenError) {
+                    // DB 갱신 실패는 로그만 남기고 access_token은 반환 (다음 갱신 시 재시도)
+                    safeLog("error", "회전 refresh_token DB 갱신 실패", { error: updateTokenError.message });
                 }
             }
 
             // refreshing_at 락 해제
             await db
-                .schema("private")
                 .from("oauth_connections")
                 .update({ refreshing_at: null })
                 .eq("id", connection.id);
@@ -206,7 +200,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
             // 예외 발생 시 락 해제 보장
             try {
                 await db
-                    .schema("private")
                     .from("oauth_connections")
                     .update({ refreshing_at: null })
                     .eq("id", connection.id);

@@ -57,7 +57,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
         // 연결 상태 조회
         const { data: connection, error: queryError } = await db
-            .schema("private")
             .from("oauth_connections")
             .select("id, user_id, tenant_id, status")
             .eq("id", connectId)

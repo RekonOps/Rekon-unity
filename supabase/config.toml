@@ -1,0 +1,17 @@
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "private"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"

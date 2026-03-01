@@ -176,9 +176,7 @@ namespace RekonOps.BugOneTouch.Editor
             EditorGUILayout.Space(4f);
 
             // 캡처 핫키
-            DrawSectionHeader("캡처 핫키");
-            SerializedProperty hotkey = _serializedSettings.FindProperty("captureHotkey");
-            EditorGUILayout.PropertyField(hotkey, new GUIContent("캡처 핫키", "버그 캡처를 트리거하는 키"));
+            DrawHotkeySection();
 
             EditorGUILayout.Space(8f);
 
@@ -204,6 +202,52 @@ namespace RekonOps.BugOneTouch.Editor
             EditorGUILayout.PropertyField(
                 maskingRulesPath,
                 new GUIContent("마스킹 규칙 경로", "민감 정보 마스킹 규칙 JSON 파일 경로 (비워두면 기본 규칙 사용)"));
+        }
+
+        private void DrawHotkeySection()
+        {
+            DrawSectionHeader("캡처 핫키");
+
+            bool isMac = Application.platform == RuntimePlatform.OSXEditor;
+
+            // 현재 조합 미리보기 표시
+            string preview = BuildHotkeyPreview(isMac);
+            EditorGUILayout.HelpBox($"현재 단축키: {preview}", MessageType.Info);
+
+            // 수식키 토글 (플랫폼별 레이블)
+            SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
+            SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
+            SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
+            SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
+
+            EditorGUILayout.BeginHorizontal();
+            ctrlCmd.boolValue = EditorGUILayout.ToggleLeft(
+                isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(80));
+            shift.boolValue = EditorGUILayout.ToggleLeft(
+                isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(80));
+            alt.boolValue = EditorGUILayout.ToggleLeft(
+                isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(80));
+            EditorGUILayout.EndHorizontal();
+
+            // 메인 키 선택
+            EditorGUILayout.PropertyField(hotkey, new GUIContent("메인 키", "버그 캡처를 트리거하는 기본 키"));
+        }
+
+        private string BuildHotkeyPreview(bool isMac)
+        {
+            SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
+            SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
+            SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
+            SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
+
+            var parts = new System.Collections.Generic.List<string>();
+
+            if (ctrlCmd.boolValue) parts.Add(isMac ? "⌘" : "Ctrl");
+            if (shift.boolValue)   parts.Add(isMac ? "⇧" : "Shift");
+            if (alt.boolValue)     parts.Add(isMac ? "⌥" : "Alt");
+            parts.Add(((KeyCode)hotkey.enumValueIndex).ToString());
+
+            return string.Join(" + ", parts);
         }
 
         // ─── Video 탭 ─────────────────────────────────────────────────────────────

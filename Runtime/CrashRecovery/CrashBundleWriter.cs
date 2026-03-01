@@ -258,6 +258,7 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>
         /// 전체 무결성 상태를 결정합니다.
+        /// PRD 스펙에 따라 "complete" / "partial" / "missing" 값을 반환합니다.
         /// </summary>
         private static string DetermineOverall(DataIntegrity integrity)
         {
@@ -265,7 +266,7 @@ namespace GaoZombie.BugOneTouch
             bool allOk = integrity.logs_ok && integrity.state_ok; // 영상은 선택사항
 
             if (allOk)
-                return "ok";
+                return "complete"; // PRD 스펙: "ok" 대신 "complete" 사용 (AC-26)
             if (anyOk)
                 return "partial";
             return "missing";
@@ -425,8 +426,8 @@ namespace GaoZombie.BugOneTouch
         public bool video_ok;
 
         /// <summary>
-        /// 전체 무결성 상태.
-        /// "ok": 필수 데이터 모두 정상
+        /// 전체 무결성 상태 (PRD 스펙 AC-26).
+        /// "complete": 필수 데이터 모두 정상
         /// "partial": 일부만 존재
         /// "missing": 유효한 데이터 없음
         /// </summary>
@@ -475,6 +476,12 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>Jira 등록 완료 시각 (미등록 시 null)</summary>
         public string registered_at;
+
+        /// <summary>
+        /// Jira 등록 완료 여부 (AC-20/24).
+        /// 초기값 false, Jira 제출 성공 시 true로 갱신됩니다.
+        /// </summary>
+        public bool registered = false;
     }
 
     /// <summary>

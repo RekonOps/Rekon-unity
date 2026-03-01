@@ -1,0 +1,94 @@
+# ============================================================
+# Unity 빌드 / 캐시
+# ============================================================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# MemoryCaptures can get excessive in size.
+# They also could contain extremely sensitive data
+[Mm]emory[Cc]aptures/
+
+# Recordings can get excessive in size
+[Rr]ecordings/
+
+# Crashlytics generated file
+Assets/StreamingAssets/aa.meta
+Assets/StreamingAssets/aa/
+
+# Asset meta data should only be ignored when the corresponding asset is also ignored
+!/[Aa]ssets/**/*.meta
+
+# ============================================================
+# IDE
+# ============================================================
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.unityproj
+*.booproj
+
+# Visual Studio cache directory
+.vs/
+
+# Gradle cache directory
+.gradle/
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# Supabase / 환경 변수
+# ============================================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+supabase/.branches
+supabase/.temp
+
+# ============================================================
+# 기타
+# ============================================================
+*.pidb.meta
+*.pdb.meta
+sysinfo.txt
+
+# Unity3D generated meta files
+*.meta
+
+# Unity3D Generated File On Crash Reports
+sysinfo.txt
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics generated file
+crashlytics-build.properties
+
+# Packed Addressables
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+
+# Temporary auto-generated Android Assets
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*

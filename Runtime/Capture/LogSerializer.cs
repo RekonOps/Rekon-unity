@@ -92,7 +92,7 @@ namespace RekonOps.BugOneTouch
                 {
                     using var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None);
                     using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create, leaveOpen: false);
-                    var entry = archive.CreateEntry(EntryFileName, CompressionLevel.Optimal);
+                    var entry = archive.CreateEntry(EntryFileName, System.IO.Compression.CompressionLevel.Optimal);
 
                     using var entryStream = entry.Open();
                     entryStream.Write(textBytes, 0, textBytes.Length);

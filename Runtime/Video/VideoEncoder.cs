@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -21,13 +22,20 @@ namespace GaoZombie.BugOneTouch
     /// </summary>
     public class VideoEncoder : IVideoEncoder
     {
+        /// <summary>출력 파일 확장자. 디렉토리 출력이므로 빈 문자열.</summary>
+        public string OutputExtension => "";
+
+        /// <summary>인코딩 시 권장 타임아웃 (초)</summary>
+        public float RecommendedTimeoutSeconds => 5f;
+
         /// <summary>
         /// 프레임 배열을 PNG 시퀀스로 비동기 저장합니다.
         /// </summary>
         /// <param name="frames">인코딩할 프레임 배열 (시간순)</param>
         /// <param name="outputPath">출력 디렉토리 경로</param>
         /// <param name="config">인코딩 설정</param>
-        public async Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config)
+        /// <param name="cancellationToken">취소 토큰 (현재 사용되지 않음)</param>
+        public async Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(outputPath))
                 throw new ArgumentNullException(nameof(outputPath));

@@ -123,9 +123,21 @@ namespace GaoZombie.BugOneTouch
                 });
             }
 
-            // 영상 세그먼트 (디렉토리)
-            if (!string.IsNullOrEmpty(result.VideoPath) && Directory.Exists(result.VideoPath))
+            // 영상 (MP4 단일 파일 또는 raw 프레임 디렉토리)
+            if (!string.IsNullOrEmpty(result.VideoPath) && File.Exists(result.VideoPath))
             {
+                // MP4 단일 파일
+                artifacts.Add(new BundleArtifact
+                {
+                    type        = BundleArtifactType.Video,
+                    file_name   = Path.GetFileName(result.VideoPath),
+                    size_bytes  = new FileInfo(result.VideoPath).Length,
+                    sha256_hash = string.Empty, // BundleWriter에서 채움
+                });
+            }
+            else if (!string.IsNullOrEmpty(result.VideoPath) && Directory.Exists(result.VideoPath))
+            {
+                // raw 프레임 디렉토리
                 long dirSize = CalculateDirectorySize(result.VideoPath);
                 artifacts.Add(new BundleArtifact
                 {

@@ -1,5 +1,6 @@
 using System;
-using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -96,6 +97,16 @@ namespace GaoZombie.BugOneTouch.Editor
         // JiraConnectionPanel은 Jira 탭에서 사용
         private JiraConnectionPanel _jiraPanel;
 
+        // JiraMetadataService - 프로젝트/이슈타입/필드 동적 조회
+        private JiraMetadataService _metadataService;
+        private bool _isLoadingProjects;
+        private bool _isLoadingIssueTypes;
+        private bool _isLoadingFields;
+        private string _metadataError = "";
+
+        private bool _isLoadingSpecialFields;   // myself/assignee/sprint/epic 로딩 상태
+        private bool _showHiddenFields;          // 숨겨진 필드 foldout 상태
+
         // 스크롤 포지션 (각 탭별)
         private Vector2 _scrollPos;
 
@@ -119,6 +130,38 @@ namespace GaoZombie.BugOneTouch.Editor
             // JiraConnectionPanel 초기화
             _jiraPanel = new JiraConnectionPanel();
             _jiraPanel.Initialize(_settings);
+
+            // JiraMetadataService 초기화
+            InitializeMetadataService();
+        }
+
+        /// <summary>
+        /// JiraMetadataService를 초기화합니다.
+        /// _settings가 null이 아닌 시점에서 호출해야 합니다.
+        /// authBrokerUrl이 비어 있을 경우 폴백 URL을 사용합니다.
+        /// </summary>
+        private void InitializeMetadataService()
+        {
+            if (_settings == null) return;
+
+            try
+            {
+                string brokerUrl = string.IsNullOrEmpty(_settings.authBrokerUrl)
+                    ? "http://localhost"
+                    : _settings.authBrokerUrl;
+
+                var tokenStore = new SessionTokenStore();
+                var reAuthHandler = new ReAuthHandler(tokenStore);
+                var brokerClient = new AuthBrokerClient(brokerUrl, tokenStore);
+                var tokenManager = new TokenRefreshManager(brokerClient, tokenStore, reAuthHandler);
+                var apiClient = new JiraApiClient(tokenManager);
+                _metadataService = new JiraMetadataService(apiClient);
+            }
+            catch (Exception ex)
+            {
+                _metadataError = $"메타데이터 서비스 초기화 실패: {ex.Message}";
+                Debug.LogWarning($"[BugOneTouch] JiraMetadataService 초기화 실패: {ex.Message}");
+            }
         }
 
         private void OnDisable()
@@ -295,8 +338,10 @@ namespace GaoZombie.BugOneTouch.Editor
             EditorGUILayout.EndHorizontal();
 
             // 메인 키 선택 (플랫폼별 추천 키 드롭다운)
-            KeyCode[] keyList     = isMac ? s_MacKeys : s_WindowsKeys;
-            string[]  displayNames = keyList.Select(k => GetKeyDisplayName(k)).ToArray();
+            KeyCode[] keyList = isMac ? s_MacKeys : s_WindowsKeys;
+            string[] displayNames = new string[keyList.Length];
+            for (int ki = 0; ki < keyList.Length; ki++)
+                displayNames[ki] = GetKeyDisplayName(keyList[ki]);
 
             int currentIndex = Array.IndexOf(keyList, (KeyCode)hotkey.intValue);
             // 목록에 없는 키(이전 설정값 등)면 첫 번째 항목으로 대체
@@ -408,6 +453,55 @@ namespace GaoZombie.BugOneTouch.Editor
                     2f, 20f,
                     new GUIContent("비트레이트 (Mbps)", "목표 영상 비트레이트 (2~20Mbps)"));
             }
+
+            EditorGUILayout.Space(12f);
+
+            // FFmpeg 설치 상태 섹션
+            DrawFfmpegStatusSection();
+        }
+
+        // ─── FFmpeg 상태 섹션 ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// FFmpeg 설치 상태를 표시하는 UI 섹션을 그립니다.
+        /// FfmpegHelper API를 통해 설치 여부와 버전 정보를 확인합니다.
+        /// </summary>
+        private void DrawFfmpegStatusSection()
+        {
+            DrawSectionHeader("FFmpeg 상태");
+
+            bool isInstalled = FfmpegHelper.IsInstalled();
+
+            if (isInstalled)
+            {
+                string versionInfo = FfmpegHelper.GetVersionInfo();
+                EditorGUILayout.LabelField("상태", $"✓ 설치됨 ({versionInfo})");
+            }
+            else
+            {
+                EditorGUILayout.LabelField("상태", "✗ 미설치");
+
+                EditorGUILayout.Space(4f);
+
+                EditorGUILayout.HelpBox(
+                    "FFmpeg가 없어도 플러그인은 정상 동작합니다.\n" +
+                    "단, 영상 녹화가 MP4 대신 raw 프레임으로 저장됩니다.",
+                    MessageType.Info);
+
+                EditorGUILayout.Space(4f);
+
+                EditorGUILayout.LabelField("설치 방법", EditorStyles.boldLabel);
+                EditorGUILayout.SelectableLabel("macOS:   brew install ffmpeg", EditorStyles.helpBox, GUILayout.Height(18f));
+                EditorGUILayout.SelectableLabel("Windows: choco install ffmpeg", EditorStyles.helpBox, GUILayout.Height(18f));
+                EditorGUILayout.SelectableLabel("또는     https://ffmpeg.org/download.html", EditorStyles.helpBox, GUILayout.Height(18f));
+            }
+
+            EditorGUILayout.Space(4f);
+
+            if (GUILayout.Button("다시 확인", GUILayout.Width(80f)))
+            {
+                FfmpegHelper.ClearCache();
+            }
         }
 
         // ─── Crash Recovery 탭 ────────────────────────────────────────────────────
@@ -508,21 +602,667 @@ namespace GaoZombie.BugOneTouch.Editor
 
         private void DrawJiraTab()
         {
-            EditorGUILayout.LabelField("Jira 연결 설정", EditorStyles.boldLabel);
-            EditorGUILayout.Space(4f);
-
-            // JiraConnectionPanel이 Jira 탭 전체를 렌더링
+            // 1. 기존 JiraConnectionPanel (유지)
             _jiraPanel?.OnGUI();
-
             EditorGUILayout.Space(8f);
 
-            // 기본 라벨 설정
-            DrawSectionHeader("기본 라벨");
-            SerializedProperty defaultLabels = _serializedSettings.FindProperty("defaultLabels");
-            EditorGUILayout.PropertyField(
-                defaultLabels,
-                new GUIContent("기본 Jira 라벨", "이슈 생성 시 자동으로 추가되는 라벨 목록"),
-                includeChildren: true);
+            // 2. 프로젝트 설정
+            DrawSectionHeader("프로젝트 설정");
+            DrawProjectSelector();
+            EditorGUILayout.Space(4f);
+            DrawIssueTypeSelector();
+            EditorGUILayout.Space(8f);
+
+            // 3. 필드 기본값 설정 (필드가 로드된 경우만)
+            if (_settings.cachedFieldIds != null && _settings.cachedFieldIds.Length > 0)
+            {
+                DrawSectionHeader("필드 기본값 설정");
+                EditorGUILayout.HelpBox(
+                    "* 표시는 필수 필드입니다. summary와 description은 버그 리포트 폼에서 입력합니다.\n[H] 버튼으로 불필요한 필드를 숨길 수 있습니다.",
+                    MessageType.Info);
+                DrawFieldDefaults(true);   // 필수 필드
+                EditorGUILayout.Space(4f);
+                DrawFieldDefaults(false);  // 선택 필드 (숨기지 않은 것만)
+                EditorGUILayout.Space(8f);
+
+                // 숨겨진 필드 Foldout
+                DrawHiddenFieldsFoldout();
+            }
+
+            // 4. 에러 메시지
+            if (!string.IsNullOrEmpty(_metadataError))
+                EditorGUILayout.HelpBox(_metadataError, MessageType.Error);
+
+            // "기본 라벨" 섹션 제거됨 — labels 필드 안으로 통합
+        }
+
+        // ─── 프로젝트 선택 ────────────────────────────────────────────────────────
+
+        private void DrawProjectSelector()
+        {
+            EditorGUILayout.BeginHorizontal();
+
+            // 조회 버튼
+            bool hasProjects = _settings.cachedProjectKeys?.Length > 0;
+            string btnLabel = _isLoadingProjects ? "조회 중..." : (hasProjects ? "새로고침" : "프로젝트 조회");
+
+            using (new EditorGUI.DisabledScope(_isLoadingProjects))
+            {
+                if (GUILayout.Button(btnLabel, GUILayout.Width(120f)))
+                {
+                    _metadataError = "";
+                    FetchProjects();
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            // 드롭다운 (캐시가 있을 때)
+            if (hasProjects)
+            {
+                // "PROJ - My Project" 형태
+                string[] displayNames = new string[_settings.cachedProjectKeys.Length];
+                for (int i = 0; i < displayNames.Length; i++)
+                    displayNames[i] = $"{_settings.cachedProjectKeys[i]} - {_settings.cachedProjectNames[i]}";
+
+                int currentIndex = Array.IndexOf(_settings.cachedProjectKeys, _settings.jiraProjectKey);
+                if (currentIndex < 0) currentIndex = 0;
+
+                EditorGUI.BeginChangeCheck();
+                int newIndex = EditorGUILayout.Popup(
+                    new GUIContent("프로젝트"), currentIndex, displayNames);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _settings.jiraProjectKey = _settings.cachedProjectKeys[newIndex];
+                    EditorUtility.SetDirty(_settings);
+                    // 프로젝트 변경 → 이슈타입 새로 조회
+                    FetchIssueTypes(_settings.cachedProjectKeys[newIndex]);
+                    // 프로젝트 변경 → 특수 필드 새로 조회
+                    FetchSpecialFields(_settings.cachedProjectKeys[newIndex]);
+                }
+            }
+            else if (!_isLoadingProjects)
+            {
+                // 캐시 없으면 수동 입력 폴백
+                var projectKeyProp = _serializedSettings.FindProperty("jiraProjectKey");
+                EditorGUILayout.PropertyField(projectKeyProp, new GUIContent("프로젝트 키 (직접 입력)"));
+            }
+        }
+
+        // ─── 이슈 타입 선택 ───────────────────────────────────────────────────────
+
+        private void DrawIssueTypeSelector()
+        {
+            if (_settings.cachedIssueTypeNames?.Length > 0)
+            {
+                int currentIndex = Array.IndexOf(_settings.cachedIssueTypeNames, _settings.jiraDefaultIssueType);
+                if (currentIndex < 0)
+                {
+                    // "Bug" 디폴트 찾기
+                    currentIndex = Array.IndexOf(_settings.cachedIssueTypeNames, "Bug");
+                    if (currentIndex < 0) currentIndex = 0;
+                }
+
+                string loadingText = _isLoadingIssueTypes ? " (로딩 중...)" : "";
+                EditorGUI.BeginChangeCheck();
+                int newIndex = EditorGUILayout.Popup(
+                    new GUIContent("기본 이슈 타입" + loadingText),
+                    currentIndex, _settings.cachedIssueTypeNames);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _settings.jiraDefaultIssueType = _settings.cachedIssueTypeNames[newIndex];
+                    if (newIndex < _settings.cachedIssueTypeIds.Length)
+                        _settings.jiraSelectedIssueTypeId = _settings.cachedIssueTypeIds[newIndex];
+                    EditorUtility.SetDirty(_settings);
+                    // 이슈타입 변경 → 필드 새로 조회
+                    FetchFields(_settings.jiraProjectKey, _settings.jiraSelectedIssueTypeId);
+                }
+            }
+            else
+            {
+                // 폴백: 하드코딩
+                var issueTypeProp = _serializedSettings.FindProperty("jiraDefaultIssueType");
+                string[] fallbackTypes = { "Bug", "Task", "Story", "Epic", "Sub-task" };
+                int currentIndex = Array.IndexOf(fallbackTypes, issueTypeProp.stringValue);
+                if (currentIndex < 0) currentIndex = 0;
+                int newIndex = EditorGUILayout.Popup(new GUIContent("기본 이슈 타입"), currentIndex, fallbackTypes);
+                if (newIndex != currentIndex)
+                {
+                    issueTypeProp.stringValue = fallbackTypes[newIndex];
+                    _serializedSettings.ApplyModifiedProperties();
+                }
+            }
+        }
+
+        // ─── 필드 기본값 ──────────────────────────────────────────────────────────
+
+        private void DrawFieldDefaults(bool requiredOnly)
+        {
+            string groupLabel = requiredOnly ? "필수 필드" : "선택 필드";
+
+            bool hasFields = false;
+            for (int i = 0; i < _settings.cachedFieldIds.Length; i++)
+            {
+                if (_settings.cachedFieldRequired[i] != requiredOnly) continue;
+                string fid = _settings.cachedFieldIds[i];
+                if (fid == "summary" || fid == "description" || fid == "issuetype" || fid == "project") continue;
+                // 선택 필드에서 숨긴 필드는 건너뜀
+                if (!requiredOnly && _settings.IsFieldHidden(fid)) continue;
+                hasFields = true;
+                break;
+            }
+            if (!hasFields) return;
+
+            EditorGUILayout.LabelField(groupLabel, EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
+
+            for (int i = 0; i < _settings.cachedFieldIds.Length; i++)
+            {
+                if (_settings.cachedFieldRequired[i] != requiredOnly) continue;
+
+                string fieldId   = _settings.cachedFieldIds[i];
+                string fieldName = _settings.cachedFieldNames[i];
+
+                if (fieldId == "summary" || fieldId == "description" || fieldId == "issuetype" || fieldId == "project") continue;
+                // 선택 필드에서 숨긴 필드는 건너뜀
+                if (!requiredOnly && _settings.IsFieldHidden(fieldId)) continue;
+
+                string labelText = requiredOnly ? $"{fieldName} *" : fieldName;
+
+                // labels 필드는 PropertyField로 별도 표시 (horizontal 바깥)
+                if (fieldId == "labels")
+                {
+                    if (!requiredOnly)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        if (GUILayout.Button("H", EditorStyles.miniButton, GUILayout.Width(20f)))
+                        {
+                            _settings.ToggleFieldHidden(fieldId);
+                            EditorUtility.SetDirty(_settings);
+                        }
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    SerializedProperty defaultLabels = _serializedSettings.FindProperty("defaultLabels");
+                    EditorGUILayout.PropertyField(defaultLabels,
+                        new GUIContent(labelText, "이슈 생성 시 추가되는 라벨 목록"),
+                        includeChildren: true);
+                    continue;
+                }
+
+                EditorGUILayout.BeginHorizontal();
+
+                // 선택 필드만 숨김 버튼 표시
+                if (!requiredOnly)
+                {
+                    if (GUILayout.Button("H", EditorStyles.miniButton, GUILayout.Width(20f)))
+                    {
+                        _settings.ToggleFieldHidden(fieldId);
+                        EditorUtility.SetDirty(_settings);
+                    }
+                }
+
+                // 특수 필드별 커스텀 UI
+                DrawFieldUI(fieldId, labelText);
+
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        // ─── 필드 UI ──────────────────────────────────────────────────────────────
+
+        private void DrawFieldUI(string fieldId, string labelText)
+        {
+            switch (fieldId)
+            {
+                case "reporter":
+                    // 현재 계정 자동 표시 (읽기전용)
+                    string reporterName = string.IsNullOrEmpty(_settings.currentUserDisplayName)
+                        ? "(조회 필요)" : _settings.currentUserDisplayName;
+                    EditorGUI.BeginDisabledGroup(true);
+                    EditorGUILayout.TextField(new GUIContent(labelText), reporterName);
+                    EditorGUI.EndDisabledGroup();
+                    break;
+
+                case "assignee":
+                    DrawCachedDropdown(labelText, fieldId,
+                        _settings.cachedAssigneeIds, _settings.cachedAssigneeNames);
+                    break;
+
+                case "customfield_10020": // Sprint (일반적인 Sprint 필드 ID)
+                case "sprint":
+                    DrawCachedDropdown(labelText, fieldId,
+                        _settings.cachedSprintIds, _settings.cachedSprintNames);
+                    break;
+
+                case "parent":
+                    DrawCachedDropdown(labelText, fieldId,
+                        _settings.cachedEpicKeys, _settings.cachedEpicNames);
+                    break;
+
+                case "issuelinks":
+                    DrawCachedDropdown(labelText, fieldId,
+                        _settings.cachedIssueKeys, _settings.cachedIssueNames);
+                    break;
+
+                default:
+                    // allowedValues가 있으면 드롭다운, 없으면 텍스트
+                    string[] allowed   = _settings.GetFieldAllowedValues(fieldId);
+                    string   currentVal = _settings.GetFieldDefault(fieldId);
+
+                    if (allowed.Length > 0)
+                    {
+                        int currentIdx = Array.IndexOf(allowed, currentVal);
+                        if (currentIdx < 0) currentIdx = 0;
+                        EditorGUI.BeginChangeCheck();
+                        int newIdx = EditorGUILayout.Popup(new GUIContent(labelText), currentIdx, allowed);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            _settings.SetFieldDefault(fieldId, allowed[newIdx]);
+                            EditorUtility.SetDirty(_settings);
+                        }
+                    }
+                    else
+                    {
+                        EditorGUI.BeginChangeCheck();
+                        string newVal = EditorGUILayout.TextField(new GUIContent(labelText), currentVal);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            _settings.SetFieldDefault(fieldId, newVal);
+                            EditorUtility.SetDirty(_settings);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // ─── 캐시 드롭다운 헬퍼 ──────────────────────────────────────────────────
+
+        private void DrawCachedDropdown(string label, string fieldId, string[] ids, string[] names)
+        {
+            if (names == null || names.Length == 0)
+            {
+                EditorGUILayout.TextField(new GUIContent(label), _settings.GetFieldDefault(fieldId));
+                return;
+            }
+
+            // "(없음)" 옵션 추가
+            string[] displayNames = new string[names.Length + 1];
+            displayNames[0] = "(없음)";
+            for (int i = 0; i < names.Length; i++)
+                displayNames[i + 1] = names[i];
+
+            string currentVal = _settings.GetFieldDefault(fieldId);
+            int currentIdx = 0;
+            if (!string.IsNullOrEmpty(currentVal) && ids != null)
+            {
+                int found = Array.IndexOf(ids, currentVal);
+                if (found >= 0) currentIdx = found + 1;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int newIdx = EditorGUILayout.Popup(new GUIContent(label), currentIdx, displayNames);
+            if (EditorGUI.EndChangeCheck())
+            {
+                string newVal = newIdx == 0 ? "" : (ids != null && newIdx - 1 < ids.Length ? ids[newIdx - 1] : "");
+                _settings.SetFieldDefault(fieldId, newVal);
+                EditorUtility.SetDirty(_settings);
+            }
+        }
+
+        // ─── 숨겨진 필드 Foldout ─────────────────────────────────────────────────
+
+        private void DrawHiddenFieldsFoldout()
+        {
+            int hiddenCount = _settings.hiddenFieldIds?.Length ?? 0;
+            if (hiddenCount == 0) return;
+
+            _showHiddenFields = EditorGUILayout.Foldout(_showHiddenFields,
+                $"숨겨진 필드 ({hiddenCount}개)", true);
+
+            if (!_showHiddenFields) return;
+
+            EditorGUI.indentLevel++;
+            for (int h = 0; h < _settings.hiddenFieldIds.Length; h++)
+            {
+                string hiddenId   = _settings.hiddenFieldIds[h];
+                // cachedFieldNames에서 이름 찾기
+                string hiddenName = hiddenId;
+                for (int i = 0; i < _settings.cachedFieldIds.Length; i++)
+                {
+                    if (_settings.cachedFieldIds[i] == hiddenId)
+                    {
+                        hiddenName = _settings.cachedFieldNames[i];
+                        break;
+                    }
+                }
+
+                EditorGUILayout.BeginHorizontal();
+                // 표시(Show) 버튼
+                if (GUILayout.Button("S", EditorStyles.miniButton, GUILayout.Width(20f)))
+                {
+                    _settings.ToggleFieldHidden(hiddenId);
+                    EditorUtility.SetDirty(_settings);
+                }
+                EditorGUILayout.LabelField(hiddenName, EditorStyles.miniLabel);
+                EditorGUILayout.EndHorizontal();
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        // ─── 비동기 메타데이터 조회 ───────────────────────────────────────────────
+
+        private void FetchProjects()
+        {
+            if (_metadataService == null || _isLoadingProjects) return;
+            _isLoadingProjects = true;
+            _ = FetchProjectsAsync();
+        }
+
+        private async Task FetchProjectsAsync()
+        {
+            try
+            {
+                var projects = await _metadataService.GetProjectsAsync();
+                EditorApplication.delayCall += () =>
+                {
+                    _settings.cachedProjectKeys  = new string[projects.Length];
+                    _settings.cachedProjectNames = new string[projects.Length];
+                    for (int i = 0; i < projects.Length; i++)
+                    {
+                        _settings.cachedProjectKeys[i]  = projects[i].key;
+                        _settings.cachedProjectNames[i] = projects[i].name;
+                    }
+                    EditorUtility.SetDirty(_settings);
+                    _isLoadingProjects = false;
+
+                    // 현재 선택된 프로젝트가 목록에 있으면 이슈타입도 조회
+                    if (!string.IsNullOrEmpty(_settings.jiraProjectKey))
+                    {
+                        FetchIssueTypes(_settings.jiraProjectKey);
+                        // 특수 필드 조회 (myself, assignee, boards→sprints, epics, issues)
+                        FetchSpecialFields(_settings.jiraProjectKey);
+                    }
+                    else if (projects.Length > 0)
+                    {
+                        _settings.jiraProjectKey = projects[0].key;
+                        EditorUtility.SetDirty(_settings);
+                        FetchIssueTypes(projects[0].key);
+                        // 특수 필드 조회 (myself, assignee, boards→sprints, epics, issues)
+                        FetchSpecialFields(projects[0].key);
+                    }
+
+                    Repaint();
+                };
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    _metadataError     = $"프로젝트 조회 실패: {ex.Message}";
+                    _isLoadingProjects = false;
+                    Repaint();
+                };
+            }
+        }
+
+        private void FetchIssueTypes(string projectKey)
+        {
+            if (_metadataService == null || _isLoadingIssueTypes || string.IsNullOrEmpty(projectKey)) return;
+            _isLoadingIssueTypes = true;
+            Debug.Log($"[BugOneTouch] 이슈 타입 조회 시작: projectKey={projectKey}");
+            _ = FetchIssueTypesAsync(projectKey);
+        }
+
+        private async Task FetchIssueTypesAsync(string projectKey)
+        {
+            try
+            {
+                var issueTypes = await _metadataService.GetIssueTypesAsync(projectKey);
+                Debug.Log($"[BugOneTouch] 이슈 타입 조회 API 응답 수신: {issueTypes.Length}개");
+                EditorApplication.delayCall += () =>
+                {
+                    _settings.cachedIssueTypeIds   = new string[issueTypes.Length];
+                    _settings.cachedIssueTypeNames = new string[issueTypes.Length];
+                    for (int i = 0; i < issueTypes.Length; i++)
+                    {
+                        _settings.cachedIssueTypeIds[i]   = issueTypes[i].id;
+                        _settings.cachedIssueTypeNames[i] = issueTypes[i].name;
+                    }
+
+                    // Bug 디폴트 선택
+                    if (issueTypes.Length > 0)
+                    {
+                        int bugIdx = Array.IndexOf(_settings.cachedIssueTypeNames, "Bug");
+                        if (bugIdx < 0 || bugIdx >= _settings.cachedIssueTypeNames.Length) bugIdx = 0;
+                        _settings.jiraDefaultIssueType    = _settings.cachedIssueTypeNames[bugIdx];
+                        _settings.jiraSelectedIssueTypeId = _settings.cachedIssueTypeIds[bugIdx];
+                        Debug.Log($"[BugOneTouch] 이슈 타입 선택: name={_settings.jiraDefaultIssueType}, id={_settings.jiraSelectedIssueTypeId}");
+                    }
+                    else
+                    {
+                        _settings.jiraDefaultIssueType    = string.Empty;
+                        _settings.jiraSelectedIssueTypeId = string.Empty;
+                        Debug.LogWarning($"[BugOneTouch] 이슈 타입 목록이 비어 있어 필드 조회를 건너뜁니다.");
+                    }
+                    EditorUtility.SetDirty(_settings);
+                    _isLoadingIssueTypes = false;
+
+                    // 필드 조회 시작
+                    if (!string.IsNullOrEmpty(_settings.jiraSelectedIssueTypeId))
+                        FetchFields(projectKey, _settings.jiraSelectedIssueTypeId);
+
+                    Repaint();
+                };
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[BugOneTouch] 이슈 타입 조회 예외 발생: {ex.GetType().Name}: {ex.Message}");
+                EditorApplication.delayCall += () =>
+                {
+                    _metadataError       = $"이슈 타입 조회 실패: {ex.Message}";
+                    _isLoadingIssueTypes = false;
+                    Repaint();
+                };
+            }
+        }
+
+        private void FetchSpecialFields(string projectKey)
+        {
+            if (_metadataService == null || _isLoadingSpecialFields || string.IsNullOrEmpty(projectKey)) return;
+            _isLoadingSpecialFields = true;
+            _ = FetchSpecialFieldsAsync(projectKey);
+        }
+
+        private async Task FetchSpecialFieldsAsync(string projectKey)
+        {
+            try
+            {
+                // 병렬로 여러 API 호출
+                var myselfTask     = _metadataService.GetMyselfAsync();
+                var assignableTask = _metadataService.GetAssignableUsersAsync(projectKey);
+                var boardsTask     = _metadataService.GetBoardsAsync(projectKey);
+                var epicsTask      = _metadataService.SearchIssuesAsync(projectKey, "Epic");
+                var issuesTask     = _metadataService.SearchIssuesAsync(projectKey);
+
+                // myself
+                try
+                {
+                    var myself = await myselfTask;
+                    EditorApplication.delayCall += () =>
+                    {
+                        _settings.currentUserAccountId   = myself?.accountId   ?? "";
+                        _settings.currentUserDisplayName = myself?.displayName  ?? "";
+                        EditorUtility.SetDirty(_settings);
+                        Repaint();
+                    };
+                }
+                catch (Exception ex) { Debug.LogWarning($"[BugOneTouch] myself 조회 실패: {ex.Message}"); }
+
+                // assignable users
+                try
+                {
+                    var users = await assignableTask;
+                    EditorApplication.delayCall += () =>
+                    {
+                        _settings.cachedAssigneeIds   = new string[users.Length];
+                        _settings.cachedAssigneeNames = new string[users.Length];
+                        for (int i = 0; i < users.Length; i++)
+                        {
+                            _settings.cachedAssigneeIds[i]   = users[i].accountId ?? "";
+                            _settings.cachedAssigneeNames[i] = users[i].displayName ?? users[i].emailAddress ?? "";
+                        }
+                        EditorUtility.SetDirty(_settings);
+                        Repaint();
+                    };
+                }
+                catch (Exception ex) { Debug.LogWarning($"[BugOneTouch] assignable users 조회 실패: {ex.Message}"); }
+
+                // boards → sprints
+                try
+                {
+                    var boards = await boardsTask;
+                    if (boards.Length > 0)
+                    {
+                        var sprints = await _metadataService.GetSprintsAsync(boards[0].id);
+                        EditorApplication.delayCall += () =>
+                        {
+                            _settings.cachedSprintIds   = new string[sprints.Length];
+                            _settings.cachedSprintNames = new string[sprints.Length];
+                            for (int i = 0; i < sprints.Length; i++)
+                            {
+                                _settings.cachedSprintIds[i]   = sprints[i].id.ToString();
+                                _settings.cachedSprintNames[i] = $"{sprints[i].name} ({sprints[i].state})";
+                            }
+                            EditorUtility.SetDirty(_settings);
+                            Repaint();
+                        };
+                    }
+                }
+                catch (Exception ex) { Debug.LogWarning($"[BugOneTouch] sprints 조회 실패: {ex.Message}"); }
+
+                // epics
+                try
+                {
+                    var epics = await epicsTask;
+                    EditorApplication.delayCall += () =>
+                    {
+                        _settings.cachedEpicKeys  = new string[epics.Length];
+                        _settings.cachedEpicNames = new string[epics.Length];
+                        for (int i = 0; i < epics.Length; i++)
+                        {
+                            _settings.cachedEpicKeys[i]  = epics[i].key ?? "";
+                            _settings.cachedEpicNames[i] = $"{epics[i].key} - {epics[i].fields?.summary ?? ""}";
+                        }
+                        EditorUtility.SetDirty(_settings);
+                        Repaint();
+                    };
+                }
+                catch (Exception ex) { Debug.LogWarning($"[BugOneTouch] epics 조회 실패: {ex.Message}"); }
+
+                // all issues (연결용)
+                try
+                {
+                    var issues = await issuesTask;
+                    EditorApplication.delayCall += () =>
+                    {
+                        _settings.cachedIssueKeys  = new string[issues.Length];
+                        _settings.cachedIssueNames = new string[issues.Length];
+                        for (int i = 0; i < issues.Length; i++)
+                        {
+                            _settings.cachedIssueKeys[i]  = issues[i].key ?? "";
+                            _settings.cachedIssueNames[i] = $"{issues[i].key} - {issues[i].fields?.summary ?? ""}";
+                        }
+                        EditorUtility.SetDirty(_settings);
+                        Repaint();
+                    };
+                }
+                catch (Exception ex) { Debug.LogWarning($"[BugOneTouch] issues 조회 실패: {ex.Message}"); }
+            }
+            finally
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    _isLoadingSpecialFields = false;
+                    Repaint();
+                };
+            }
+        }
+
+        private void FetchFields(string projectKey, string issueTypeId)
+        {
+            if (_metadataService == null || _isLoadingFields) return;
+            if (string.IsNullOrEmpty(projectKey) || string.IsNullOrEmpty(issueTypeId))
+            {
+                Debug.LogWarning($"[BugOneTouch] FetchFields 조기 반환: projectKey='{projectKey}', issueTypeId='{issueTypeId}'");
+                return;
+            }
+            _isLoadingFields = true;
+            Debug.Log($"[BugOneTouch] 필드 조회 시작: projectKey={projectKey}, issueTypeId={issueTypeId}");
+            _ = FetchFieldsAsync(projectKey, issueTypeId);
+        }
+
+        private async Task FetchFieldsAsync(string projectKey, string issueTypeId)
+        {
+            try
+            {
+                var fields = await _metadataService.GetFieldsAsync(projectKey, issueTypeId);
+                Debug.Log($"[BugOneTouch] 필드 조회 API 응답 수신: {fields.Length}개 필드");
+                EditorApplication.delayCall += () =>
+                {
+                    if (fields.Length == 0)
+                    {
+                        Debug.LogWarning($"[BugOneTouch] 필드 조회 결과가 비어 있습니다. projectKey={projectKey}, issueTypeId={issueTypeId}");
+                        _metadataError = $"필드 목록이 비어 있습니다. (프로젝트: {projectKey}, 이슈타입ID: {issueTypeId})\nJira API 응답을 확인하세요.";
+                        _isLoadingFields = false;
+                        Repaint();
+                        return;
+                    }
+
+                    _settings.cachedFieldIds      = new string[fields.Length];
+                    _settings.cachedFieldNames    = new string[fields.Length];
+                    _settings.cachedFieldRequired = new bool[fields.Length];
+                    _settings.cachedFieldTypes    = new string[fields.Length];
+
+                    for (int i = 0; i < fields.Length; i++)
+                    {
+                        _settings.cachedFieldIds[i]      = fields[i].fieldId;
+                        _settings.cachedFieldNames[i]    = fields[i].name;
+                        _settings.cachedFieldRequired[i] = fields[i].required;
+                        _settings.cachedFieldTypes[i]    = fields[i].schemaType;
+
+                        // allowedValues 캐시
+                        if (fields[i].allowedValues != null && fields[i].allowedValues.Length > 0)
+                        {
+                            string[] names = new string[fields[i].allowedValues.Length];
+                            for (int j = 0; j < fields[i].allowedValues.Length; j++)
+                                names[j] = !string.IsNullOrEmpty(fields[i].allowedValues[j].name)
+                                    ? fields[i].allowedValues[j].name
+                                    : fields[i].allowedValues[j].value ?? fields[i].allowedValues[j].id;
+                            _settings.SetFieldAllowedValues(fields[i].fieldId, names);
+                        }
+                    }
+
+                    EditorUtility.SetDirty(_settings);
+                    _isLoadingFields = false;
+                    Debug.Log($"[BugOneTouch] 필드 조회 완료: {fields.Length}개 필드 캐시됨");
+                    Repaint();
+                };
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[BugOneTouch] 필드 조회 예외 발생: {ex.GetType().Name}: {ex.Message}");
+                EditorApplication.delayCall += () =>
+                {
+                    _metadataError   = $"필드 조회 실패: {ex.Message}";
+                    _isLoadingFields = false;
+                    Repaint();
+                };
+            }
         }
 
         // ─── 푸터 ─────────────────────────────────────────────────────────────────

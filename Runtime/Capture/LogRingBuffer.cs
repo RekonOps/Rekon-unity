@@ -23,6 +23,7 @@ namespace GaoZombie.BugOneTouch
         private int _count;    // 현재 저장된 항목 수
         private bool _disposed;
         private readonly object _lock = new object();
+        private double _lastMainThreadTime; // 백그라운드 스레드 fallback용
 
         /// <summary>현재 버퍼에 저장된 로그 항목 수</summary>
         public int Count
@@ -130,8 +131,23 @@ namespace GaoZombie.BugOneTouch
             if (_disposed)
                 return;
 
+            // Time.realtimeSinceStartupAsDouble는 메인 스레드 전용.
+            // 백그라운드 스레드(Task.Run 등)에서 Debug.Log 호출 시
+            // 이 콜백이 같은 스레드에서 발동되므로 스레드 안전한 타임스탬프 사용.
+            double timestamp;
+            try
+            {
+                timestamp = Time.realtimeSinceStartupAsDouble;
+                _lastMainThreadTime = timestamp;
+            }
+            catch
+            {
+                // 백그라운드 스레드에서 호출된 경우 마지막 메인 스레드 시간 사용
+                timestamp = _lastMainThreadTime;
+            }
+
             var entry = new LogEntry(
-                timestamp: Time.realtimeSinceStartupAsDouble,
+                timestamp: timestamp,
                 logType: logType,
                 message: condition,
                 stackTrace: stackTrace

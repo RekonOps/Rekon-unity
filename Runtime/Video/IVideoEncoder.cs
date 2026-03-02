@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace GaoZombie.BugOneTouch
@@ -14,6 +15,17 @@ namespace GaoZombie.BugOneTouch
         /// <param name="frames">인코딩할 프레임 배열 (시간순 정렬됨)</param>
         /// <param name="outputPath">출력 파일 또는 디렉토리 경로</param>
         /// <param name="config">인코딩 설정</param>
-        Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config);
+        /// <param name="cancellationToken">취소 토큰</param>
+        Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 출력 파일 확장자. 빈 문자열이면 디렉토리 출력.
+        /// </summary>
+        string OutputExtension { get; }
+
+        /// <summary>
+        /// 인코딩 시 권장 타임아웃 (초)
+        /// </summary>
+        float RecommendedTimeoutSeconds { get; }
     }
 }

@@ -1,3 +1,5 @@
+using System;
+using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -53,6 +55,19 @@ namespace RekonOps.BugOneTouch
         private string _stepsToReproduce = "";
         private bool   _includeVideo     = true;
 
+        // ─── 이슈 타입 / 우선순위 ─────────────────────────────────────────────────
+
+        private static readonly string[] FallbackIssueTypes = { "Bug", "Task", "Story", "Epic", "Sub-task" };
+        private static readonly string[] FallbackPriorities  = { "Highest", "High", "Medium", "Low", "Lowest" };
+
+        private string[] _activeIssueTypes;
+        private string[] _activePriorities;
+
+        private string _issueType      = "Bug";
+        private string _priority       = "Medium";
+        private int    _issueTypeIndex = 0;
+        private int    _priorityIndex  = 2;
+
         // ─── 상태 ─────────────────────────────────────────────────────────────────
 
         private FormState _state = FormState.Hidden;
@@ -80,6 +95,7 @@ namespace RekonOps.BugOneTouch
         private JiraSubmissionService _jiraService;
         private BundleWriter          _bundleWriter;
         private BundleRepository      _bundleRepository;
+        private BugOneTouchSettings   _settings;
 
         // ─── GUI 스타일 캐시 ──────────────────────────────────────────────────────
 
@@ -120,11 +136,13 @@ namespace RekonOps.BugOneTouch
         public void SetDependencies(
             JiraSubmissionService jiraService,
             BundleWriter bundleWriter,
-            BundleRepository bundleRepository)
+            BundleRepository bundleRepository,
+            BugOneTouchSettings settings)
         {
             _jiraService       = jiraService;
             _bundleWriter      = bundleWriter;
             _bundleRepository  = bundleRepository;
+            _settings          = settings;
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────────
@@ -154,7 +172,33 @@ namespace RekonOps.BugOneTouch
             _resultSuccess       = false;
             _bundle              = null;
             _scrollPos           = Vector2.zero;
-            _state               = FormState.Editing;
+
+            // 동적 이슈타입 로드 (Settings 캐시 → 폴백)
+            if (_settings != null && _settings.cachedIssueTypeNames != null && _settings.cachedIssueTypeNames.Length > 0)
+                _activeIssueTypes = _settings.cachedIssueTypeNames;
+            else
+                _activeIssueTypes = FallbackIssueTypes;
+
+            // 동적 우선순위 로드 (Settings allowedValues 캐시 → 폴백)
+            string[] cachedPriorities = _settings?.GetFieldAllowedValues("priority");
+            if (cachedPriorities != null && cachedPriorities.Length > 0)
+                _activePriorities = cachedPriorities;
+            else
+                _activePriorities = FallbackPriorities;
+
+            // 기본값 설정
+            if (_settings != null)
+            {
+                _issueType = _settings.jiraDefaultIssueType;
+                _priority  = _settings.jiraDefaultPriority;
+            }
+
+            _issueTypeIndex = Array.IndexOf(_activeIssueTypes, _issueType);
+            if (_issueTypeIndex < 0) _issueTypeIndex = 0;
+            _priorityIndex  = Array.IndexOf(_activePriorities, _priority);
+            if (_priorityIndex < 0) _priorityIndex  = 2;
+
+            _state = FormState.Editing;
 
             Debug.Log("[BugOneTouch] 버그 리포트 폼 표시");
         }
@@ -172,8 +216,23 @@ namespace RekonOps.BugOneTouch
 
         private void OnDestroy()
         {
-            _cancelSource?.Cancel();
-            _cancelSource?.Dispose();
+            // 플레이모드 종료 시 Cancel() 호출이 JiraApiClient의 CancellationToken 콜백을 즉시 실행하며,
+            // 이 시점에 Unity 네이티브 오브젝트가 이미 파괴되어 있을 수 있습니다.
+            // JiraApiClient 측에서도 try-catch로 보호하고 있으나,
+            // 여기서도 AggregateException 등 예외를 안전하게 처리합니다.
+            try
+            {
+                _cancelSource?.Cancel();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] OnDestroy Cancel 예외 무시: {ex.Message}");
+            }
+            finally
+            {
+                _cancelSource?.Dispose();
+                _cancelSource = null;
+            }
         }
 
         private void OnGUI()
@@ -227,6 +286,30 @@ namespace RekonOps.BugOneTouch
             // 제목 (필수)
             DrawFieldLabel("제목 *");
             _title = GUILayout.TextField(_title, _textFieldStyle);
+
+            GUILayout.Space(8f);
+
+            // 이슈 타입 / 우선순위 선택 (좌우 화살표 순환)
+            GUILayout.BeginHorizontal();
+
+            GUILayout.Label("이슈 타입:", _labelStyle, GUILayout.Width(70f));
+            if (GUILayout.Button("<", _buttonStyle, GUILayout.Width(25f)))
+                _issueTypeIndex = (_issueTypeIndex - 1 + _activeIssueTypes.Length) % _activeIssueTypes.Length;
+            GUILayout.Label(_activeIssueTypes[_issueTypeIndex], GUI.skin.box, GUILayout.MinWidth(80f));
+            if (GUILayout.Button(">", _buttonStyle, GUILayout.Width(25f)))
+                _issueTypeIndex = (_issueTypeIndex + 1) % _activeIssueTypes.Length;
+
+            GUILayout.Space(16f);
+
+            GUILayout.Label("우선순위:", _labelStyle, GUILayout.Width(60f));
+            if (GUILayout.Button("<", _buttonStyle, GUILayout.Width(25f)))
+                _priorityIndex = (_priorityIndex - 1 + _activePriorities.Length) % _activePriorities.Length;
+            GUILayout.Label(_activePriorities[_priorityIndex], GUI.skin.box, GUILayout.MinWidth(70f));
+            if (GUILayout.Button(">", _buttonStyle, GUILayout.Width(25f)))
+                _priorityIndex = (_priorityIndex + 1) % _activePriorities.Length;
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
 
             GUILayout.Space(8f);
 
@@ -393,16 +476,16 @@ namespace RekonOps.BugOneTouch
                 _submitStageText = "Jira 이슈 제출 중...";
 
                 // 2단계: Jira 제출 요청 구성
-                var settings = BugOneTouchSettingsProvider.Settings;
                 var request  = new JiraSubmissionService.SubmissionRequest
                 {
                     BundleId = _bundle?.id ?? "unknown",
                     IssueRequest = new JiraIssueCreator.CreateIssueRequest
                     {
+                        ProjectKey  = _settings?.jiraProjectKey ?? "",
                         Summary     = _title,
                         Description = BuildDescription(),
-                        IssueType   = "Bug",
-                        Priority    = "Medium",
+                        IssueType   = _activeIssueTypes[_issueTypeIndex],
+                        Priority    = _activePriorities[_priorityIndex],
                     },
                 };
 
@@ -530,8 +613,53 @@ namespace RekonOps.BugOneTouch
             TryAddFileAttachment(request, captureResult.LogsPath,         "logs.zip",         "application/zip");
             TryAddFileAttachment(request, captureResult.StatePath,        "state.json",       "application/json");
 
-            if (_includeVideo)
-                TryAddFileAttachment(request, captureResult.VideoPath, "video.mp4", "video/mp4");
+            if (_includeVideo && !string.IsNullOrEmpty(captureResult.VideoPath))
+            {
+                if (System.IO.File.Exists(captureResult.VideoPath))
+                {
+                    // MP4 단일 파일 - 직접 첨부
+                    TryAddFileAttachment(request, captureResult.VideoPath,
+                        System.IO.Path.GetFileName(captureResult.VideoPath), "video/mp4");
+                    Debug.Log($"[BugOneTouch] MP4 파일 첨부 준비 완료: {captureResult.VideoPath}");
+                }
+                else if (System.IO.Directory.Exists(captureResult.VideoPath))
+                {
+                    // raw 프레임 디렉토리 - ZIP 압축 후 첨부 (기존 로직 유지)
+                    try
+                    {
+                        byte[] zipData;
+                        using (var ms = new System.IO.MemoryStream())
+                        {
+                            using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, true))
+                            {
+                                foreach (var filePath in System.IO.Directory.GetFiles(captureResult.VideoPath))
+                                {
+                                    var entry = archive.CreateEntry(System.IO.Path.GetFileName(filePath), System.IO.Compression.CompressionLevel.Fastest);
+                                    using (var entryStream = entry.Open())
+                                    {
+                                        var fileBytes = System.IO.File.ReadAllBytes(filePath);
+                                        entryStream.Write(fileBytes, 0, fileBytes.Length);
+                                    }
+                                }
+                            }
+                            zipData = ms.ToArray();
+                        }
+
+                        request.Attachments.Add(new JiraAttachmentUploader.AttachmentItem
+                        {
+                            FileName    = "video_frames.zip",
+                            Data        = zipData,
+                            ContentType = "application/zip",
+                        });
+
+                        Debug.Log($"[BugOneTouch] 영상 프레임 ZIP 첨부 준비 완료 ({zipData.Length / 1024}KB)");
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning($"[BugOneTouch] 영상 ZIP 압축 실패: {ex.Message}");
+                    }
+                }
+            }
         }
 
         /// <summary>

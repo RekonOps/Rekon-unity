@@ -66,7 +66,21 @@ namespace RekonOps.BugOneTouch
                     int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
                     frameRingBuffer = new FrameRingBuffer(frameCapacity);
 
-                    videoEncoder = new VideoEncoder();
+                    // FFmpeg 설치 여부에 따라 인코더 선택
+#if UNITY_STANDALONE || UNITY_EDITOR
+                    // 최초 호출 시 최대 3초 소요 (FFmpeg 프로세스 실행 및 응답 대기)
+                    // 이후 호출은 캐시된 결과를 즉시 반환합니다.
+                    if (FfmpegHelper.IsInstalled())
+                    {
+                        videoEncoder = new Mp4VideoEncoder();
+                        Debug.Log("[BugOneTouch] MP4 인코더 활성화 (FFmpeg 감지됨)");
+                    }
+                    else
+#endif
+                    {
+                        videoEncoder = new VideoEncoder();
+                        Debug.Log("[BugOneTouch] raw 프레임 인코더 사용");
+                    }
                     videoConfig = VideoEncoderConfig.FromSettings(settings);
 
                     // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
@@ -98,6 +112,33 @@ namespace RekonOps.BugOneTouch
                 // ── 8. CaptureOverlay 초기화 ──────────────────────────────────────
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
+
+                // ── 9. BugReportForm 생성 및 의존성 주입 ──────────────────────────
+                // Auth 관련 의존성
+                var tokenStore      = new SessionTokenStore();
+                var reAuthHandler   = new ReAuthHandler(tokenStore);
+                var brokerClient    = new AuthBrokerClient(settings.authBrokerUrl, tokenStore);
+                var tokenManager    = new TokenRefreshManager(brokerClient, tokenStore, reAuthHandler);
+
+                // Jira API 클라이언트
+                var jiraApiClient   = new JiraApiClient(tokenManager);
+
+                // Jira 서비스
+                var issueCreator        = new JiraIssueCreator(jiraApiClient, settings);
+                var attachmentUploader  = new JiraAttachmentUploader(jiraApiClient);
+                var jiraService         = new JiraSubmissionService(issueCreator, attachmentUploader);
+
+                // 번들 관련
+                var manifestGenerator   = new ManifestGenerator();
+                var bundleWriter        = new BundleWriter(manifestGenerator);
+                var bundleRepository    = new BundleRepository();
+
+                // BugReportForm 생성 및 의존성 주입
+                var bugReportForm = BugReportForm.EnsureInstance();
+                bugReportForm.SetDependencies(jiraService, bundleWriter, bundleRepository, settings);
+
+                // ── 10. 캡처 완료 이벤트 → BugReportForm 바인딩 ─────────────────
+                orchestrator.OnCaptureCompleted += bugReportForm.ShowForm;
 
                 Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");
             }

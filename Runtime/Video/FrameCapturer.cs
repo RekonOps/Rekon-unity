@@ -11,10 +11,11 @@ namespace GaoZombie.BugOneTouch
     ///   1. AsyncGPUReadback.Request() 지원 시 비동기 GPU 읽기 사용 (성능 우선)
     ///   2. 미지원 시 ReadPixels 폴백 (동기, 메인 스레드 블로킹)
     ///
+    /// camera.Render()를 사용하여 설정된 해상도(기본 1280x720)로 직접 렌더링합니다.
+    /// 이 방식은 게임 윈도우 크기와 무관하게 일정한 해상도로 캡처됩니다.
+    ///
     /// FPS 스로틀링:
     ///   Time.unscaledTime 기반으로 프레임 간격을 계산하여 목표 FPS를 유지합니다.
-    ///
-    /// 이 클래스는 MonoBehaviour이므로 게임 오브젝트에 첨부해야 합니다.
     /// </summary>
     public class FrameCapturer : MonoBehaviour, IFrameCapturer
     {

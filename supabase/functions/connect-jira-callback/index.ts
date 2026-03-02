@@ -175,7 +175,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
                 status: "completed",
                 cloud_id: cloudId,
                 refresh_token: refresh_token,
-                scopes: JIRA_CLIENT_ID ? ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access"] : [],
+                scopes: JIRA_CLIENT_ID ? ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access", "read:board-scope:jira-software", "read:sprint:jira-software"] : [],
             })
             .eq("id", connection.id);
 

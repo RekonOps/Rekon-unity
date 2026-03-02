@@ -93,7 +93,11 @@ namespace GaoZombie.BugOneTouch
 
             _isCapturing = true;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            // 인코더별 권장 타임아웃 적용 (인코딩 방식에 따라 소요 시간이 다름)
+            float effectiveTimeout = (_videoEncoder != null)
+                ? _videoEncoder.RecommendedTimeoutSeconds
+                : TimeoutSeconds;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(effectiveTimeout));
             var result = new CaptureResult { Timestamp = DateTime.UtcNow };
 
             // 임시 디렉토리 생성
@@ -114,7 +118,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (OperationCanceledException)
             {
-                Debug.LogWarning("[BugOneTouch] 캡처 타임아웃 (5초 초과). 수집된 아티팩트만 반환합니다.");
+                Debug.LogWarning($"[BugOneTouch] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
                 ReportProgress("complete", 1.0f, "타임아웃");
             }
             catch (Exception ex)
@@ -240,9 +244,14 @@ namespace GaoZombie.BugOneTouch
                 FrameData[] frames = _frameBuffer.GetFrames();
                 if (frames.Length > 0)
                 {
-                    string videoDir = Path.Combine(dir, "video");
-                    await _videoEncoder.EncodeAsync(frames, videoDir, _videoConfig);
-                    result.VideoPath = videoDir;
+                    // 인코더의 OutputExtension을 사용하여 출력 경로 결정 (OCP 적용)
+                    string ext = _videoEncoder.OutputExtension;
+                    string videoPath = string.IsNullOrEmpty(ext)
+                        ? Path.Combine(dir, "video")
+                        : Path.Combine(dir, $"video{ext}");
+
+                    await _videoEncoder.EncodeAsync(frames, videoPath, _videoConfig, token);
+                    result.VideoPath = videoPath;
                 }
 
                 ReportProgress("video", 1.0f);

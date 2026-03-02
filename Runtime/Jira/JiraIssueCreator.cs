@@ -41,6 +41,18 @@ namespace GaoZombie.BugOneTouch
 
             /// <summary>우선순위 이름 (예: "High", "Medium", "Low")</summary>
             public string Priority { get; set; } = "Medium";
+
+            /// <summary>보고자 accountId</summary>
+            public string ReporterAccountId { get; set; }
+
+            /// <summary>담당자 accountId</summary>
+            public string AssigneeAccountId { get; set; }
+
+            /// <summary>스프린트 ID (숫자 문자열)</summary>
+            public string SprintId { get; set; }
+
+            /// <summary>상위 항목 이슈 키 (예: "PROJ-123")</summary>
+            public string ParentKey { get; set; }
         }
 
         /// <summary>이슈 생성 결과</summary>
@@ -178,6 +190,23 @@ namespace GaoZombie.BugOneTouch
             sb.Append($"\"description\":{adfDescriptionJson},");
             sb.Append($"\"labels\":{labelsJson},");
             sb.Append($"\"priority\":{{\"name\":\"{EscapeJson(request.Priority ?? "Medium")}\"}}");
+
+            // reporter
+            if (!string.IsNullOrEmpty(request.ReporterAccountId))
+                sb.Append($",\"reporter\":{{\"accountId\":\"{EscapeJson(request.ReporterAccountId)}\"}}");
+
+            // assignee
+            if (!string.IsNullOrEmpty(request.AssigneeAccountId))
+                sb.Append($",\"assignee\":{{\"accountId\":\"{EscapeJson(request.AssigneeAccountId)}\"}}");
+
+            // sprint (customfield_10020이 일반적이나, 프로젝트마다 다를 수 있음)
+            if (!string.IsNullOrEmpty(request.SprintId))
+                sb.Append($",\"customfield_10020\":{request.SprintId}");
+
+            // parent (에픽 등 상위 항목)
+            if (!string.IsNullOrEmpty(request.ParentKey))
+                sb.Append($",\"parent\":{{\"key\":\"{EscapeJson(request.ParentKey)}\"}}");
+
             sb.Append("}}");
 
             return sb.ToString();

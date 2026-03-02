@@ -120,7 +120,16 @@ namespace GaoZombie.BugOneTouch
                         break;
 
                     case BundleArtifactType.Video:
-                        await CopyDirectoryArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        if (!string.IsNullOrEmpty(source.VideoPath) && File.Exists(source.VideoPath))
+                        {
+                            // MP4 단일 파일
+                            await CopyFileArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        }
+                        else if (!string.IsNullOrEmpty(source.VideoPath) && Directory.Exists(source.VideoPath))
+                        {
+                            // raw 프레임 디렉토리
+                            await CopyDirectoryArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        }
                         break;
 
                     default:

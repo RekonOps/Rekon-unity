@@ -85,6 +85,7 @@ namespace GaoZombie.BugOneTouch
         private string _resultIssueKey  = "";
         private string _resultMessage   = "";
         private bool   _resultSuccess   = false;
+        private string _resultIssueUrl  = "";
 
         // ─── 제출 취소 토큰 ───────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ namespace GaoZombie.BugOneTouch
             _resultIssueKey      = "";
             _resultMessage       = "";
             _resultSuccess       = false;
+            _resultIssueUrl      = "";
             _bundle              = null;
             _scrollPos           = Vector2.zero;
 
@@ -415,9 +417,20 @@ namespace GaoZombie.BugOneTouch
 
             if (_resultSuccess)
             {
-                GUILayout.Label("Jira 이슈가 생성되었습니다.", _successStyle);
-                GUILayout.Space(8f);
-                GUILayout.Label($"이슈 키: {_resultIssueKey}", _titleStyle);
+                bool isJiraIssue = !string.IsNullOrEmpty(_resultIssueKey) && _resultIssueKey.Contains("-");
+                if (isJiraIssue)
+                {
+                    GUILayout.Label("Jira 이슈가 생성되었습니다.", _successStyle);
+                    GUILayout.Space(8f);
+                    GUILayout.Label($"이슈 키: {_resultIssueKey}", _titleStyle);
+                }
+                else
+                {
+                    GUILayout.Label("버그 리포트가 저장되었습니다.", _successStyle);
+                    GUILayout.Space(8f);
+                    if (!string.IsNullOrEmpty(_resultMessage))
+                        GUILayout.Label(_resultMessage, _titleStyle);
+                }
             }
             else
             {
@@ -426,15 +439,22 @@ namespace GaoZombie.BugOneTouch
                 GUILayout.Label(_resultMessage, _labelStyle);
             }
 
-            GUILayout.Space(16f);
-
+            GUILayout.Space(10);
             GUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("닫기", _buttonStyle, GUILayout.Width(100f), GUILayout.Height(30f)))
+
+            if (!string.IsNullOrEmpty(_resultIssueUrl))
+            {
+                if (GUILayout.Button("이슈로 이동", GUILayout.Height(35)))
+                {
+                    Application.OpenURL(_resultIssueUrl);
+                }
+            }
+
+            if (GUILayout.Button("닫기", _buttonStyle, GUILayout.Height(35)))
             {
                 HideForm();
             }
-            GUILayout.FlexibleSpace();
+
             GUILayout.EndHorizontal();
 
             GUILayout.FlexibleSpace();
@@ -497,15 +517,29 @@ namespace GaoZombie.BugOneTouch
 
                 // 3단계: Jira 제출 이벤트 구독
                 _jiraService.OnProgressChanged += HandleSubmitProgress;
-
-                JiraSubmissionService.SubmissionResult result =
-                    await _jiraService.SubmitAsync(request, _cancelSource.Token);
-
-                _jiraService.OnProgressChanged -= HandleSubmitProgress;
+                JiraSubmissionService.SubmissionResult result;
+                try
+                {
+                    result = await _jiraService.SubmitAsync(request, _cancelSource.Token);
+                }
+                finally
+                {
+                    _jiraService.OnProgressChanged -= HandleSubmitProgress;
+                }
 
                 if (result.Success)
                 {
-                    ShowResult(true, result.IssueKey, "");
+                    // integrations.jira 갱신 (하위 호환을 위해 jira_issue_key도 함께 설정)
+                    if (_bundle != null)
+                    {
+                        _bundle.jira_issue_key = result.IssueKey;
+                        if (_bundle.integrations == null)
+                            _bundle.integrations = new BundleIntegrations();
+                        _bundle.integrations.jira.issueKey  = result.IssueKey;
+                        _bundle.integrations.jira.connected = true;
+                    }
+
+                    ShowResult(true, result.IssueKey, "", result.IssueUrl);
                     Debug.Log($"[BugOneTouch] Jira 이슈 생성 완료: {result.IssueKey}");
                 }
                 else
@@ -522,9 +556,6 @@ namespace GaoZombie.BugOneTouch
             }
             catch (System.Exception ex)
             {
-                if (_jiraService != null)
-                    _jiraService.OnProgressChanged -= HandleSubmitProgress;
-
                 ShowResult(false, "", $"제출 실패: {ex.Message}");
                 Debug.LogError($"[BugOneTouch] Jira 제출 오류: {ex}");
             }
@@ -572,12 +603,38 @@ namespace GaoZombie.BugOneTouch
         /// <summary>
         /// 결과 화면으로 전환합니다.
         /// </summary>
-        private void ShowResult(bool success, string issueKey, string message)
+        /// <param name="success">성공 여부</param>
+        /// <param name="issueKey">생성된 이슈 키 (예: PROJ-123)</param>
+        /// <param name="message">오류 메시지 (실패 시)</param>
+        /// <param name="fallbackIssueUrl">이슈 URL 폴백 (jiraSiteUrl이 비어있을 때 사용)</param>
+        private void ShowResult(bool success, string issueKey, string message, string fallbackIssueUrl = "")
         {
             _resultSuccess  = success;
             _resultIssueKey = issueKey;
             _resultMessage  = message;
-            _state          = FormState.Result;
+            _resultIssueUrl = "";
+
+            // 성공 시 실제 Jira 이슈 키(PROJ-123 형태)인 경우에만 URL 생성
+            if (success && !string.IsNullOrEmpty(issueKey) && issueKey.Contains("-"))
+            {
+                string siteUrl = _settings?.jiraSiteUrl ?? "";
+                if (!string.IsNullOrEmpty(siteUrl))
+                {
+                    // Settings에 저장된 사이트 URL로 browse URL 생성 (사용자가 직접 열 수 있는 URL)
+                    _resultIssueUrl = siteUrl.TrimEnd('/') + "/browse/" + issueKey;
+                }
+                else if (!string.IsNullOrEmpty(fallbackIssueUrl))
+                {
+                    // jiraSiteUrl이 비어있으면 제출 응답의 self URL을 폴백으로 사용
+                    // (Jira REST API self URL: https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/issue/{id})
+                    _resultIssueUrl = fallbackIssueUrl;
+                    Debug.LogWarning("[BugOneTouch] jiraSiteUrl이 비어있어 API self URL을 이슈 링크로 사용합니다. " +
+                                     "Settings > Jira 탭에서 'Jira 사이트 URL'을 직접 설정하거나, " +
+                                     "프로젝트 조회 버튼을 누르면 자동으로 설정됩니다.");
+                }
+            }
+
+            _state = FormState.Result;
         }
 
         /// <summary>

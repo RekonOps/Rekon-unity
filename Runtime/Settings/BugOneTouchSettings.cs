@@ -55,7 +55,7 @@ namespace GaoZombie.BugOneTouch
 
         [Tooltip("Video frames per second")]
         [Range(15, 60)]
-        public int videoFps = 30;
+        public int videoFps = 15;
 
         [Tooltip("Video buffer duration in seconds")]
         [Range(10, 120)]
@@ -102,6 +102,13 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("Maximum disk usage in MB")]
         [Range(500, 20000)]
         public int maxDiskUsageMB = 5120;
+
+        [Header("Team Identity")]
+        [Tooltip("팀 식별자 (UUID). 같은 팀의 모든 멤버가 동일한 값을 사용합니다. 비어있으면 자동 생성됩니다.")]
+        public string tenantId = "";
+
+        [Tooltip("사용자 식별자 (UUID). 각 사용자별 고유 값입니다. 비어있으면 자동 생성됩니다.")]
+        public string userId = "";
 
         [Header("Auth Broker")]
         [Tooltip("Auth Broker base URL")]
@@ -158,6 +165,12 @@ namespace GaoZombie.BugOneTouch
 
         // 선택된 이슈타입 ID (이슈 타입 name → id 매핑용)
         [HideInInspector] public string jiraSelectedIssueTypeId = "";
+
+        // 첨부파일 크기 제한 캐시 (Jira 서버에서 조회한 값)
+        /// <summary>Jira 서버에서 조회한 첨부파일 최대 크기(바이트). 0이면 미조회 상태.</summary>
+        [HideInInspector] public long cachedAttachmentSizeLimitBytes = 0;
+        /// <summary>첨부파일 크기 제한을 마지막으로 조회한 일시 (ISO 8601 문자열).</summary>
+        [HideInInspector] public string cachedAttachmentSizeLimitFetchedAt = "";
 
         [HideInInspector] public string[] hiddenFieldIds = new string[0];
 
@@ -277,6 +290,28 @@ namespace GaoZombie.BugOneTouch
 
             cachedFieldAllowedKeys = AppendToArray(cachedFieldAllowedKeys, fieldId);
             cachedFieldAllowedValues = AppendToArray(cachedFieldAllowedValues, csv);
+        }
+
+        /// <summary>
+        /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.
+        /// </summary>
+        public void EnsureIdentityIds()
+        {
+            bool changed = false;
+            if (string.IsNullOrEmpty(tenantId))
+            {
+                tenantId = System.Guid.NewGuid().ToString();
+                changed = true;
+            }
+            if (string.IsNullOrEmpty(userId))
+            {
+                userId = System.Guid.NewGuid().ToString();
+                changed = true;
+            }
+#if UNITY_EDITOR
+            if (changed)
+                UnityEditor.EditorUtility.SetDirty(this);
+#endif
         }
 
         private static T[] AppendToArray<T>(T[] arr, T value)

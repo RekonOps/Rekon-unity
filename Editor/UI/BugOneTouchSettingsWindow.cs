@@ -104,8 +104,9 @@ namespace GaoZombie.BugOneTouch.Editor
         private bool _isLoadingFields;
         private string _metadataError = "";
 
-        private bool _isLoadingSpecialFields;   // myself/assignee/sprint/epic 로딩 상태
-        private bool _showHiddenFields;          // 숨겨진 필드 foldout 상태
+        private bool _isLoadingSpecialFields;      // myself/assignee/sprint/epic 로딩 상태
+        private bool _showHiddenFields;           // 숨겨진 필드 foldout 상태
+        private bool _isLoadingAttachmentLimit;   // 첨부파일 크기 제한 조회 중 여부
 
         // 스크롤 포지션 (각 탭별)
         private Vector2 _scrollPos;
@@ -139,6 +140,8 @@ namespace GaoZombie.BugOneTouch.Editor
         /// JiraMetadataService를 초기화합니다.
         /// _settings가 null이 아닌 시점에서 호출해야 합니다.
         /// authBrokerUrl이 비어 있을 경우 폴백 URL을 사용합니다.
+        /// JiraConnectionPanel과 동일한 SessionTokenStore 인스턴스를 공유하여
+        /// OAuth 완료 후 저장된 토큰을 즉시 읽을 수 있도록 합니다.
         /// </summary>
         private void InitializeMetadataService()
         {
@@ -150,7 +153,10 @@ namespace GaoZombie.BugOneTouch.Editor
                     ? "http://localhost"
                     : _settings.authBrokerUrl;
 
-                var tokenStore = new SessionTokenStore();
+                // JiraConnectionPanel과 동일한 TokenStore 인스턴스를 공유합니다.
+                // 각각 new SessionTokenStore()를 생성하면 EditorPrefs 키는 동일하게 공유하지만,
+                // ReAuthHandler.Clear() 호출이나 인메모리 캐시가 분리되는 문제를 방지합니다.
+                var tokenStore = _jiraPanel?.TokenStore ?? new SessionTokenStore();
                 var reAuthHandler = new ReAuthHandler(tokenStore);
                 var brokerClient = new AuthBrokerClient(brokerUrl, tokenStore);
                 var tokenManager = new TokenRefreshManager(brokerClient, tokenStore, reAuthHandler);
@@ -296,6 +302,94 @@ namespace GaoZombie.BugOneTouch.Editor
             EditorGUILayout.PropertyField(
                 maskingRulesPath,
                 new GUIContent("마스킹 규칙 경로", "민감 정보 마스킹 규칙 JSON 파일 경로 (비워두면 기본 규칙 사용)"));
+
+            EditorGUILayout.Space(8f);
+
+            // 팀 ID 관리
+            DrawTeamIdentitySection();
+        }
+
+        private void DrawTeamIdentitySection()
+        {
+            DrawSectionHeader("팀 ID 관리");
+
+            EditorGUILayout.HelpBox("같은 팀의 멤버는 동일한 팀 ID를 사용하세요.", MessageType.Info);
+            EditorGUILayout.Space(4f);
+
+            SerializedProperty tenantIdProp = _serializedSettings.FindProperty("tenantId");
+            SerializedProperty userIdProp   = _serializedSettings.FindProperty("userId");
+
+            // ── 팀 ID (tenantId) ──
+            EditorGUILayout.LabelField("팀 ID (tenantId)", EditorStyles.boldLabel);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUI.BeginChangeCheck();
+                string newTenantId = EditorGUILayout.TextField(tenantIdProp.stringValue);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (string.IsNullOrEmpty(newTenantId) || System.Guid.TryParse(newTenantId, out _))
+                    {
+                        tenantIdProp.stringValue = newTenantId;
+                        _serializedSettings.ApplyModifiedProperties();
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("형식 오류", "팀 ID는 UUID 형식이어야 합니다.\n예: 550e8400-e29b-41d4-a716-446655440000", "확인");
+                    }
+                }
+
+                if (GUILayout.Button("복사", GUILayout.Width(50f)))
+                {
+                    GUIUtility.systemCopyBuffer = tenantIdProp.stringValue;
+                }
+
+                if (GUILayout.Button("새로 생성", GUILayout.Width(80f)))
+                {
+                    tenantIdProp.stringValue = System.Guid.NewGuid().ToString();
+                    _serializedSettings.ApplyModifiedProperties();
+                }
+            }
+
+            EditorGUILayout.Space(6f);
+
+            // ── 사용자 ID (userId) ──
+            EditorGUILayout.LabelField("사용자 ID (userId)", EditorStyles.boldLabel);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUI.BeginChangeCheck();
+                string newUserId = EditorGUILayout.TextField(userIdProp.stringValue);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (string.IsNullOrEmpty(newUserId) || System.Guid.TryParse(newUserId, out _))
+                    {
+                        userIdProp.stringValue = newUserId;
+                        _serializedSettings.ApplyModifiedProperties();
+                    }
+                    else
+                    {
+                        EditorUtility.DisplayDialog("형식 오류", "사용자 ID는 UUID 형식이어야 합니다.\n예: 550e8400-e29b-41d4-a716-446655440000", "확인");
+                    }
+                }
+
+                if (GUILayout.Button("복사", GUILayout.Width(50f)))
+                {
+                    GUIUtility.systemCopyBuffer = userIdProp.stringValue;
+                }
+
+                if (GUILayout.Button("새로 생성", GUILayout.Width(80f)))
+                {
+                    userIdProp.stringValue = System.Guid.NewGuid().ToString();
+                    _serializedSettings.ApplyModifiedProperties();
+                }
+            }
+
+            EditorGUILayout.Space(4f);
+
+            if (GUILayout.Button("빈 ID 자동 생성 (EnsureIdentityIds)", GUILayout.Height(24f)))
+            {
+                _settings.EnsureIdentityIds();
+                _serializedSettings.Update();
+            }
         }
 
         private void DrawHotkeySection()
@@ -606,14 +700,31 @@ namespace GaoZombie.BugOneTouch.Editor
             _jiraPanel?.OnGUI();
             EditorGUILayout.Space(8f);
 
-            // 2. 프로젝트 설정
+            // 2. Jira 사이트 URL (OAuth 연결 시 자동 설정, 읽기 전용으로 표시)
+            DrawSectionHeader("Jira 사이트 설정");
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.TextField(
+                    new GUIContent("Jira 사이트 URL", "Jira OAuth 연결 시 자동으로 설정됩니다."),
+                    string.IsNullOrEmpty(_settings.jiraSiteUrl)
+                        ? "(Jira 연결 시 자동 설정됩니다)"
+                        : _settings.jiraSiteUrl);
+            }
+            EditorGUILayout.Space(8f);
+
+            // 4. 첨부파일 크기 제한 표시
+            DrawSectionHeader("첨부파일 크기 제한");
+            DrawAttachmentSizeLimit();
+            EditorGUILayout.Space(8f);
+
+            // 5. 프로젝트 설정
             DrawSectionHeader("프로젝트 설정");
             DrawProjectSelector();
             EditorGUILayout.Space(4f);
             DrawIssueTypeSelector();
             EditorGUILayout.Space(8f);
 
-            // 3. 필드 기본값 설정 (필드가 로드된 경우만)
+            // 6. 필드 기본값 설정 (필드가 로드된 경우만)
             if (_settings.cachedFieldIds != null && _settings.cachedFieldIds.Length > 0)
             {
                 DrawSectionHeader("필드 기본값 설정");
@@ -629,11 +740,49 @@ namespace GaoZombie.BugOneTouch.Editor
                 DrawHiddenFieldsFoldout();
             }
 
-            // 4. 에러 메시지
+            // 7. 에러 메시지
             if (!string.IsNullOrEmpty(_metadataError))
                 EditorGUILayout.HelpBox(_metadataError, MessageType.Error);
 
             // "기본 라벨" 섹션 제거됨 — labels 필드 안으로 통합
+        }
+
+        // ─── 첨부파일 크기 제한 표시 ───────────────────────────────────────────────
+
+        private void DrawAttachmentSizeLimit()
+        {
+            EditorGUILayout.BeginHorizontal();
+
+            // 현재 캐시 값 표시
+            string limitText;
+            if (_settings.cachedAttachmentSizeLimitBytes > 0)
+            {
+                double limitMb = _settings.cachedAttachmentSizeLimitBytes / (1024.0 * 1024.0);
+                string fetchedAt = string.IsNullOrEmpty(_settings.cachedAttachmentSizeLimitFetchedAt)
+                    ? "날짜 미상"
+                    : _settings.cachedAttachmentSizeLimitFetchedAt;
+                limitText = $"{limitMb:F0} MB ({fetchedAt} 조회)";
+            }
+            else
+            {
+                limitText = "(미조회 — 기본값 250 MB 사용)";
+            }
+
+            EditorGUI.BeginDisabledGroup(true);
+            EditorGUILayout.TextField(new GUIContent("현재 첨부파일 크기 제한"), limitText);
+            EditorGUI.EndDisabledGroup();
+
+            // 새로고침 버튼
+            string refreshLabel = _isLoadingAttachmentLimit ? "조회 중..." : "새로고침";
+            using (new EditorGUI.DisabledScope(_isLoadingAttachmentLimit || _metadataService == null))
+            {
+                if (GUILayout.Button(refreshLabel, GUILayout.Width(80f)))
+                {
+                    FetchAttachmentSizeLimit();
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
 
         // ─── 프로젝트 선택 ────────────────────────────────────────────────────────
@@ -956,6 +1105,20 @@ namespace GaoZombie.BugOneTouch.Editor
         private void FetchProjects()
         {
             if (_metadataService == null || _isLoadingProjects) return;
+
+            // 세션 토큰이 없으면 Jira 연결을 먼저 해야 한다고 안내합니다.
+            var tokenStore = _jiraPanel?.TokenStore;
+            if (tokenStore != null)
+            {
+                string sessionToken = tokenStore.Load();
+                if (string.IsNullOrEmpty(sessionToken))
+                {
+                    _metadataError = "Jira 연결이 필요합니다. 위의 'Jira 연결 시작' 버튼을 눌러 먼저 연결해주세요.";
+                    Repaint();
+                    return;
+                }
+            }
+
             _isLoadingProjects = true;
             _ = FetchProjectsAsync();
         }
@@ -991,6 +1154,18 @@ namespace GaoZombie.BugOneTouch.Editor
                         FetchIssueTypes(projects[0].key);
                         // 특수 필드 조회 (myself, assignee, boards→sprints, epics, issues)
                         FetchSpecialFields(projects[0].key);
+                    }
+
+                    // 프로젝트 조회 성공 시 첨부파일 크기 제한도 자동 조회 (캐시가 없을 때만)
+                    if (_settings.cachedAttachmentSizeLimitBytes <= 0)
+                    {
+                        FetchAttachmentSizeLimit();
+                    }
+
+                    // jiraSiteUrl이 비어있으면 /serverInfo API로 자동 설정
+                    if (string.IsNullOrEmpty(_settings.jiraSiteUrl))
+                    {
+                        FetchAndSetSiteUrl();
                     }
 
                     Repaint();
@@ -1189,6 +1364,76 @@ namespace GaoZombie.BugOneTouch.Editor
                     _isLoadingSpecialFields = false;
                     Repaint();
                 };
+            }
+        }
+
+        private void FetchAttachmentSizeLimit()
+        {
+            if (_metadataService == null || _isLoadingAttachmentLimit) return;
+            _isLoadingAttachmentLimit = true;
+            _ = FetchAttachmentSizeLimitAsync();
+        }
+
+        private async Task FetchAttachmentSizeLimitAsync()
+        {
+            try
+            {
+                long limitBytes = await _metadataService.GetAttachmentSizeLimitBytesAsync();
+                EditorApplication.delayCall += () =>
+                {
+                    _settings.cachedAttachmentSizeLimitBytes = limitBytes;
+                    _settings.cachedAttachmentSizeLimitFetchedAt = DateTime.Now.ToString("yyyy-MM-dd");
+                    EditorUtility.SetDirty(_settings);
+                    _isLoadingAttachmentLimit = false;
+                    Repaint();
+                };
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    _metadataError = $"첨부파일 크기 제한 조회 실패: {ex.Message}";
+                    _isLoadingAttachmentLimit = false;
+                    Repaint();
+                };
+            }
+        }
+
+        /// <summary>
+        /// /serverInfo API를 호출하여 Jira 사이트 URL을 자동으로 설정합니다.
+        /// jiraSiteUrl이 비어있을 때만 호출합니다.
+        /// </summary>
+        private void FetchAndSetSiteUrl()
+        {
+            if (_metadataService == null) return;
+            _ = FetchAndSetSiteUrlAsync();
+        }
+
+        private async Task FetchAndSetSiteUrlAsync()
+        {
+            try
+            {
+                var serverInfo = await _metadataService.GetServerInfoAsync();
+                if (serverInfo != null && !string.IsNullOrEmpty(serverInfo.baseUrl))
+                {
+                    EditorApplication.delayCall += () =>
+                    {
+                        // 아직 비어 있는 경우에만 덮어씁니다.
+                        if (string.IsNullOrEmpty(_settings.jiraSiteUrl))
+                        {
+                            _settings.jiraSiteUrl = serverInfo.baseUrl.TrimEnd('/');
+                            EditorUtility.SetDirty(_settings);
+                            Debug.Log($"[BugOneTouch] jiraSiteUrl 자동 설정: {_settings.jiraSiteUrl}");
+                            Repaint();
+                        }
+                    };
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] /serverInfo로 사이트 URL 자동 설정 실패: {ex.Message}");
             }
         }
 

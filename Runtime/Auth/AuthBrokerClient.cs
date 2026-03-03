@@ -42,6 +42,7 @@ namespace RekonOps.BugOneTouch
         {
             public string status;          // "pending" | "completed" | "error"
             public string session_token;   // completed 상태에서만 포함
+            public string site_url;        // completed 상태에서만 포함 (예: https://yourcompany.atlassian.net)
         }
 
         /// <summary>token-jira 응답 모델</summary>

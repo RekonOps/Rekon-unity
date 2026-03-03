@@ -16,8 +16,8 @@ namespace RekonOps.BugOneTouch
         /// <summary>OAuth 플로우 진행 상태 변경 이벤트. (message)</summary>
         public event Action<string> OnStatusChanged;
 
-        /// <summary>OAuth 플로우 완료 이벤트. (sessionToken)</summary>
-        public event Action<string> OnCompleted;
+        /// <summary>OAuth 플로우 완료 이벤트. (sessionToken, siteUrl)</summary>
+        public event Action<string, string> OnCompleted;
 
         /// <summary>OAuth 플로우 실패 이벤트. (errorMessage)</summary>
         public event Action<string> OnFailed;
@@ -107,7 +107,7 @@ namespace RekonOps.BugOneTouch
 
                 // Step 3: 완료 상태 폴링
                 NotifyStatus("Jira 인증 완료를 기다리는 중... (브라우저에서 Jira 로그인 후 허가해주세요)");
-                var sessionToken = await PollForCompletionAsync(
+                var (sessionToken, siteUrl) = await PollForCompletionAsync(
                     startResponse.connect_id,
                     _currentCts.Token);
 
@@ -116,7 +116,7 @@ namespace RekonOps.BugOneTouch
                 Debug.Log("[OAuthFlowManager] OAuth 플로우 완료. 세션 토큰 저장됨.");
 
                 NotifyStatus("Jira 연동이 완료되었습니다!");
-                OnCompleted?.Invoke(sessionToken);
+                OnCompleted?.Invoke(sessionToken, siteUrl);
 
                 return sessionToken;
             }
@@ -173,8 +173,8 @@ namespace RekonOps.BugOneTouch
         /// </summary>
         /// <param name="connectId">연결 UUID</param>
         /// <param name="cancellationToken">타임아웃 포함 취소 토큰</param>
-        /// <returns>JWT 세션 토큰</returns>
-        private async Task<string> PollForCompletionAsync(
+        /// <returns>(JWT 세션 토큰, Jira 사이트 URL) 튜플. 사이트 URL은 없을 수 있음</returns>
+        private async Task<(string sessionToken, string siteUrl)> PollForCompletionAsync(
             string connectId,
             CancellationToken cancellationToken)
         {
@@ -210,7 +210,7 @@ namespace RekonOps.BugOneTouch
                     case StatusCompleted:
                         if (string.IsNullOrEmpty(statusResponse.session_token))
                             throw new InvalidOperationException("completed 상태이나 세션 토큰이 없습니다.");
-                        return statusResponse.session_token;
+                        return (statusResponse.session_token, statusResponse.site_url ?? "");
 
                     case StatusError:
                         throw new InvalidOperationException("Jira 연동 중 서버 오류가 발생했습니다.");

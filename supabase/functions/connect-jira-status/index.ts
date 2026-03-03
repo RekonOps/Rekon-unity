@@ -16,6 +16,7 @@ type ConnectionStatus = "pending" | "completed" | "error";
 interface StatusResponse {
     status: ConnectionStatus;
     session_token?: string;
+    site_url?: string;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -58,7 +59,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         // 연결 상태 조회
         const { data: connection, error: queryError } = await db
             .from("oauth_connections")
-            .select("id, user_id, tenant_id, status")
+            .select("id, user_id, tenant_id, status, site_url")
             .eq("id", connectId)
             .maybeSingle();
 
@@ -75,7 +76,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             status: connection.status as ConnectionStatus,
         };
 
-        // completed 상태면 JWT 세션 토큰 발급
+        // completed 상태면 JWT 세션 토큰 발급 및 site_url 포함
         if (connection.status === "completed") {
             try {
                 response.session_token = await createSessionToken(
@@ -86,6 +87,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
             } catch (jwtError) {
                 safeLog("error", "JWT 생성 실패", { error: String(jwtError) });
                 throw new AppError(500, "Failed to create session token");
+            }
+
+            // site_url이 있으면 응답에 포함 (Unity 클라이언트가 jiraSiteUrl 자동 설정에 사용)
+            if (connection.site_url) {
+                response.site_url = connection.site_url;
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -48,6 +49,12 @@ namespace GaoZombie.BugOneTouch.Editor
         private double _lastRepaintTime;
 
         // ─── 초기화 / 정리 ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 패널에서 사용 중인 SessionTokenStore 인스턴스.
+        /// BugOneTouchSettingsWindow의 메타데이터 서비스와 토큰 저장소를 공유할 때 사용합니다.
+        /// </summary>
+        public SessionTokenStore TokenStore => _tokenStore;
 
         /// <summary>
         /// 패널을 초기화합니다. BugOneTouchSettings를 주입받아 서비스를 생성합니다.
@@ -295,10 +302,22 @@ namespace GaoZombie.BugOneTouch.Editor
             _cancelSource = new CancellationTokenSource();
 
             // 비동기 OAuth 플로우 시작 (에디터 비동기 실행)
-            // tenantId, userId는 에디터 머신 기반 임시 값 사용
-            string tenantId = SystemInfo.deviceUniqueIdentifier;
-            string userId   = System.Environment.UserName;
-            _ = _oauthManager.StartOAuthFlowAsync(tenantId, userId, _cancelSource.Token);
+            // tenantId, userId는 Settings에서 가져오며, 비어있으면 자동 생성
+            _settings.EnsureIdentityIds();
+            string tenantId = _settings.tenantId;
+            string userId   = _settings.userId;
+
+            var task = _oauthManager.StartOAuthFlowAsync(tenantId, userId, _cancelSource.Token);
+            task.ContinueWith(t =>
+            {
+                if (t.IsFaulted && t.Exception != null)
+                {
+                    foreach (var ex in t.Exception.InnerExceptions)
+                    {
+                        Debug.LogError($"[BugOneTouch] OAuth 플로우 오류: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }, TaskContinuationOptions.OnlyOnFaulted);
 
             Debug.Log("[BugOneTouch] Jira OAuth 플로우 시작");
         }
@@ -358,7 +377,8 @@ namespace GaoZombie.BugOneTouch.Editor
         // ─── 상태 조회 ────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 저장된 토큰 유무로 연결 상태를 갱신합니다.
+        /// 저장된 토큰 유무 및 만료 여부로 연결 상태를 갱신합니다.
+        /// 토큰이 만료된 경우 자동으로 삭제하고 Disconnected 상태로 전환합니다.
         /// </summary>
         private void RefreshConnectionState()
         {
@@ -367,9 +387,23 @@ namespace GaoZombie.BugOneTouch.Editor
             try
             {
                 string token = _tokenStore.Load();
-                _state = string.IsNullOrEmpty(token)
-                    ? ConnectionState.Disconnected
-                    : ConnectionState.Connected;
+                if (string.IsNullOrEmpty(token))
+                {
+                    _state = ConnectionState.Disconnected;
+                    return;
+                }
+
+                // 토큰 만료 여부 확인 (0초 여유 = 현재 시각 기준 엄격 검사)
+                if (_tokenStore.IsExpired(0))
+                {
+                    Debug.LogWarning("[BugOneTouch] 세션 토큰이 만료되었습니다. 재연결이 필요합니다.");
+                    _tokenStore.Clear();
+                    _state = ConnectionState.Disconnected;
+                }
+                else
+                {
+                    _state = ConnectionState.Connected;
+                }
             }
             catch
             {
@@ -390,7 +424,7 @@ namespace GaoZombie.BugOneTouch.Editor
             };
         }
 
-        private void OnOAuthCompleted(string sessionToken)
+        private void OnOAuthCompleted(string sessionToken, string siteUrl)
         {
             EditorApplication.delayCall += () =>
             {
@@ -398,6 +432,15 @@ namespace GaoZombie.BugOneTouch.Editor
                 _statusMessage   = "";
                 _connectProgress = 1f;
                 _lastError       = "";
+
+                // OAuth 응답에서 받은 site_url을 Settings에 자동 설정
+                if (!string.IsNullOrEmpty(siteUrl) && _settings != null)
+                {
+                    _settings.jiraSiteUrl = siteUrl.TrimEnd('/');
+                    UnityEditor.EditorUtility.SetDirty(_settings);
+                    Debug.Log($"[BugOneTouch] jiraSiteUrl 자동 설정: {_settings.jiraSiteUrl}");
+                }
+
                 Debug.Log("[BugOneTouch] Jira OAuth 연결 완료");
                 RepaintSettingsWindow();
             };

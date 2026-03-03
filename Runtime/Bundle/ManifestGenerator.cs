@@ -16,6 +16,18 @@ namespace GaoZombie.BugOneTouch
         // 플러그인 버전 상수 (package.json과 동기화)
         private const string PluginVersion = "0.1.0";
 
+        /// <summary>Jira 연동 초기값 구성에 사용하는 설정 객체.</summary>
+        private readonly BugOneTouchSettings _settings;
+
+        /// <summary>
+        /// ManifestGenerator 생성자.
+        /// </summary>
+        /// <param name="settings">BugOneTouchSettings. null 허용 (연동 정보 미설정 시 기본값 사용).</param>
+        public ManifestGenerator(BugOneTouchSettings settings = null)
+        {
+            _settings = settings;
+        }
+
         /// <summary>
         /// CaptureResult를 기반으로 BundleManifest 초안을 생성합니다.
         /// SHA-256 해시는 BundleWriter에서 파일 복사 후 채워집니다.
@@ -68,6 +80,17 @@ namespace GaoZombie.BugOneTouch
                 jira_issue_key  = null,
                 registered_at   = null,
                 retry_count     = 0,
+                integrations    = new BundleIntegrations
+                {
+                    jira = new JiraIntegrationInfo
+                    {
+                        // jiraProjectKey가 설정된 경우 connected = true로 초기화
+                        connected  = !string.IsNullOrEmpty(_settings?.jiraProjectKey),
+                        cloudId    = "",  // jiraSiteUrl에서 cloudId를 별도 파싱하지 않으므로 빈 문자열
+                        projectKey = _settings?.jiraProjectKey ?? "",
+                        issueKey   = "", // 제출 성공 후 갱신됨
+                    }
+                },
             };
 
             manifest.RecalculateTotalSize();

@@ -12,6 +12,7 @@ import { verifySessionToken } from "../_shared/jwt-helper.ts";
 import { rateLimitMiddleware } from "../_shared/rate-limiter.ts";
 import { AppError, errorResponse, jsonResponse } from "../_shared/error-handler.ts";
 import { safeLog } from "../_shared/log-redactor.ts";
+import { decryptToken, encryptToken, isEncrypted } from "../_shared/token-encryptor.ts";
 
 const JIRA_CLIENT_ID = Deno.env.get("JIRA_CLIENT_ID")!;
 const JIRA_CLIENT_SECRET = Deno.env.get("JIRA_CLIENT_SECRET")!;
@@ -117,16 +118,46 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
 
         try {
-            // oauth_connections 테이블에서 refresh_token 직접 조회
-            // Vault pgsodium 권한 문제로 인해 DB 컬럼에서 직접 읽기 (MVP)
-            const refreshToken = connection.refresh_token;
+            // oauth_connections 테이블에서 refresh_token 조회 후 복호화
+            const storedRefreshToken = connection.refresh_token;
 
-            if (!refreshToken) {
+            if (!storedRefreshToken) {
                 safeLog("error", "oauth_connections에서 refresh_token 조회 실패", {
                     connection_id: connection.id,
                     has_token: false,
                 });
                 throw new AppError(500, "Failed to retrieve refresh token");
+            }
+
+            // refresh_token 복호화 (평문 폴백 지원)
+            const refreshToken = await decryptToken(storedRefreshToken);
+
+            // 마이그레이션: 평문이었으면 암호화하여 즉시 재저장
+            if (!isEncrypted(storedRefreshToken)) {
+                safeLog("info", "평문 refresh_token 감지 - 암호화하여 재저장", {
+                    connection_id: connection.id,
+                });
+                try {
+                    const reEncrypted = await encryptToken(refreshToken);
+                    const { error: migrateError } = await db
+                        .from("oauth_connections")
+                        .update({ refresh_token: reEncrypted })
+                        .eq("id", connection.id);
+                    if (migrateError) {
+                        safeLog("warn", "평문 토큰 재암호화 저장 실패 (계속 진행)", {
+                            error: migrateError.message,
+                        });
+                    } else {
+                        safeLog("info", "평문 refresh_token 재암호화 완료", {
+                            connection_id: connection.id,
+                        });
+                    }
+                } catch (migrationEncryptError) {
+                    // 재암호화 실패는 경고만 남기고 현재 요청은 계속 진행
+                    safeLog("warn", "평문 토큰 재암호화 실패 (계속 진행)", {
+                        error: String(migrationEncryptError),
+                    });
+                }
             }
 
             // Atlassian API로 access_token 갱신
@@ -162,19 +193,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
             const newTokens: AtlassianTokenResponse = await tokenResponse.json();
 
-            // 회전 refresh token 처리: 새 refresh_token이 있으면 DB 직접 업데이트
-            // Vault pgsodium 권한 문제로 인해 oauth_connections 테이블에 직접 저장 (MVP)
+            // 회전 refresh token 처리: 새 refresh_token이 있으면 암호화 후 DB 업데이트
             if (newTokens.refresh_token) {
-                safeLog("info", "refresh_token 로테이션 감지, DB 갱신", { tenant_id });
+                safeLog("info", "refresh_token 로테이션 감지, 암호화 후 DB 갱신", { tenant_id });
 
-                const { error: updateTokenError } = await db
-                    .from("oauth_connections")
-                    .update({ refresh_token: newTokens.refresh_token })
-                    .eq("id", connection.id);
+                try {
+                    const encryptedNewRefreshToken = await encryptToken(newTokens.refresh_token);
+                    const { error: updateTokenError } = await db
+                        .from("oauth_connections")
+                        .update({ refresh_token: encryptedNewRefreshToken })
+                        .eq("id", connection.id);
 
-                if (updateTokenError) {
-                    // DB 갱신 실패는 로그만 남기고 access_token은 반환 (다음 갱신 시 재시도)
-                    safeLog("error", "회전 refresh_token DB 갱신 실패", { error: updateTokenError.message });
+                    if (updateTokenError) {
+                        // DB 갱신 실패는 로그만 남기고 access_token은 반환 (다음 갱신 시 재시도)
+                        safeLog("error", "회전 refresh_token DB 갱신 실패", { error: updateTokenError.message });
+                    } else {
+                        safeLog("info", "로테이션된 refresh_token 암호화 저장 완료", { tenant_id });
+                    }
+                } catch (rotationEncryptError) {
+                    safeLog("error", "로테이션 refresh_token 암호화 실패", {
+                        error: String(rotationEncryptError),
+                    });
+                    // 암호화 실패 시에도 access_token은 반환 (보안상 평문 저장 금지)
                 }
             }
 

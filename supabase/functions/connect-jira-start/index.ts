@@ -13,7 +13,7 @@ import { safeLog } from "../_shared/log-redactor.ts";
 
 const JIRA_CLIENT_ID = Deno.env.get("JIRA_CLIENT_ID")!;
 const JIRA_REDIRECT_URI = Deno.env.get("JIRA_REDIRECT_URI")!;
-const JIRA_SCOPES = "read:jira-work write:jira-work read:jira-user offline_access read:board-scope:jira-software read:sprint:jira-software";
+const JIRA_SCOPES = "read:jira-work write:jira-work read:jira-user offline_access";
 const STATE_TTL_MINUTES = 10;
 
 interface StartRequest {

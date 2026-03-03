@@ -9,6 +9,7 @@ import { getServiceClient } from "../_shared/supabase-client.ts";
 import { AppError, errorResponse } from "../_shared/error-handler.ts";
 import { safeLog } from "../_shared/log-redactor.ts";
 import { createSessionToken } from "../_shared/jwt-helper.ts";
+import { encryptToken } from "../_shared/token-encryptor.ts";
 
 const JIRA_CLIENT_ID = Deno.env.get("JIRA_CLIENT_ID")!;
 const JIRA_CLIENT_SECRET = Deno.env.get("JIRA_CLIENT_SECRET")!;
@@ -144,8 +145,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
             return errorHtml("Received an invalid response from Jira.");
         }
 
-        // Accessible Resources API로 cloud_id 획득
+        // refresh_token 암호화 (키 없으면 에러 발생 → OAuth 중단)
+        let encryptedRefreshToken: string;
+        try {
+            encryptedRefreshToken = await encryptToken(refresh_token);
+            safeLog("info", "refresh_token 암호화 완료", { connect_id: connection.id });
+        } catch (encryptError) {
+            safeLog("error", "refresh_token 암호화 실패 - 환경변수 누락", {
+                connect_id: connection.id,
+                error: String(encryptError),
+            });
+            return errorHtml("Server configuration error. Please contact support.");
+        }
+
+        // Accessible Resources API로 cloud_id 및 site_url 획득
         let cloudId: string | null = null;
+        let siteUrl: string | null = null;
         try {
             const resourcesResponse = await fetch(
                 "https://api.atlassian.com/oauth/token/accessible-resources",
@@ -158,7 +173,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
                 const resources = await resourcesResponse.json();
                 if (Array.isArray(resources) && resources.length > 0) {
                     cloudId = resources[0].id;
-                    safeLog("info", "cloud_id 획득 성공", { cloud_id: cloudId });
+                    siteUrl = resources[0].url ?? null;
+                    safeLog("info", "cloud_id 및 site_url 획득 성공", {
+                        cloud_id: cloudId,
+                        site_url: siteUrl,
+                    });
                 }
             } else {
                 safeLog("warn", "accessible-resources 조회 실패", { status: resourcesResponse.status });
@@ -167,15 +186,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
             safeLog("warn", "accessible-resources 호출 오류", { error: String(err) });
         }
 
-        // oauth_connections 상태 completed로 업데이트 (refresh_token 직접 저장)
-        // Vault pgsodium 권한 문제로 인해 DB 컬럼에 직접 저장 (MVP)
+        // oauth_connections 상태 completed로 업데이트 (암호화된 refresh_token 저장)
         const { error: updateError } = await db
             .from("oauth_connections")
             .update({
                 status: "completed",
                 cloud_id: cloudId,
-                refresh_token: refresh_token,
-                scopes: JIRA_CLIENT_ID ? ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access", "read:board-scope:jira-software", "read:sprint:jira-software"] : [],
+                site_url: siteUrl,
+                refresh_token: encryptedRefreshToken,
+                scopes: JIRA_CLIENT_ID ? ["read:jira-work", "write:jira-work", "read:jira-user", "offline_access"] : [],
             })
             .eq("id", connection.id);
 

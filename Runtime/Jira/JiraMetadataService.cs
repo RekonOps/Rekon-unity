@@ -363,6 +363,64 @@ namespace RekonOps.BugOneTouch
         }
 
         /// <summary>
+        /// Jira 서버 설정에서 첨부 파일 최대 크기(바이트)를 조회합니다.
+        /// GET /rest/api/3/configuration API를 시도하고, 실패 시 기본값(250MB)을 반환합니다.
+        /// </summary>
+        /// <param name="cancellationToken">취소 토큰</param>
+        /// <returns>첨부 파일 최대 크기(바이트). 조회 실패 시 262144000(250MB) 반환.</returns>
+        public async Task<long> GetAttachmentSizeLimitBytesAsync(CancellationToken cancellationToken = default)
+        {
+            // Jira Cloud 기본값: 250MB
+            const long defaultLimitBytes = 250L * 1024L * 1024L; // 262144000
+
+            try
+            {
+                string json = await _apiClient.GetAsync("/configuration", cancellationToken);
+                Debug.Log($"[BugOneTouch] /configuration 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                var config = JsonUtility.FromJson<JiraConfigurationResponse>(json);
+                if (config != null && config.attachmentSize > 0)
+                {
+                    Debug.Log($"[BugOneTouch] 첨부파일 크기 제한 조회 성공: {config.attachmentSize} 바이트");
+                    return config.attachmentSize;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] /configuration 조회 실패: {ex.Message}. 기본값({defaultLimitBytes} 바이트)을 사용합니다.");
+            }
+
+            // 기본값 반환 (Jira Cloud 250MB)
+            return defaultLimitBytes;
+        }
+
+        /// <summary>
+        /// Jira 서버 정보를 조회합니다.
+        /// GET /rest/api/3/serverInfo
+        /// baseUrl 필드에 실제 Jira 사이트 URL(예: https://yourcompany.atlassian.net)이 포함됩니다.
+        /// </summary>
+        /// <param name="ct">취소 토큰</param>
+        /// <returns>서버 정보. 조회 실패 시 null.</returns>
+        public async Task<JiraServerInfo> GetServerInfoAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                string json = await _apiClient.GetAsync("/serverInfo", ct);
+                Debug.Log($"[BugOneTouch] /serverInfo 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                return JsonUtility.FromJson<JiraServerInfo>(json);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] /serverInfo 조회 실패: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// JQL로 이슈를 검색합니다 (에픽, 연결 이슈용).
         /// </summary>
         public async Task<JiraIssueSummary[]> SearchIssuesAsync(
@@ -505,5 +563,30 @@ namespace RekonOps.BugOneTouch
         {
             public JiraUser[] users;
         }
+
+        /// <summary>GET /rest/api/3/configuration 응답 래퍼</summary>
+        [Serializable]
+        private class JiraConfigurationResponse
+        {
+            /// <summary>첨부 파일 최대 크기 (바이트)</summary>
+            public long attachmentSize;
+        }
+    }
+
+    /// <summary>
+    /// GET /rest/api/3/serverInfo 응답 모델.
+    /// baseUrl에 실제 Jira 사이트 URL이 포함됩니다.
+    /// </summary>
+    [Serializable]
+    public class JiraServerInfo
+    {
+        /// <summary>Jira 사이트 기본 URL (예: https://yourcompany.atlassian.net)</summary>
+        public string baseUrl;
+
+        /// <summary>Jira 버전 문자열</summary>
+        public string version;
+
+        /// <summary>서버 제목 (사이트 이름)</summary>
+        public string serverTitle;
     }
 }

@@ -135,7 +135,8 @@ namespace RekonOps.BugOneTouch
                 }
 
                 // CancellationToken 등록: 취소 시 FFmpeg 프로세스 강제 종료
-                cancellationToken.Register(() =>
+                // using var로 스코프 종료 시 자동 해제하여 메모리 누수 방지
+                using var ctReg = cancellationToken.Register(() =>
                 {
                     try { process.Kill(); } catch { /* 무시 */ }
                 });
@@ -273,7 +274,7 @@ namespace RekonOps.BugOneTouch
             // -vf vflip: Unity 텍스처는 하단 원점(Y-up)이라 상하 반전 보정 필요
             return $"-y -f rawvideo -pix_fmt rgba -video_size {config.Width}x{config.Height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-vf vflip -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 " +
+                   $"-vf vflip -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf} " +
                    $"\"{safeOutputPath}\"";
         }
     }

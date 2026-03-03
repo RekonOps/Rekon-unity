@@ -4,6 +4,35 @@ using System.Collections.Generic;
 namespace RekonOps.BugOneTouch
 {
     /// <summary>
+    /// Jira 연동 정보.
+    /// </summary>
+    [Serializable]
+    public class JiraIntegrationInfo
+    {
+        /// <summary>Jira 연결 여부.</summary>
+        public bool connected;
+
+        /// <summary>Jira Cloud ID.</summary>
+        public string cloudId = "";
+
+        /// <summary>Jira 프로젝트 키 (예: BUG, PROJ).</summary>
+        public string projectKey = "";
+
+        /// <summary>생성된 Jira 이슈 키 (예: BUG-123). 제출 전 빈 문자열.</summary>
+        public string issueKey = "";
+    }
+
+    /// <summary>
+    /// 번들의 외부 시스템 연동 정보.
+    /// </summary>
+    [Serializable]
+    public class BundleIntegrations
+    {
+        /// <summary>Jira 연동 정보.</summary>
+        public JiraIntegrationInfo jira = new JiraIntegrationInfo();
+    }
+
+    /// <summary>
     /// 번들에 포함된 개별 아티팩트의 메타데이터.
     /// </summary>
     [Serializable]
@@ -146,6 +175,9 @@ namespace RekonOps.BugOneTouch
         /// 재시도 횟수. SubmissionQueue에서 관리합니다.
         /// </summary>
         public int retry_count;
+
+        /// <summary>외부 시스템 연동 정보 (Jira 등).</summary>
+        public BundleIntegrations integrations = new BundleIntegrations();
 
         /// <summary>
         /// 필수 필드가 모두 유효한지 검사합니다.

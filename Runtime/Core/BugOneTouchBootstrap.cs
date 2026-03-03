@@ -43,8 +43,8 @@ namespace RekonOps.BugOneTouch
                 // 로그 링버퍼: Application.logMessageReceivedThreaded 구독 시작
                 var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
 
-                // 로그 직렬화기: 생성자 파라미터 없음
-                var logSerializer = new LogSerializer();
+                // 로그 직렬화기: 마스킹 활성화
+                var logSerializer = new LogSerializer(enableMasking: true);
 
                 // 스크린샷 캡처기: settings 주입
                 var screenshotCapturer = new ScreenshotCapturer(settings);
@@ -129,7 +129,7 @@ namespace RekonOps.BugOneTouch
                 var jiraService         = new JiraSubmissionService(issueCreator, attachmentUploader);
 
                 // 번들 관련
-                var manifestGenerator   = new ManifestGenerator();
+                var manifestGenerator   = new ManifestGenerator(settings);
                 var bundleWriter        = new BundleWriter(manifestGenerator);
                 var bundleRepository    = new BundleRepository();
 

@@ -25,6 +25,23 @@ namespace RekonOps.BugOneTouch
         private const string Separator = "---";
         private const string StackTracePrefix = "StackTrace: ";
 
+        private readonly bool _enableMasking;
+        private readonly LogMasker _masker;
+
+        /// <summary>마스킹 비활성화 기본 생성자 (하위 호환성 유지)</summary>
+        public LogSerializer() : this(false) { }
+
+        /// <summary>
+        /// 마스킹 활성화 여부를 지정하는 생성자.
+        /// </summary>
+        /// <param name="enableMasking">true이면 직렬화 시 민감 정보를 마스킹합니다.</param>
+        public LogSerializer(bool enableMasking)
+        {
+            _enableMasking = enableMasking;
+            if (_enableMasking)
+                _masker = new LogMasker();
+        }
+
         /// <summary>
         /// LogEntry 배열을 사람이 읽기 좋은 텍스트 형식으로 직렬화합니다.
         /// 타임스탬프는 UTC 기준 ISO 8601 형식으로 출력됩니다.
@@ -49,13 +66,17 @@ namespace RekonOps.BugOneTouch
 
             foreach (var entry in entries)
             {
-                // 타임스탬프를 게임 시작 기준 상대 시간으로 출력
-                sb.AppendLine($"[+{entry.Timestamp:F3}s] [{entry.LogType}] {entry.Message}");
+                // 마스킹 활성화 시 민감 정보 마스킹
+                string message    = _enableMasking ? _masker.MaskAll(entry.Message)    : entry.Message;
+                string stackTrace = _enableMasking ? _masker.MaskAll(entry.StackTrace) : entry.StackTrace;
 
-                if (!string.IsNullOrEmpty(entry.StackTrace))
+                // 타임스탬프를 게임 시작 기준 상대 시간으로 출력
+                sb.AppendLine($"[+{entry.Timestamp:F3}s] [{entry.LogType}] {message}");
+
+                if (!string.IsNullOrEmpty(stackTrace))
                 {
                     sb.AppendLine(StackTracePrefix);
-                    sb.AppendLine(entry.StackTrace);
+                    sb.AppendLine(stackTrace);
                 }
 
                 sb.AppendLine(Separator);

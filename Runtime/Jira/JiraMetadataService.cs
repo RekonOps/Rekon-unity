@@ -452,6 +452,32 @@ namespace GaoZombie.BugOneTouch
             }
         }
 
+        /// <summary>
+        /// 프로젝트의 에픽 목록을 검색합니다.
+        /// </summary>
+        public async Task<JiraIssueSummary[]> SearchEpicsAsync(string projectKey, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(projectKey))
+                throw new ArgumentException("projectKey는 필수입니다.", nameof(projectKey));
+
+            try
+            {
+                string jql = UnityWebRequest.EscapeURL($"project={projectKey} AND issuetype=Epic ORDER BY created DESC");
+                string json = await _apiClient.GetAsync(
+                    $"/rest/api/3/search?jql={jql}&fields=summary&maxResults=50", ct);
+                Debug.Log($"[BugOneTouch] SearchEpicsAsync 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+
+                var response = JsonUtility.FromJson<IssueSearchResponse>(json);
+                return response?.GetItems() ?? Array.Empty<JiraIssueSummary>();
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] 에픽 검색 실패 (프로젝트: {projectKey}): {ex.Message}");
+                return Array.Empty<JiraIssueSummary>();
+            }
+        }
+
         // ─── JSON 파싱용 private 래퍼 클래스 ─────────────────────────────────────
         // JsonUtility.FromJson은 최상위 배열을 직접 파싱하지 못하므로 래퍼 클래스 필수.
         // private 클래스에도 [Serializable] 필수 (JsonUtility 요구사항).

@@ -729,7 +729,7 @@ namespace RekonOps.BugOneTouch.Editor
             {
                 DrawSectionHeader("필드 기본값 설정");
                 EditorGUILayout.HelpBox(
-                    "* 표시는 필수 필드입니다. summary와 description은 버그 리포트 폼에서 입력합니다.\n[H] 버튼으로 불필요한 필드를 숨길 수 있습니다.",
+                    "* 표시는 필수 필드입니다. summary와 description은 버그 리포트 폼에서 입력합니다.\n[V] 버튼으로 필드를 숨길 수 있습니다. 숨긴 필드는 아래 'Foldout'에서 [—] 버튼으로 다시 표시할 수 있습니다.",
                     MessageType.Info);
                 DrawFieldDefaults(true);   // 필수 필드
                 EditorGUILayout.Space(4f);
@@ -924,7 +924,7 @@ namespace RekonOps.BugOneTouch.Editor
                     if (!requiredOnly)
                     {
                         EditorGUILayout.BeginHorizontal();
-                        if (GUILayout.Button("H", EditorStyles.miniButton, GUILayout.Width(20f)))
+                        if (GUILayout.Button("V", EditorStyles.miniButton, GUILayout.Width(20f)))
                         {
                             _settings.ToggleFieldHidden(fieldId);
                             EditorUtility.SetDirty(_settings);
@@ -943,7 +943,7 @@ namespace RekonOps.BugOneTouch.Editor
                 // 선택 필드만 숨김 버튼 표시
                 if (!requiredOnly)
                 {
-                    if (GUILayout.Button("H", EditorStyles.miniButton, GUILayout.Width(20f)))
+                    if (GUILayout.Button("V", EditorStyles.miniButton, GUILayout.Width(20f)))
                     {
                         _settings.ToggleFieldHidden(fieldId);
                         EditorUtility.SetDirty(_settings);
@@ -1088,8 +1088,8 @@ namespace RekonOps.BugOneTouch.Editor
                 }
 
                 EditorGUILayout.BeginHorizontal();
-                // 표시(Show) 버튼
-                if (GUILayout.Button("S", EditorStyles.miniButton, GUILayout.Width(20f)))
+                // 숨김 해제(Show) 버튼 — 현재 숨김 상태이므로 "—" 표시
+                if (GUILayout.Button("—", EditorStyles.miniButton, GUILayout.Width(20f)))
                 {
                     _settings.ToggleFieldHidden(hiddenId);
                     EditorUtility.SetDirty(_settings);

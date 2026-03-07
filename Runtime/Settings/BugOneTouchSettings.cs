@@ -110,6 +110,16 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("사용자 식별자 (UUID). 각 사용자별 고유 값입니다. 비어있으면 자동 생성됩니다.")]
         public string userId = "";
 
+        [Header("Supabase")]
+        [Tooltip("Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)")]
+        public string supabaseUrl = "";
+
+        [Tooltip("Supabase Anon Key")]
+        public string supabaseAnonKey = "";
+
+        [Tooltip("라이선스 키 (워크스페이스 설정 페이지에서 복사)")]
+        public string licenseKey = "";
+
         [Header("Auth Broker")]
         [Tooltip("Auth Broker base URL")]
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";

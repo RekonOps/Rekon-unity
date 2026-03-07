@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,6 +54,13 @@ namespace RekonOps.BugOneTouch
 
             /// <summary>상위 항목 이슈 키 (예: "PROJ-123")</summary>
             public string ParentKey { get; set; }
+
+            /// <summary>
+            /// R2에 업로드된 파일들의 공개 URL 목록.
+            /// 키: 파일 유형 설명(예: "스크린샷", "로그", "영상"), 값: R2 공개 URL.
+            /// null 또는 빈 사전이면 첨부파일 섹션을 추가하지 않습니다.
+            /// </summary>
+            public Dictionary<string, string> R2Urls { get; set; }
         }
 
         /// <summary>이슈 생성 결과</summary>
@@ -105,8 +113,11 @@ namespace RekonOps.BugOneTouch
             // 레이블 병합: 기본 레이블 + 추가 레이블
             var labels = MergeLabels(_settings.defaultLabels, request.AdditionalLabels);
 
+            // R2 URL이 있으면 description에 첨부파일 섹션 추가
+            string fullDescription = BuildDescriptionWithR2Links(request.Description, request.R2Urls);
+
             // ADF 본문 생성
-            var adfDescription = AdfBuilder.CreateFromText(request.Description ?? "");
+            var adfDescription = AdfBuilder.CreateFromText(fullDescription);
 
             // Jira 이슈 생성 JSON 빌드
             var requestJson = BuildCreateIssueJson(request, labels, adfDescription);
@@ -132,6 +143,43 @@ namespace RekonOps.BugOneTouch
         }
 
         // ─── 내부 메서드 ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// R2 URL이 있으면 description 끝에 첨부파일 섹션을 추가합니다.
+        /// </summary>
+        private static string BuildDescriptionWithR2Links(string description, Dictionary<string, string> r2Urls)
+        {
+            var desc = description ?? "";
+
+            if (r2Urls == null || r2Urls.Count == 0)
+                return desc;
+
+            var sb = new StringBuilder(desc);
+            if (sb.Length > 0)
+                sb.Append("\n\n");
+
+            sb.AppendLine("## 첨부파일");
+            sb.AppendLine();
+
+            foreach (var kvp in r2Urls)
+            {
+                if (!string.IsNullOrEmpty(kvp.Value))
+                {
+                    // URL 스킴 검증: http 또는 https만 허용
+                    if (!Uri.TryCreate(kvp.Value, UriKind.Absolute, out var uri)
+                        || (uri.Scheme != "https" && uri.Scheme != "http"))
+                    {
+                        Debug.LogWarning($"[JiraIssueCreator] 잘못된 R2 URL 스킴, 건너뜀: {kvp.Value}");
+                        continue;
+                    }
+
+                    // 마크다운 링크 형식: [파일 유형](URL)
+                    sb.AppendLine($"- [{kvp.Key}]({kvp.Value})");
+                }
+            }
+
+            return sb.ToString().TrimEnd();
+        }
 
         private static void ValidateRequest(CreateIssueRequest request)
         {

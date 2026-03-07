@@ -79,6 +79,7 @@ namespace RekonOps.BugOneTouch.Editor
             "Video",
             "Crash Recovery",
             "Advanced",
+            "Supabase",
             "Jira",
         };
 
@@ -86,7 +87,8 @@ namespace RekonOps.BugOneTouch.Editor
         private const int TabVideo         = 1;
         private const int TabCrashRecovery = 2;
         private const int TabAdvanced      = 3;
-        private const int TabJira          = 4;
+        private const int TabSupabase      = 4;
+        private const int TabJira          = 5;
 
         // ─── 내부 상태 ─────────────────────────────────────────────────────────────
 
@@ -107,6 +109,14 @@ namespace RekonOps.BugOneTouch.Editor
         private bool _isLoadingSpecialFields;      // myself/assignee/sprint/epic 로딩 상태
         private bool _showHiddenFields;           // 숨겨진 필드 foldout 상태
         private bool _isLoadingAttachmentLimit;   // 첨부파일 크기 제한 조회 중 여부
+
+        // Supabase 웹 로그인 관련 상태
+        private bool _isWebLoginInProgress;
+        private string _webLoginStatus = "";
+        private SupabaseAuthClient _editorSupabaseAuth;
+        private SessionTokenStore _editorTokenStore;
+        private CancellationTokenSource _loginCts;
+        private string _cachedSupabaseUrl;
 
         // 스크롤 포지션 (각 탭별)
         private Vector2 _scrollPos;
@@ -173,6 +183,9 @@ namespace RekonOps.BugOneTouch.Editor
         private void OnDisable()
         {
             _jiraPanel?.Cleanup();
+            _loginCts?.Cancel();
+            _loginCts?.Dispose();
+            _loginCts = null;
         }
 
         private void OnGUI()
@@ -259,6 +272,9 @@ namespace RekonOps.BugOneTouch.Editor
                     break;
                 case TabAdvanced:
                     DrawAdvancedTab();
+                    break;
+                case TabSupabase:
+                    DrawSupabaseTab();
                     break;
                 case TabJira:
                     DrawJiraTab();
@@ -689,6 +705,197 @@ namespace RekonOps.BugOneTouch.Editor
             if (GUILayout.Button("URL 형식 검증", GUILayout.Width(140f)))
             {
                 ValidateAuthBrokerUrl(brokerUrl.stringValue);
+            }
+        }
+
+        // ─── Supabase 탭 ───────────────────────────────────────────────────────────
+
+        private void DrawSupabaseTab()
+        {
+            EditorGUILayout.LabelField("Supabase 연동 설정", EditorStyles.boldLabel);
+            EditorGUILayout.Space(4f);
+
+            // Supabase URL 설정
+            DrawSectionHeader("Supabase 프로젝트");
+
+            SerializedProperty supabaseUrlProp = _serializedSettings.FindProperty("supabaseUrl");
+            EditorGUILayout.PropertyField(
+                supabaseUrlProp,
+                new GUIContent("Supabase URL", "Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)"));
+
+            SerializedProperty supabaseAnonKeyProp = _serializedSettings.FindProperty("supabaseAnonKey");
+            EditorGUILayout.PropertyField(
+                supabaseAnonKeyProp,
+                new GUIContent("Supabase Anon Key", "Supabase Anon Key"));
+
+            // 라이선스 키는 민감 정보이므로 PasswordField로 마스킹 표시
+            SerializedProperty licenseKeyProp = _serializedSettings.FindProperty("licenseKey");
+            EditorGUI.BeginChangeCheck();
+            string maskedValue = EditorGUILayout.PasswordField(
+                new GUIContent("라이선스 키", "워크스페이스 설정 페이지에서 복사한 라이선스 키"),
+                licenseKeyProp.stringValue);
+            if (EditorGUI.EndChangeCheck())
+            {
+                licenseKeyProp.stringValue = maskedValue;
+            }
+
+            EditorGUILayout.Space(8f);
+
+            // 웹 로그인 섹션
+            DrawSectionHeader("웹 로그인");
+
+            bool hasSupabaseUrl = !string.IsNullOrEmpty(_settings.supabaseUrl)
+                && !string.IsNullOrEmpty(_settings.supabaseAnonKey);
+
+            if (!hasSupabaseUrl)
+            {
+                EditorGUILayout.HelpBox(
+                    "Supabase URL과 Anon Key를 먼저 설정하세요.",
+                    MessageType.Info);
+            }
+            else
+            {
+                // 로그인 상태 표시
+                EnsureEditorSupabaseAuth();
+                bool isLoggedIn = _editorTokenStore != null && !_editorTokenStore.IsSupabaseExpired();
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.PrefixLabel("인증 상태");
+                if (isLoggedIn)
+                {
+                    var origColor = GUI.contentColor;
+                    GUI.contentColor = new Color(0.2f, 0.8f, 0.3f);
+                    EditorGUILayout.LabelField("인증됨");
+                    GUI.contentColor = origColor;
+                }
+                else
+                {
+                    var origColor = GUI.contentColor;
+                    GUI.contentColor = new Color(0.9f, 0.3f, 0.3f);
+                    EditorGUILayout.LabelField("미인증");
+                    GUI.contentColor = origColor;
+                }
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.Space(4f);
+
+                EditorGUILayout.BeginHorizontal();
+
+                // 웹 로그인 버튼
+                using (new EditorGUI.DisabledScope(_isWebLoginInProgress))
+                {
+                    string loginLabel = _isWebLoginInProgress ? "로그인 중..." : "웹 로그인";
+                    if (GUILayout.Button(loginLabel, GUILayout.Width(120f), GUILayout.Height(28f)))
+                    {
+                        StartWebLogin();
+                    }
+                }
+
+                // 로그아웃 버튼
+                using (new EditorGUI.DisabledScope(!isLoggedIn || _isWebLoginInProgress))
+                {
+                    if (GUILayout.Button("로그아웃", GUILayout.Width(80f), GUILayout.Height(28f)))
+                    {
+                        _editorTokenStore?.ClearSupabase();
+                        _webLoginStatus = "로그아웃 완료";
+                        Debug.Log("[BugOneTouch] Supabase 에디터 로그아웃 완료");
+                        Repaint();
+                    }
+                }
+
+                EditorGUILayout.EndHorizontal();
+
+                // 상태 메시지 표시
+                if (!string.IsNullOrEmpty(_webLoginStatus))
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.HelpBox(_webLoginStatus, MessageType.Info);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 에디터용 SupabaseAuthClient 인스턴스를 생성합니다 (지연 초기화).
+        /// </summary>
+        private void EnsureEditorSupabaseAuth()
+        {
+            if (_editorTokenStore == null)
+                _editorTokenStore = new SessionTokenStore();
+
+            // settings의 URL이 변경되면 클라이언트 재생성
+            if (_editorSupabaseAuth != null && _settings.supabaseUrl != _cachedSupabaseUrl)
+            {
+                Debug.Log("[BugOneTouch] Supabase URL 변경 감지. 클라이언트를 재생성합니다.");
+                _editorSupabaseAuth = null;
+            }
+
+            if (_editorSupabaseAuth == null
+                && !string.IsNullOrEmpty(_settings.supabaseUrl)
+                && !string.IsNullOrEmpty(_settings.supabaseAnonKey))
+            {
+                try
+                {
+                    _editorSupabaseAuth = new SupabaseAuthClient(
+                        _settings.supabaseUrl, _settings.supabaseAnonKey, _editorTokenStore);
+                    _cachedSupabaseUrl = _settings.supabaseUrl;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[BugOneTouch] SupabaseAuthClient 초기화 실패: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 웹 브라우저를 통한 Supabase 로그인을 시작합니다.
+        /// </summary>
+        private async void StartWebLogin()
+        {
+            if (_isWebLoginInProgress) return;
+
+            EnsureEditorSupabaseAuth();
+            if (_editorSupabaseAuth == null)
+            {
+                _webLoginStatus = "SupabaseAuthClient 초기화에 실패했습니다. URL과 Anon Key를 확인하세요.";
+                Repaint();
+                return;
+            }
+
+            // 이전 로그인 시도 취소 및 새 CancellationTokenSource 생성
+            _loginCts?.Cancel();
+            _loginCts?.Dispose();
+            _loginCts = new CancellationTokenSource();
+            var ct = _loginCts.Token;
+
+            _isWebLoginInProgress = true;
+            _webLoginStatus = "브라우저에서 로그인을 완료해주세요...";
+            Repaint();
+
+            try
+            {
+                string deviceId = SystemInfo.deviceUniqueIdentifier;
+                var result = await _editorSupabaseAuth.StartWebLoginAsync(deviceId, ct);
+                _webLoginStatus = $"인증 완료! 워크스페이스: {result.WorkspaceName}";
+                Debug.Log($"[BugOneTouch] 에디터 Supabase 웹 로그인 성공: {result.WorkspaceName}");
+            }
+            catch (OperationCanceledException)
+            {
+                _webLoginStatus = "로그인이 취소되었습니다.";
+                Debug.Log("[BugOneTouch] 에디터 Supabase 웹 로그인 취소됨");
+            }
+            catch (TimeoutException)
+            {
+                _webLoginStatus = "로그인 시간이 초과되었습니다. 다시 시도해주세요.";
+            }
+            catch (Exception ex)
+            {
+                _webLoginStatus = $"로그인 실패: {ex.Message}";
+                Debug.LogError($"[BugOneTouch] 에디터 Supabase 웹 로그인 실패: {ex.Message}");
+            }
+            finally
+            {
+                _isWebLoginInProgress = false;
+                Repaint();
             }
         }
 

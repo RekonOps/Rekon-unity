@@ -86,6 +86,7 @@ namespace RekonOps.BugOneTouch
         private string _resultMessage   = "";
         private bool   _resultSuccess   = false;
         private string _resultIssueUrl  = "";
+        private string _resultWebUrl    = "";
 
         // ─── 제출 취소 토큰 ───────────────────────────────────────────────────────
 
@@ -97,6 +98,9 @@ namespace RekonOps.BugOneTouch
         private BundleWriter          _bundleWriter;
         private BundleRepository      _bundleRepository;
         private BugOneTouchSettings   _settings;
+        private ReportSubmitter       _reportSubmitter;
+        private LicenseValidator      _licenseValidator;
+        private SupabaseAuthClient    _supabaseAuthClient;
 
         // ─── GUI 스타일 캐시 ──────────────────────────────────────────────────────
 
@@ -138,12 +142,18 @@ namespace RekonOps.BugOneTouch
             JiraSubmissionService jiraService,
             BundleWriter bundleWriter,
             BundleRepository bundleRepository,
-            BugOneTouchSettings settings)
+            BugOneTouchSettings settings,
+            ReportSubmitter reportSubmitter = null,
+            LicenseValidator licenseValidator = null,
+            SupabaseAuthClient supabaseAuthClient = null)
         {
-            _jiraService       = jiraService;
-            _bundleWriter      = bundleWriter;
-            _bundleRepository  = bundleRepository;
-            _settings          = settings;
+            _jiraService        = jiraService;
+            _bundleWriter       = bundleWriter;
+            _bundleRepository   = bundleRepository;
+            _settings           = settings;
+            _reportSubmitter    = reportSubmitter;
+            _licenseValidator   = licenseValidator;
+            _supabaseAuthClient = supabaseAuthClient;
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────────
@@ -172,6 +182,7 @@ namespace RekonOps.BugOneTouch
             _resultMessage       = "";
             _resultSuccess       = false;
             _resultIssueUrl      = "";
+            _resultWebUrl        = "";
             _bundle              = null;
             _scrollPos           = Vector2.zero;
 
@@ -340,11 +351,17 @@ namespace RekonOps.BugOneTouch
 
             DrawSeparator();
 
+            bool hasTitle = !string.IsNullOrWhiteSpace(_title);
+            bool isWebLoggedIn = _supabaseAuthClient != null && _supabaseAuthClient.IsLoggedIn;
+            bool canJira = hasTitle && isWebLoggedIn
+                           && (_licenseValidator == null || _licenseValidator.CanSubmitToJira())
+                           && _jiraService != null;
+
             // 버튼 영역
             GUILayout.BeginHorizontal();
 
             // 취소 버튼
-            if (GUILayout.Button("취소", _buttonStyle, GUILayout.Width(80f), GUILayout.Height(30f)))
+            if (GUILayout.Button("취소", _buttonStyle, GUILayout.Width(60f), GUILayout.Height(30f)))
             {
                 HideForm();
             }
@@ -352,34 +369,55 @@ namespace RekonOps.BugOneTouch
             GUILayout.FlexibleSpace();
 
             // 로컬 저장 버튼
-            if (GUILayout.Button("로컬 저장", _buttonStyle, GUILayout.Width(100f), GUILayout.Height(30f)))
+            if (GUILayout.Button("로컬 저장", _buttonStyle, GUILayout.Width(80f), GUILayout.Height(30f)))
             {
                 _ = SaveLocalAsync();
             }
 
-            GUILayout.Space(8f);
+            GUILayout.Space(4f);
 
-            // Jira 제출 버튼 (제목이 비어 있으면 비활성화)
-            bool canSubmit = !string.IsNullOrWhiteSpace(_title);
-            using (new GUIDisabledScope(!canSubmit))
+            // 웹 저장 버튼
+            if (_reportSubmitter != null)
+            {
+                bool canWeb = hasTitle && isWebLoggedIn;
+                using (new GUIDisabledScope(!canWeb))
+                {
+                    Color origBg = GUI.backgroundColor;
+                    GUI.backgroundColor = canWeb ? new Color(0.2f, 0.7f, 0.5f) : Color.gray;
+                    if (GUILayout.Button("웹 저장", _buttonStyle, GUILayout.Width(80f), GUILayout.Height(30f)))
+                    {
+                        _ = SaveToWebAsync();
+                    }
+                    GUI.backgroundColor = origBg;
+                }
+            }
+
+            GUILayout.Space(4f);
+
+            // Jira 등록 버튼
+            using (new GUIDisabledScope(!canJira))
             {
                 Color original = GUI.backgroundColor;
-                GUI.backgroundColor = canSubmit ? new Color(0.2f, 0.6f, 0.9f) : Color.gray;
-                if (GUILayout.Button("Jira에 제출", _buttonStyle, GUILayout.Width(120f), GUILayout.Height(30f)))
+                GUI.backgroundColor = canJira ? new Color(0.2f, 0.6f, 0.9f) : Color.gray;
+                if (GUILayout.Button("Jira 등록", _buttonStyle, GUILayout.Width(90f), GUILayout.Height(30f)))
                 {
-                    _ = SubmitToJiraAsync();
+                    if (_reportSubmitter != null)
+                        _ = SubmitToJiraWithWebAsync();
+                    else
+                        _ = SubmitToJiraAsync();
                 }
                 GUI.backgroundColor = original;
             }
 
-            if (!canSubmit)
-            {
-                GUILayout.EndHorizontal();
-                GUILayout.Label("* 제목은 필수입니다.", _errorStyle);
-                return;
-            }
-
             GUILayout.EndHorizontal();
+
+            // 안내 텍스트
+            if (!hasTitle)
+                GUILayout.Label("* 제목은 필수입니다.", _errorStyle);
+            else if (!isWebLoggedIn && _reportSubmitter != null)
+                GUILayout.Label("웹 로그인이 필요합니다. (Settings > Supabase)", _labelStyle);
+            else if (_licenseValidator != null && !_licenseValidator.CanSubmitToJira())
+                GUILayout.Label("Jira 등록은 유료 플랜이 필요합니다.", _labelStyle);
         }
 
         // ─── 제출 중 화면 ─────────────────────────────────────────────────────────
@@ -418,11 +456,20 @@ namespace RekonOps.BugOneTouch
             if (_resultSuccess)
             {
                 bool isJiraIssue = !string.IsNullOrEmpty(_resultIssueKey) && _resultIssueKey.Contains("-");
+                bool isWebSaved = !string.IsNullOrEmpty(_resultWebUrl);
+
                 if (isJiraIssue)
                 {
                     GUILayout.Label("Jira 이슈가 생성되었습니다.", _successStyle);
                     GUILayout.Space(8f);
                     GUILayout.Label($"이슈 키: {_resultIssueKey}", _titleStyle);
+                }
+                else if (isWebSaved)
+                {
+                    GUILayout.Label("버그 리포트가 웹에 저장되었습니다.", _successStyle);
+                    GUILayout.Space(8f);
+                    if (!string.IsNullOrEmpty(_resultMessage))
+                        GUILayout.Label(_resultMessage, _labelStyle);
                 }
                 else
                 {
@@ -441,6 +488,14 @@ namespace RekonOps.BugOneTouch
 
             GUILayout.Space(10);
             GUILayout.BeginHorizontal();
+
+            if (!string.IsNullOrEmpty(_resultWebUrl))
+            {
+                if (GUILayout.Button("웹에서 보기", GUILayout.Height(35)))
+                {
+                    Application.OpenURL(_resultWebUrl);
+                }
+            }
 
             if (!string.IsNullOrEmpty(_resultIssueUrl))
             {
@@ -596,6 +651,259 @@ namespace RekonOps.BugOneTouch
                 ShowResult(false, "", $"로컬 저장 실패: {ex.Message}");
                 Debug.LogError($"[BugOneTouch] 번들 저장 오류: {ex}");
             }
+        }
+
+        // ─── 웹 저장 / Jira 등록 (R2 경로) ──────────────────────────────────────
+
+        /// <summary>
+        /// [웹 저장] 경로: create-report → R2 업로드만 수행합니다.
+        /// </summary>
+        private async Task SaveToWebAsync()
+        {
+            if (_reportSubmitter == null)
+            {
+                ShowResult(false, "", "ReportSubmitter가 설정되지 않았습니다.");
+                return;
+            }
+
+            _state = FormState.Submitting;
+            _submitProgress = 0f;
+            _submitStageText = "웹 저장 중...";
+
+            _cancelSource?.Cancel();
+            _cancelSource?.Dispose();
+            _cancelSource = new CancellationTokenSource();
+
+            try
+            {
+                var request = BuildWebSubmitRequest();
+                _reportSubmitter.OnProgressChanged += HandleSubmitProgress;
+                ReportSubmitter.SubmitResult result;
+                try
+                {
+                    result = await _reportSubmitter.SubmitAsync(request, _cancelSource.Token);
+                }
+                finally
+                {
+                    _reportSubmitter.OnProgressChanged -= HandleSubmitProgress;
+                }
+
+                if (result.Success)
+                {
+                    _resultWebUrl = result.WorkspaceUrl ?? "";
+                    ShowResult(true, "", "웹 대시보드에서 확인하세요.");
+                    Debug.Log($"[BugOneTouch] 웹 저장 완료: {result.ReportId}");
+                }
+                else
+                {
+                    ShowResult(false, "", result.ErrorMessage ?? "웹 저장 실패");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _state = FormState.Editing;
+                _submitProgress = 0f;
+                _submitStageText = "";
+                Debug.Log("[BugOneTouch] 웹 저장 취소됨");
+            }
+            catch (Exception ex)
+            {
+                ShowResult(false, "", $"웹 저장 실패: {ex.Message}");
+                Debug.LogError($"[BugOneTouch] 웹 저장 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// [Jira 등록] 경로: create-report → R2 업로드 → Jira 이슈 생성.
+        /// R2에 저장 후 기존 Jira 제출 플로우를 실행합니다.
+        /// </summary>
+        private async Task SubmitToJiraWithWebAsync()
+        {
+            if (_reportSubmitter == null || _jiraService == null)
+            {
+                ShowResult(false, "", "ReportSubmitter 또는 JiraService가 설정되지 않았습니다.");
+                return;
+            }
+
+            _state = FormState.Submitting;
+            _submitProgress = 0f;
+            _submitStageText = "웹 저장 중...";
+
+            _cancelSource?.Cancel();
+            _cancelSource?.Dispose();
+            _cancelSource = new CancellationTokenSource();
+
+            try
+            {
+                // 1단계: R2 업로드 (웹 저장)
+                var webRequest = BuildWebSubmitRequest();
+                _reportSubmitter.OnProgressChanged += HandleWebThenJiraProgress;
+                ReportSubmitter.SubmitResult webResult;
+                try
+                {
+                    webResult = await _reportSubmitter.SubmitAsync(webRequest, _cancelSource.Token);
+                }
+                finally
+                {
+                    _reportSubmitter.OnProgressChanged -= HandleWebThenJiraProgress;
+                }
+
+                if (!webResult.Success)
+                {
+                    ShowResult(false, "", webResult.ErrorMessage ?? "웹 저장 실패 (Jira 등록 중단)");
+                    return;
+                }
+
+                _resultWebUrl = webResult.WorkspaceUrl ?? "";
+
+                // 2단계: 번들 저장 (로컬)
+                _submitProgress = 0.5f;
+                _submitStageText = "번들 저장 중...";
+
+                if (_bundle == null && _bundleWriter != null && _captureResult != null)
+                {
+                    _bundle = await _bundleWriter.WriteAsync(_captureResult);
+                    _bundle.title = _title;
+                    _bundle.description = _description;
+                }
+
+                // 3단계: Jira 이슈 제출
+                _submitProgress = 0.6f;
+                _submitStageText = "Jira 이슈 생성 중...";
+
+                var jiraRequest = new JiraSubmissionService.SubmissionRequest
+                {
+                    BundleId = _bundle?.id ?? "unknown",
+                    IssueRequest = new JiraIssueCreator.CreateIssueRequest
+                    {
+                        ProjectKey = _settings?.jiraProjectKey ?? "",
+                        Summary = _title,
+                        Description = BuildDescription(),
+                        IssueType = _activeIssueTypes[_issueTypeIndex],
+                        Priority = _activePriorities[_priorityIndex],
+                    },
+                };
+
+                if (_captureResult != null)
+                    BuildAttachments(jiraRequest, _captureResult);
+
+                _jiraService.OnProgressChanged += HandleJiraPhaseProgress;
+                JiraSubmissionService.SubmissionResult jiraResult;
+                try
+                {
+                    jiraResult = await _jiraService.SubmitAsync(jiraRequest, _cancelSource.Token);
+                }
+                finally
+                {
+                    _jiraService.OnProgressChanged -= HandleJiraPhaseProgress;
+                }
+
+                if (jiraResult.Success)
+                {
+                    if (_bundle != null)
+                    {
+                        _bundle.jira_issue_key = jiraResult.IssueKey;
+                        if (_bundle.integrations == null)
+                            _bundle.integrations = new BundleIntegrations();
+                        _bundle.integrations.jira.issueKey = jiraResult.IssueKey;
+                        _bundle.integrations.jira.connected = true;
+                    }
+
+                    ShowResult(true, jiraResult.IssueKey, "", jiraResult.IssueUrl);
+                    Debug.Log($"[BugOneTouch] Jira 이슈 생성 완료 (웹 저장 포함): {jiraResult.IssueKey}");
+                }
+                else
+                {
+                    ShowResult(false, "", jiraResult.ErrorMessage ?? "Jira 등록 실패");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _state = FormState.Editing;
+                _submitProgress = 0f;
+                _submitStageText = "";
+                Debug.Log("[BugOneTouch] Jira 등록 (웹 경로) 취소됨");
+            }
+            catch (Exception ex)
+            {
+                ShowResult(false, "", $"Jira 등록 실패: {ex.Message}");
+                Debug.LogError($"[BugOneTouch] Jira 등록 (웹 경로) 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// CaptureResult를 ReportSubmitter.SubmitRequest로 변환합니다.
+        /// </summary>
+        private ReportSubmitter.SubmitRequest BuildWebSubmitRequest()
+        {
+            var request = new ReportSubmitter.SubmitRequest
+            {
+                // TODO: 실제 workspace_id는 SupabaseAuthClient의 캐시된 값 사용
+                WorkspaceId = "",
+                Title = _title,
+                Description = BuildDescription(),
+            };
+
+            // 환경 정보 JSON
+            if (_captureResult?.StateSnapshot != null)
+            {
+                request.DeviceInfoJson = JsonUtility.ToJson(_captureResult.StateSnapshot);
+            }
+
+            // 파일 목록 구성
+            if (_captureResult != null)
+            {
+                TryAddWebFile(request, _captureResult.ScreenshotPath, "screenshot", "screenshot.png", "image/png");
+                TryAddWebFile(request, _captureResult.LogsPath, "log", "logs.zip", "application/zip");
+
+                if (_includeVideo && !string.IsNullOrEmpty(_captureResult.VideoPath)
+                    && System.IO.File.Exists(_captureResult.VideoPath))
+                {
+                    TryAddWebFile(request, _captureResult.VideoPath, "video",
+                        System.IO.Path.GetFileName(_captureResult.VideoPath), "video/mp4");
+                }
+            }
+
+            return request;
+        }
+
+        private static void TryAddWebFile(
+            ReportSubmitter.SubmitRequest request,
+            string filePath, string type, string fileName, string contentType)
+        {
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+                return;
+
+            try
+            {
+                var fileInfo = new System.IO.FileInfo(filePath);
+                request.Files.Add(new ReportSubmitter.FileEntry
+                {
+                    Type = type,
+                    FileName = fileName,
+                    LocalPath = filePath,
+                    ContentType = contentType,
+                    FileSize = fileInfo.Length
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] 웹 파일 정보 생성 실패: {filePath}\n{ex.Message}");
+            }
+        }
+
+        private void HandleWebThenJiraProgress(float progress, string message)
+        {
+            // 웹 저장 단계: 전체의 0 ~ 0.5 범위
+            _submitProgress = progress * 0.5f;
+            _submitStageText = message;
+        }
+
+        private void HandleJiraPhaseProgress(float progress, string message)
+        {
+            // Jira 제출 단계: 전체의 0.6 ~ 1.0 범위
+            _submitProgress = 0.6f + progress * 0.4f;
+            _submitStageText = message;
         }
 
         // ─── 헬퍼 ─────────────────────────────────────────────────────────────────

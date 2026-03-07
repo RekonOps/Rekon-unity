@@ -133,11 +133,34 @@ namespace RekonOps.BugOneTouch
                 var bundleWriter        = new BundleWriter(manifestGenerator);
                 var bundleRepository    = new BundleRepository();
 
+                // ── 10. Supabase / 웹 저장 / 라이선스 의존성 (설정된 경우만) ──────────
+                SupabaseAuthClient supabaseAuthClient = null;
+                ReportSubmitter reportSubmitter = null;
+                LicenseValidator licenseValidator = null;
+
+                if (!string.IsNullOrEmpty(settings.supabaseUrl) && !string.IsNullOrEmpty(settings.supabaseAnonKey))
+                {
+                    supabaseAuthClient = new SupabaseAuthClient(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore);
+
+                    var r2Uploader = new R2Uploader();
+                    reportSubmitter = new ReportSubmitter(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore, r2Uploader);
+
+                    if (!string.IsNullOrEmpty(settings.licenseKey))
+                    {
+                        licenseValidator = new LicenseValidator(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore);
+                        Debug.Log("[BugOneTouch] 라이선스 검증기 초기화 완료");
+                    }
+
+                    Debug.Log("[BugOneTouch] Supabase 연동 초기화 완료");
+                }
+
                 // BugReportForm 생성 및 의존성 주입
                 var bugReportForm = BugReportForm.EnsureInstance();
-                bugReportForm.SetDependencies(jiraService, bundleWriter, bundleRepository, settings);
+                bugReportForm.SetDependencies(
+                    jiraService, bundleWriter, bundleRepository, settings,
+                    reportSubmitter, licenseValidator, supabaseAuthClient);
 
-                // ── 10. 캡처 완료 이벤트 → BugReportForm 바인딩 ─────────────────
+                // ── 11. 캡처 완료 이벤트 → BugReportForm 바인딩 ─────────────────
                 orchestrator.OnCaptureCompleted += bugReportForm.ShowForm;
 
                 Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");

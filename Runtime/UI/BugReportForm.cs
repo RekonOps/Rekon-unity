@@ -771,9 +771,13 @@ namespace GaoZombie.BugOneTouch
                 _submitProgress = 0.6f;
                 _submitStageText = "Jira 이슈 생성 중...";
 
+                // R2 URL이 있으면 description에 링크를 포함하고, 직접 첨부 업로드를 건너뜀
+                bool hasR2Urls = webResult.FileUrls != null && webResult.FileUrls.Count > 0;
+
                 var jiraRequest = new JiraSubmissionService.SubmissionRequest
                 {
                     BundleId = _bundle?.id ?? "unknown",
+                    UseR2Links = hasR2Urls,
                     IssueRequest = new JiraIssueCreator.CreateIssueRequest
                     {
                         ProjectKey = _settings?.jiraProjectKey ?? "",
@@ -781,10 +785,12 @@ namespace GaoZombie.BugOneTouch
                         Description = BuildDescription(),
                         IssueType = _activeIssueTypes[_issueTypeIndex],
                         Priority = _activePriorities[_priorityIndex],
+                        R2Urls = webResult.FileUrls,
                     },
                 };
 
-                if (_captureResult != null)
+                // R2 URL이 없는 경우에만 기존 직접 첨부 방식 사용
+                if (!hasR2Urls && _captureResult != null)
                     BuildAttachments(jiraRequest, _captureResult);
 
                 _jiraService.OnProgressChanged += HandleJiraPhaseProgress;
@@ -1010,12 +1016,14 @@ namespace GaoZombie.BugOneTouch
                             zipData = ms.ToArray();
                         }
 
+#pragma warning disable CS0618
                         request.Attachments.Add(new JiraAttachmentUploader.AttachmentItem
                         {
                             FileName    = "video_frames.zip",
                             Data        = zipData,
                             ContentType = "application/zip",
                         });
+#pragma warning restore CS0618
 
                         Debug.Log($"[BugOneTouch] 영상 프레임 ZIP 첨부 준비 완료 ({zipData.Length / 1024}KB)");
                     }
@@ -1043,12 +1051,14 @@ namespace GaoZombie.BugOneTouch
             try
             {
                 byte[] data = System.IO.File.ReadAllBytes(filePath);
+#pragma warning disable CS0618
                 request.Attachments.Add(new JiraAttachmentUploader.AttachmentItem
                 {
                     FileName    = fileName,
                     Data        = data,
                     ContentType = contentType,
                 });
+#pragma warning restore CS0618
             }
             catch (System.Exception ex)
             {

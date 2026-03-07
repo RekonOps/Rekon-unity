@@ -63,6 +63,12 @@ namespace GaoZombie.BugOneTouch
             public string WorkspaceUrl;
             public string ErrorMessage;
             public R2Uploader.UploadResult[] UploadResults;
+
+            /// <summary>
+            /// 업로드된 파일의 공개 URL 목록.
+            /// 키: 파일 유형(screenshot, log, video), 값: 공개 URL.
+            /// </summary>
+            public Dictionary<string, string> FileUrls;
         }
 
         // ─── 응답 모델 (JsonUtility) ─────────────────────────────────────────────
@@ -81,6 +87,7 @@ namespace GaoZombie.BugOneTouch
             public string type;
             public string filename;
             public string upload_url;
+            public string public_url;
         }
 
         // ─── 생성자 ──────────────────────────────────────────────────────────────
@@ -149,6 +156,25 @@ namespace GaoZombie.BugOneTouch
                 var reportFiles = ParseReportFiles(responseJson);
 
                 Debug.Log($"[BugOneTouch] 리포트 생성 완료: {baseResponse.report_id}, 파일 {reportFiles.Count}개");
+
+                // 공개 URL 매핑 구성
+                var fileUrls = new Dictionary<string, string>();
+                foreach (var rf in reportFiles)
+                {
+                    if (!string.IsNullOrEmpty(rf.public_url) && !string.IsNullOrEmpty(rf.type))
+                    {
+                        // 한글 파일 유형 레이블 매핑
+                        string label = rf.type switch
+                        {
+                            "screenshot" => "스크린샷",
+                            "log" => "로그",
+                            "video" => "영상",
+                            _ => rf.type
+                        };
+                        fileUrls[label] = rf.public_url;
+                    }
+                }
+
                 ReportProgress(0.3f, "파일 업로드 중...");
 
                 // 4단계: R2 업로드
@@ -200,6 +226,7 @@ namespace GaoZombie.BugOneTouch
                     ReportId = baseResponse.report_id,
                     WorkspaceUrl = baseResponse.workspace_url,
                     UploadResults = uploadResults,
+                    FileUrls = fileUrls,
                     ErrorMessage = allUploadsOk ? null : "일부 첨부 파일 업로드에 실패했습니다."
                 };
             }
@@ -263,31 +290,38 @@ namespace GaoZombie.BugOneTouch
         {
             var result = new List<ReportFileInfo>();
 
-            // "report_files": [...] 영역 추출
-            int arrStart = json.IndexOf("\"report_files\":", StringComparison.Ordinal);
-            if (arrStart < 0) return result;
-
-            int bracketStart = json.IndexOf('[', arrStart);
-            if (bracketStart < 0) return result;
-
-            // 대괄호 매칭으로 배열 끝 찾기
-            int depth = 0;
-            int bracketEnd = -1;
-            for (int i = bracketStart; i < json.Length; i++)
+            try
             {
-                if (json[i] == '[') depth++;
-                else if (json[i] == ']') { depth--; if (depth == 0) { bracketEnd = i; break; } }
+                // "report_files": [...] 영역 추출
+                int arrStart = json.IndexOf("\"report_files\":", StringComparison.Ordinal);
+                if (arrStart < 0) return result;
+
+                int bracketStart = json.IndexOf('[', arrStart);
+                if (bracketStart < 0) return result;
+
+                // 대괄호 매칭으로 배열 끝 찾기
+                int depth = 0;
+                int bracketEnd = -1;
+                for (int i = bracketStart; i < json.Length; i++)
+                {
+                    if (json[i] == '[') depth++;
+                    else if (json[i] == ']') { depth--; if (depth == 0) { bracketEnd = i; break; } }
+                }
+                if (bracketEnd < 0) return result;
+
+                string arrayJson = json.Substring(bracketStart, bracketEnd - bracketStart + 1);
+
+                // 래퍼로 감싸서 JsonUtility 파싱
+                string wrappedJson = "{\"items\":" + arrayJson + "}";
+                var wrapper = JsonUtility.FromJson<ReportFilesWrapper>(wrappedJson);
+                if (wrapper?.items != null)
+                {
+                    result.AddRange(wrapper.items);
+                }
             }
-            if (bracketEnd < 0) return result;
-
-            string arrayJson = json.Substring(bracketStart, bracketEnd - bracketStart + 1);
-
-            // 래퍼로 감싸서 JsonUtility 파싱
-            string wrappedJson = "{\"items\":" + arrayJson + "}";
-            var wrapper = JsonUtility.FromJson<ReportFilesWrapper>(wrappedJson);
-            if (wrapper?.items != null)
+            catch (Exception ex)
             {
-                result.AddRange(wrapper.items);
+                Debug.LogWarning($"[BugOneTouch] report_files 파싱 실패 (빈 목록으로 진행): {ex.Message}");
             }
 
             return result;

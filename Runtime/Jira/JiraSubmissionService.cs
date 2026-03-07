@@ -11,6 +11,7 @@ namespace GaoZombie.BugOneTouch
     /// 이슈 생성 → 첨부파일 업로드 → 번들 상태 갱신을 순서대로 처리합니다.
     /// 부분 실패(이슈 생성 성공 + 첨부 실패)도 상태에 반영합니다.
     /// </summary>
+#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 하위 호환성)
     public class JiraSubmissionService
     {
         // ─── 이벤트 ───────────────────────────────────────────────────────────────
@@ -38,6 +39,12 @@ namespace GaoZombie.BugOneTouch
             /// <summary>업로드할 첨부파일 목록</summary>
             public List<JiraAttachmentUploader.AttachmentItem> Attachments { get; set; }
                 = new List<JiraAttachmentUploader.AttachmentItem>();
+
+            /// <summary>
+            /// R2 URL이 이미 설정되어 있으면 true.
+            /// true이면 직접 첨부 업로드를 건너뛰고 description에 R2 URL 링크를 사용합니다.
+            /// </summary>
+            public bool UseR2Links { get; set; }
         }
 
         /// <summary>Jira 이슈 제출 결과</summary>
@@ -73,7 +80,7 @@ namespace GaoZombie.BugOneTouch
         /// JiraSubmissionService를 초기화합니다.
         /// </summary>
         /// <param name="issueCreator">이슈 생성기</param>
-        /// <param name="attachmentUploader">첨부파일 업로더</param>
+        /// <param name="attachmentUploader">첨부파일 업로더 (R2 URL 방식 전환 후 Obsolete, null 허용)</param>
         /// <param name="bundleStateUpdater">번들 상태 갱신기 (M2 구현, null 허용)</param>
         public JiraSubmissionService(
             JiraIssueCreator issueCreator,
@@ -81,7 +88,7 @@ namespace GaoZombie.BugOneTouch
             IBundleStateUpdater bundleStateUpdater = null)
         {
             _issueCreator = issueCreator ?? throw new ArgumentNullException(nameof(issueCreator));
-            _attachmentUploader = attachmentUploader ?? throw new ArgumentNullException(nameof(attachmentUploader));
+            _attachmentUploader = attachmentUploader; // null 허용 (R2 URL 방식 전환 시)
             _bundleStateUpdater = bundleStateUpdater; // null 허용 (M2 미구현 시)
         }
 
@@ -142,8 +149,13 @@ namespace GaoZombie.BugOneTouch
                 return result;
             }
 
-            // Step 3: 첨부파일 업로드
-            if (request.Attachments != null && request.Attachments.Count > 0)
+            // Step 3: 첨부파일 업로드 (R2 URL이 설정된 경우 건너뜀)
+            if (request.UseR2Links)
+            {
+                Debug.Log("[JiraSubmissionService] R2 URL 링크 방식 사용. 직접 첨부 업로드를 건너뜁니다.");
+                NotifyProgress(0.9f, "R2 URL 링크가 이슈 설명에 포함되었습니다.");
+            }
+            else if (request.Attachments != null && request.Attachments.Count > 0 && _attachmentUploader != null)
             {
                 try
                 {
@@ -187,6 +199,15 @@ namespace GaoZombie.BugOneTouch
                     Debug.LogError($"[JiraSubmissionService] 첨부파일 업로드 예외: {ex.Message}");
                     // 이슈 생성은 성공 → 부분 성공 상태 유지
                 }
+            }
+            else if (!request.UseR2Links && request.Attachments != null
+                     && request.Attachments.Count > 0 && _attachmentUploader == null)
+            {
+                // 첨부파일이 있지만 업로더가 null인 비정상 상태
+                Debug.LogError(
+                    "[JiraSubmissionService] 첨부파일이 있지만 AttachmentUploader가 null입니다. " +
+                    "R2 URL 방식을 사용하거나 AttachmentUploader를 제공하세요.");
+                NotifyProgress(0.9f, "첨부파일 업로드 불가: 업로더 미설정.");
             }
             else
             {
@@ -276,4 +297,5 @@ namespace GaoZombie.BugOneTouch
             }
         }
     }
+#pragma warning restore CS0618
 }

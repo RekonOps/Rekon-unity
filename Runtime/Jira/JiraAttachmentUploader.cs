@@ -14,6 +14,7 @@ namespace GaoZombie.BugOneTouch
     ///
     /// 업로드 전 Jira REST API에서 첨부 제한 설정을 조회합니다 (AC-11).
     /// </summary>
+    [System.Obsolete("R2 URL 링크 방식으로 대체됨. JiraIssueCreator에서 R2 URL을 사용합니다. 하위 호환성을 위해 유지됩니다.")]
     public class JiraAttachmentUploader
     {
         // ─── 상수 ─────────────────────────────────────────────────────────────────

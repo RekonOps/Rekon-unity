@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using GaoZombie.BugOneTouch;
 
+#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 테스트 하위 호환성)
+
 namespace GaoZombie.BugOneTouch.Tests
 {
     /// <summary>
@@ -440,3 +442,5 @@ namespace GaoZombie.BugOneTouch.Tests
         }
     }
 }
+
+#pragma warning restore CS0618

@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
+#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 하위 호환성)
+
 namespace GaoZombie.BugOneTouch.Editor
 {
     /// <summary>
@@ -422,3 +424,5 @@ namespace GaoZombie.BugOneTouch.Editor
         }
     }
 }
+
+#pragma warning restore CS0618

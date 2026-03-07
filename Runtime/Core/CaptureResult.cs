@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace GaoZombie.BugOneTouch
 {
@@ -37,6 +38,19 @@ namespace GaoZombie.BugOneTouch
         /// ManifestGenerator에서 환경 정보(platform, device, os, scene 등)를 추출하는 데 사용됩니다.
         /// </summary>
         public StateSnapshot StateSnapshot { get; set; }
+
+        /// <summary>
+        /// R2에 업로드된 파일들의 공개 URL 목록.
+        /// 키: 파일 유형(screenshot, log, video), 값: R2 공개 URL.
+        /// R2 업로드가 수행되지 않은 경우 null 또는 빈 사전.
+        /// </summary>
+        public System.Collections.Generic.Dictionary<string, string> R2Urls { get; set; }
+
+        /// <summary>
+        /// R2 업로드를 통해 생성된 리포트 ID.
+        /// 웹 저장이 수행되지 않은 경우 null.
+        /// </summary>
+        public string WebReportId { get; set; }
 
         /// <summary>
         /// 캡처가 완료된 UTC 시각.

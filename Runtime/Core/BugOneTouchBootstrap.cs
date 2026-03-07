@@ -1,5 +1,7 @@
 using UnityEngine;
 
+#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 하위 호환성)
+
 namespace GaoZombie.BugOneTouch
 {
     /// <summary>

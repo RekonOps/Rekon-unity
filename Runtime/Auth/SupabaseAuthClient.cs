@@ -94,6 +94,12 @@ namespace RekonOps.BugOneTouch
         public bool IsLoggedIn => !_tokenStore.IsSupabaseExpired();
 
         /// <summary>
+        /// 저장된 Supabase 액세스 토큰을 반환합니다.
+        /// 로그인 상태가 아니면 null 또는 빈 문자열을 반환합니다.
+        /// </summary>
+        public string AccessToken => _tokenStore.LoadSupabase();
+
+        /// <summary>
         /// 웹 브라우저를 통한 로그인을 시작합니다.
         /// auth-unity-start를 호출한 뒤 브라우저를 열고, 완료될 때까지 폴링합니다.
         /// </summary>

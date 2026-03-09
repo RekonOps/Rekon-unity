@@ -63,6 +63,22 @@ namespace RekonOps.BugOneTouch
             public bool VideoCaptureEnabled;
             public DateTime? ExpiresAt;
             public DateTime LastCheckedAt;
+
+            /// <summary>연동된 외부 제공자 목록 (예: ["jira"])</summary>
+            public string[] ConnectedProviders;
+
+            /// <summary>지정된 제공자가 연동되어 있는지 확인합니다.</summary>
+            public bool IsProviderConnected(string provider)
+            {
+                if (ConnectedProviders == null || ConnectedProviders.Length == 0)
+                    return false;
+                for (int i = 0; i < ConnectedProviders.Length; i++)
+                {
+                    if (string.Equals(ConnectedProviders[i], provider, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                return false;
+            }
         }
 
         /// <summary>캐시 직렬화용 내부 모델</summary>
@@ -77,6 +93,7 @@ namespace RekonOps.BugOneTouch
             public bool video_capture;
             public string expires_at;
             public string last_checked_at;   // ISO 8601
+            public string connected_providers_csv; // 쉼표 구분 문자열
         }
 
         // ─── 상수 ─────────────────────────────────────────────────────────────────
@@ -459,6 +476,9 @@ namespace RekonOps.BugOneTouch
             info.JiraSubmitEnabled = ExtractBoolField(json, "jira_submit") ?? false;
             info.VideoCaptureEnabled = ExtractBoolField(json, "video_capture") ?? false;
 
+            // connected_providers 배열 파싱 (예: ["jira"])
+            info.ConnectedProviders = ExtractStringArray(json, "connected_providers");
+
             return info;
         }
 
@@ -527,7 +547,10 @@ namespace RekonOps.BugOneTouch
                     jira_submit = info.JiraSubmitEnabled,
                     video_capture = info.VideoCaptureEnabled,
                     expires_at = info.ExpiresAt?.ToString("o") ?? "",
-                    last_checked_at = info.LastCheckedAt.ToString("o")
+                    last_checked_at = info.LastCheckedAt.ToString("o"),
+                    connected_providers_csv = info.ConnectedProviders != null
+                        ? string.Join(",", info.ConnectedProviders)
+                        : ""
                 };
 
                 var json = JsonUtility.ToJson(cache);
@@ -563,7 +586,10 @@ namespace RekonOps.BugOneTouch
                     WorkspaceId = cache.workspace_id,
                     WorkspaceName = cache.workspace_name,
                     JiraSubmitEnabled = cache.jira_submit,
-                    VideoCaptureEnabled = cache.video_capture
+                    VideoCaptureEnabled = cache.video_capture,
+                    ConnectedProviders = !string.IsNullOrEmpty(cache.connected_providers_csv)
+                        ? cache.connected_providers_csv.Split(',')
+                        : new string[0]
                 };
 
                 // expires_at 파싱
@@ -652,6 +678,42 @@ namespace RekonOps.BugOneTouch
                 return false;
 
             return null;
+        }
+
+        /// <summary>
+        /// JSON 문자열에서 문자열 배열 필드를 추출합니다.
+        /// 예: "connected_providers": ["jira", "slack"] → {"jira", "slack"}
+        /// </summary>
+        private static string[] ExtractStringArray(string json, string fieldName)
+        {
+            var key = $"\"{fieldName}\"";
+            int idx = json.IndexOf(key, StringComparison.Ordinal);
+            if (idx < 0) return new string[0];
+
+            // '[' 찾기
+            int bracketStart = json.IndexOf('[', idx + key.Length);
+            if (bracketStart < 0) return new string[0];
+
+            int bracketEnd = json.IndexOf(']', bracketStart);
+            if (bracketEnd < 0) return new string[0];
+
+            string content = json.Substring(bracketStart + 1, bracketEnd - bracketStart - 1).Trim();
+            if (string.IsNullOrEmpty(content)) return new string[0];
+
+            // 각 항목 파싱 ("jira", "slack" 등)
+            var result = new System.Collections.Generic.List<string>();
+            int pos = 0;
+            while (pos < content.Length)
+            {
+                int quoteStart = content.IndexOf('"', pos);
+                if (quoteStart < 0) break;
+                int quoteEnd = content.IndexOf('"', quoteStart + 1);
+                if (quoteEnd < 0) break;
+                result.Add(content.Substring(quoteStart + 1, quoteEnd - quoteStart - 1));
+                pos = quoteEnd + 1;
+            }
+
+            return result.ToArray();
         }
 
         /// <summary>

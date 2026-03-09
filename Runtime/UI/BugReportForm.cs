@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,7 +43,7 @@ namespace RekonOps.BugOneTouch
         // ─── 폼 크기 상수 ─────────────────────────────────────────────────────────
 
         private const float FormWidth      = 520f;
-        private const float FormHeight     = 440f;
+        private const float FormHeight     = 480f;
         private const float FieldLabelWidth = 80f;
         private const int   TextAreaLines  = 4;
         private const float LineHeight     = 18f;
@@ -101,6 +102,10 @@ namespace RekonOps.BugOneTouch
         private ReportSubmitter       _reportSubmitter;
         private LicenseValidator      _licenseValidator;
         private SupabaseAuthClient    _supabaseAuthClient;
+        private ReportSubmitService   _reportSubmitService;
+
+        // ─── 제출 진행 단계 ─────────────────────────────────────────────────────
+        private SubmitPhase _currentSubmitPhase = SubmitPhase.CreatingReport;
 
         // ─── GUI 스타일 캐시 ──────────────────────────────────────────────────────
 
@@ -112,6 +117,10 @@ namespace RekonOps.BugOneTouch
         private GUIStyle _buttonStyle;
         private GUIStyle _errorStyle;
         private GUIStyle _successStyle;
+        private GUIStyle _badgeConnectedStyle;
+        private GUIStyle _badgeDisconnectedStyle;
+        private GUIStyle _phaseActiveStyle;
+        private GUIStyle _phaseInactiveStyle;
         private bool     _stylesInitialized = false;
 
         // 스크롤 위치
@@ -145,7 +154,8 @@ namespace RekonOps.BugOneTouch
             BugOneTouchSettings settings,
             ReportSubmitter reportSubmitter = null,
             LicenseValidator licenseValidator = null,
-            SupabaseAuthClient supabaseAuthClient = null)
+            SupabaseAuthClient supabaseAuthClient = null,
+            ReportSubmitService reportSubmitService = null)
         {
             _jiraService        = jiraService;
             _bundleWriter       = bundleWriter;
@@ -154,6 +164,7 @@ namespace RekonOps.BugOneTouch
             _reportSubmitter    = reportSubmitter;
             _licenseValidator   = licenseValidator;
             _supabaseAuthClient = supabaseAuthClient;
+            _reportSubmitService = reportSubmitService;
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────────
@@ -185,6 +196,7 @@ namespace RekonOps.BugOneTouch
             _resultWebUrl        = "";
             _bundle              = null;
             _scrollPos           = Vector2.zero;
+            _currentSubmitPhase  = SubmitPhase.CreatingReport;
 
             // 동적 이슈타입 로드 (Settings 캐시 → 폴백)
             if (_settings != null && _settings.cachedIssueTypeNames != null && _settings.cachedIssueTypeNames.Length > 0)
@@ -347,6 +359,11 @@ namespace RekonOps.BugOneTouch
             // 영상 포함 토글
             _includeVideo = GUILayout.Toggle(_includeVideo, "  영상 포함 (링 버퍼 60초)", GUILayout.Height(22f));
 
+            GUILayout.Space(8f);
+
+            // ─── Jira 연동 상태 뱃지 ────────────────────────────────────────────
+            DrawJiraConnectionBadge();
+
             GUILayout.EndScrollView();
 
             DrawSeparator();
@@ -426,14 +443,23 @@ namespace RekonOps.BugOneTouch
         {
             GUILayout.FlexibleSpace();
 
-            // 진행 표시
-            GUILayout.Label(_submitStageText, _labelStyle);
+            // ─── 단계 인디케이터 ────────────────────────────────────────────────
+            DrawPhaseIndicator();
+
+            GUILayout.Space(12f);
+
+            // 상태 메시지
+            GUILayout.Label(_submitStageText, _titleStyle);
             GUILayout.Space(8f);
 
-            Rect barRect = GUILayoutUtility.GetRect(0f, 20f, GUILayout.ExpandWidth(true));
+            // 전체 프로그레스 바
+            Rect barRect = GUILayoutUtility.GetRect(0f, 22f, GUILayout.ExpandWidth(true));
             DrawProgressBar(barRect, _submitProgress);
 
-            GUILayout.Space(8f);
+            // 퍼센트 표시
+            GUILayout.Label($"{(_submitProgress * 100f):F0}%", _labelStyle);
+
+            GUILayout.Space(12f);
 
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
@@ -445,6 +471,41 @@ namespace RekonOps.BugOneTouch
             GUILayout.EndHorizontal();
 
             GUILayout.FlexibleSpace();
+        }
+
+        /// <summary>
+        /// 제출 단계별 인디케이터를 그립니다.
+        /// [생성 중] → [업로드 중] → [확인 중] → [완료]
+        /// </summary>
+        private void DrawPhaseIndicator()
+        {
+            string[] phaseLabels = { "리포트 생성", "파일 업로드", "업로드 확인", "완료" };
+            SubmitPhase[] phases = {
+                SubmitPhase.CreatingReport,
+                SubmitPhase.UploadingFiles,
+                SubmitPhase.ConfirmingUpload,
+                SubmitPhase.Completed
+            };
+
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+
+            for (int i = 0; i < phaseLabels.Length; i++)
+            {
+                bool isActive = (int)_currentSubmitPhase >= (int)phases[i];
+                bool isCurrent = _currentSubmitPhase == phases[i];
+
+                GUIStyle style = isActive ? _phaseActiveStyle : _phaseInactiveStyle;
+                string label = isCurrent ? $"[{phaseLabels[i]}]" : phaseLabels[i];
+
+                GUILayout.Label(label, style);
+
+                if (i < phaseLabels.Length - 1)
+                    GUILayout.Label(" > ", _labelStyle);
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
         }
 
         // ─── 결과 화면 ────────────────────────────────────────────────────────────
@@ -515,6 +576,31 @@ namespace RekonOps.BugOneTouch
             GUILayout.FlexibleSpace();
         }
 
+        /// <summary>
+        /// Jira 연동 상태를 뱃지 형태로 표시합니다.
+        /// LicenseValidator의 connected_providers 기반.
+        /// </summary>
+        private void DrawJiraConnectionBadge()
+        {
+            GUILayout.BeginHorizontal();
+
+            bool jiraConnected = _licenseValidator?.GetCachedLicense()?.IsProviderConnected("jira") ?? false;
+
+            if (jiraConnected)
+            {
+                GUILayout.Label("Jira 연동됨", _badgeConnectedStyle, GUILayout.Height(20f));
+            }
+            else
+            {
+                GUILayout.Label("Jira 미연동", _badgeDisconnectedStyle, GUILayout.Height(20f));
+                GUILayout.Space(4f);
+                GUILayout.Label("웹에서 Jira를 연결하세요", _labelStyle, GUILayout.Height(20f));
+            }
+
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
         // ─── 비동기 제출 로직 ─────────────────────────────────────────────────────
 
         /// <summary>
@@ -531,6 +617,7 @@ namespace RekonOps.BugOneTouch
             _state          = FormState.Submitting;
             _submitProgress = 0f;
             _submitStageText = "번들 저장 중...";
+            _currentSubmitPhase = SubmitPhase.CreatingReport;
 
             _cancelSource?.Cancel();
             _cancelSource?.Dispose();
@@ -630,6 +717,7 @@ namespace RekonOps.BugOneTouch
             _state           = FormState.Submitting;
             _submitProgress  = 0.3f;
             _submitStageText = "번들 저장 중...";
+            _currentSubmitPhase = SubmitPhase.CreatingReport;
 
             try
             {
@@ -642,6 +730,7 @@ namespace RekonOps.BugOneTouch
 
                 _submitProgress  = 1.0f;
                 _submitStageText = "저장 완료";
+                _currentSubmitPhase = SubmitPhase.Completed;
 
                 ShowResult(true, "로컬 저장됨", "번들이 로컬에 저장되었습니다.");
                 Debug.Log($"[BugOneTouch] 번들 로컬 저장 완료: {_bundle?.id}");
@@ -657,10 +746,12 @@ namespace RekonOps.BugOneTouch
 
         /// <summary>
         /// [웹 저장] 경로: create-report → R2 업로드만 수행합니다.
+        /// ReportSubmitService가 있으면 3단계 진행률 파이프라인 사용,
+        /// 없으면 기존 ReportSubmitter로 폴백합니다.
         /// </summary>
         private async Task SaveToWebAsync()
         {
-            if (_reportSubmitter == null)
+            if (_reportSubmitService == null && _reportSubmitter == null)
             {
                 ShowResult(false, "", "ReportSubmitter가 설정되지 않았습니다.");
                 return;
@@ -668,7 +759,8 @@ namespace RekonOps.BugOneTouch
 
             _state = FormState.Submitting;
             _submitProgress = 0f;
-            _submitStageText = "웹 저장 중...";
+            _submitStageText = "리포트 생성 중...";
+            _currentSubmitPhase = SubmitPhase.CreatingReport;
 
             _cancelSource?.Cancel();
             _cancelSource?.Dispose();
@@ -676,27 +768,52 @@ namespace RekonOps.BugOneTouch
 
             try
             {
-                var request = BuildWebSubmitRequest();
-                _reportSubmitter.OnProgressChanged += HandleSubmitProgress;
-                ReportSubmitter.SubmitResult result;
-                try
+                // ReportSubmitService 경로 (3단계 진행률 통합)
+                if (_reportSubmitService != null)
                 {
-                    result = await _reportSubmitter.SubmitAsync(request, _cancelSource.Token);
-                }
-                finally
-                {
-                    _reportSubmitter.OnProgressChanged -= HandleSubmitProgress;
-                }
+                    var submitRequest = BuildReportSubmitRequest();
+                    var progress = new Progress<SubmitProgress>(HandleReportSubmitProgress);
 
-                if (result.Success)
-                {
-                    _resultWebUrl = result.WorkspaceUrl ?? "";
-                    ShowResult(true, "", "웹 대시보드에서 확인하세요.");
-                    Debug.Log($"[BugOneTouch] 웹 저장 완료: {result.ReportId}");
+                    var result = await _reportSubmitService.SubmitReportAsync(
+                        submitRequest, progress, _cancelSource.Token);
+
+                    if (result.Success)
+                    {
+                        _currentSubmitPhase = SubmitPhase.Completed;
+                        ShowResult(true, "", "웹 대시보드에서 확인하세요.");
+                        Debug.Log($"[BugOneTouch] 웹 저장 완료 (ReportSubmitService): {result.ReportId}");
+                    }
+                    else
+                    {
+                        _currentSubmitPhase = SubmitPhase.Failed;
+                        ShowResult(false, "", result.ErrorMessage ?? "웹 저장 실패");
+                    }
                 }
                 else
                 {
-                    ShowResult(false, "", result.ErrorMessage ?? "웹 저장 실패");
+                    // 기존 ReportSubmitter 폴백
+                    var request = BuildWebSubmitRequest();
+                    _reportSubmitter.OnProgressChanged += HandleSubmitProgress;
+                    ReportSubmitter.SubmitResult result;
+                    try
+                    {
+                        result = await _reportSubmitter.SubmitAsync(request, _cancelSource.Token);
+                    }
+                    finally
+                    {
+                        _reportSubmitter.OnProgressChanged -= HandleSubmitProgress;
+                    }
+
+                    if (result.Success)
+                    {
+                        _resultWebUrl = result.WorkspaceUrl ?? "";
+                        ShowResult(true, "", "웹 대시보드에서 확인하세요.");
+                        Debug.Log($"[BugOneTouch] 웹 저장 완료: {result.ReportId}");
+                    }
+                    else
+                    {
+                        ShowResult(false, "", result.ErrorMessage ?? "웹 저장 실패");
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -704,10 +821,12 @@ namespace RekonOps.BugOneTouch
                 _state = FormState.Editing;
                 _submitProgress = 0f;
                 _submitStageText = "";
+                _currentSubmitPhase = SubmitPhase.CreatingReport;
                 Debug.Log("[BugOneTouch] 웹 저장 취소됨");
             }
             catch (Exception ex)
             {
+                _currentSubmitPhase = SubmitPhase.Failed;
                 ShowResult(false, "", $"웹 저장 실패: {ex.Message}");
                 Debug.LogError($"[BugOneTouch] 웹 저장 오류: {ex}");
             }
@@ -728,6 +847,7 @@ namespace RekonOps.BugOneTouch
             _state = FormState.Submitting;
             _submitProgress = 0f;
             _submitStageText = "웹 저장 중...";
+            _currentSubmitPhase = SubmitPhase.CreatingReport;
 
             _cancelSource?.Cancel();
             _cancelSource?.Dispose();
@@ -834,6 +954,66 @@ namespace RekonOps.BugOneTouch
             {
                 ShowResult(false, "", $"Jira 등록 실패: {ex.Message}");
                 Debug.LogError($"[BugOneTouch] Jira 등록 (웹 경로) 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// CaptureResult를 ReportSubmitService용 ReportSubmitRequest로 변환합니다.
+        /// </summary>
+        private ReportSubmitRequest BuildReportSubmitRequest()
+        {
+            var license = _licenseValidator?.GetCachedLicense();
+            string accessToken = _supabaseAuthClient?.AccessToken ?? "";
+            string workspaceId = license?.WorkspaceId ?? "";
+
+            var request = new ReportSubmitRequest
+            {
+                AccessToken = accessToken,
+                WorkspaceId = workspaceId,
+                Title = _title,
+                Description = BuildDescription(),
+                Files = new List<FileAttachment>()
+            };
+
+            // 파일 목록 구성
+            if (_captureResult != null)
+            {
+                TryAddReportFile(request.Files, _captureResult.ScreenshotPath, "screenshot", "screenshot.png");
+                TryAddReportFile(request.Files, _captureResult.LogsPath, "log", "logs.zip");
+
+                if (_includeVideo && !string.IsNullOrEmpty(_captureResult.VideoPath)
+                    && System.IO.File.Exists(_captureResult.VideoPath))
+                {
+                    TryAddReportFile(request.Files, _captureResult.VideoPath, "video",
+                        System.IO.Path.GetFileName(_captureResult.VideoPath));
+                }
+            }
+
+            return request;
+        }
+
+        /// <summary>
+        /// 파일 경로에서 FileAttachment를 생성하여 목록에 추가합니다.
+        /// </summary>
+        private static void TryAddReportFile(
+            List<FileAttachment> files,
+            string filePath, string fileType, string fileName)
+        {
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
+                return;
+
+            try
+            {
+                files.Add(new FileAttachment
+                {
+                    FileName = fileName,
+                    Data = System.IO.File.ReadAllBytes(filePath),
+                    FileType = fileType
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[BugOneTouch] 파일 읽기 실패: {filePath}\n{ex.Message}");
             }
         }
 
@@ -1073,6 +1253,34 @@ namespace RekonOps.BugOneTouch
         {
             _submitProgress  = progress;
             _submitStageText = message;
+
+            // 진행률 기반으로 단계 자동 판별
+            UpdateSubmitPhaseFromProgress(progress, message);
+        }
+
+        /// <summary>
+        /// ReportSubmitService의 SubmitProgress를 UI에 반영하는 핸들러.
+        /// </summary>
+        private void HandleReportSubmitProgress(SubmitProgress submitProgress)
+        {
+            _submitProgress = submitProgress.OverallProgress;
+            _submitStageText = submitProgress.StatusMessage;
+            _currentSubmitPhase = submitProgress.Phase;
+        }
+
+        /// <summary>
+        /// 진행률/메시지를 기반으로 SubmitPhase를 업데이트합니다.
+        /// </summary>
+        private void UpdateSubmitPhaseFromProgress(float progress, string message)
+        {
+            if (progress >= 1.0f || message.Contains("완료"))
+                _currentSubmitPhase = SubmitPhase.Completed;
+            else if (message.Contains("확인"))
+                _currentSubmitPhase = SubmitPhase.ConfirmingUpload;
+            else if (message.Contains("업로드") || message.Contains("파일"))
+                _currentSubmitPhase = SubmitPhase.UploadingFiles;
+            else
+                _currentSubmitPhase = SubmitPhase.CreatingReport;
         }
 
         /// <summary>
@@ -1181,6 +1389,38 @@ namespace RekonOps.BugOneTouch
                 fontStyle = FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 normal    = { textColor = new Color(0.3f, 0.9f, 0.3f) },
+            };
+
+            _badgeConnectedStyle = new GUIStyle(GUI.skin.box)
+            {
+                fontSize  = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                padding   = new RectOffset(8, 8, 2, 2),
+                normal    = { textColor = new Color(0.3f, 0.9f, 0.5f) },
+            };
+
+            _badgeDisconnectedStyle = new GUIStyle(GUI.skin.box)
+            {
+                fontSize  = 11,
+                alignment = TextAnchor.MiddleCenter,
+                padding   = new RectOffset(8, 8, 2, 2),
+                normal    = { textColor = new Color(0.9f, 0.6f, 0.2f) },
+            };
+
+            _phaseActiveStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize  = 11,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                normal    = { textColor = new Color(0.2f, 0.8f, 1.0f) },
+            };
+
+            _phaseInactiveStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize  = 11,
+                alignment = TextAnchor.MiddleCenter,
+                normal    = { textColor = new Color(0.5f, 0.5f, 0.5f) },
             };
         }
 

@@ -17,9 +17,14 @@ namespace RekonOps.BugOneTouch
     /// </summary>
     public static class BugOneTouchBootstrap
     {
+        private static bool _initialized;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
         {
+            if (_initialized) return;
+            _initialized = true;
+
             // ── 1. Settings 로드 ───────────────────────────────────────────────────
             BugOneTouchSettings settings = BugOneTouchSettingsProvider.Settings;
 
@@ -113,7 +118,32 @@ namespace RekonOps.BugOneTouch
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
 
-                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");
+                // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
+                var manifestGenerator = new ManifestGenerator(settings);
+                var bundleWriter = new BundleWriter(manifestGenerator);
+
+                // ReportSubmitService: Supabase 설정이 있는 경우에만 생성
+                ReportSubmitService submitService = null;
+                if (!string.IsNullOrEmpty(settings.supabaseUrl) &&
+                    !string.IsNullOrEmpty(settings.supabaseAnonKey))
+                {
+                    try
+                    {
+                        var r2UploadService = new R2UploadService();
+                        submitService = new ReportSubmitService(r2UploadService, settings);
+                        Debug.Log("[BugOneTouch] ReportSubmitService 초기화 완료");
+                    }
+                    catch (System.Exception submitEx)
+                    {
+                        Debug.LogWarning($"[BugOneTouch] ReportSubmitService 초기화 실패 (로컬 저장만 가능): {submitEx.Message}");
+                    }
+                }
+
+                var tokenStore = new SessionTokenStore();
+                var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
+                silentSubmitManager.BindOrchestrator(orchestrator);
+
+                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit이 활성화되었습니다.");
             }
             catch (System.Exception ex)
             {

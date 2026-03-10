@@ -4,6 +4,24 @@ using System.Collections.Generic;
 namespace RekonOps.BugOneTouch
 {
     /// <summary>
+    /// 메타데이터 키-값 쌍. JsonUtility 직렬화를 위해 클래스로 정의.
+    /// </summary>
+    [Serializable]
+    public class MetadataEntry
+    {
+        public string key;
+        public string value;
+
+        public MetadataEntry() { }
+
+        public MetadataEntry(string key, string value)
+        {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    /// <summary>
     /// Jira 연동 정보.
     /// </summary>
     [Serializable]
@@ -175,6 +193,9 @@ namespace RekonOps.BugOneTouch
         /// 재시도 횟수. SubmissionQueue에서 관리합니다.
         /// </summary>
         public int retry_count;
+
+        /// <summary>사용자 정의 메타데이터 (키-값 쌍). Silent Submit 시 환경 정보 저장용.</summary>
+        public List<MetadataEntry> metadata = new List<MetadataEntry>();
 
         /// <summary>외부 시스템 연동 정보 (Jira 등).</summary>
         public BundleIntegrations integrations = new BundleIntegrations();

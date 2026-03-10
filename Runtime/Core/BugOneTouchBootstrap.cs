@@ -14,6 +14,8 @@ namespace RekonOps.BugOneTouch
     ///   6. HotkeyManager MonoBehaviour 생성 및 설정 주입
     ///   7. HotkeyManager ↔ CaptureOrchestrator 바인딩
     ///   8. CaptureOverlay 초기화 및 오케스트레이터 바인딩
+    ///   9. SilentSubmitManager 초기화
+    ///  10. SubmitToast 초기화 및 SilentSubmitManager 바인딩
     /// </summary>
     public static class BugOneTouchBootstrap
     {
@@ -143,7 +145,11 @@ namespace RekonOps.BugOneTouch
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
 
-                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit이 활성화되었습니다.");
+                // ── 10. SubmitToast 초기화 ──────────────────────────────────────────
+                var submitToast = SubmitToast.EnsureInstance();
+                submitToast.BindSilentSubmitManager(silentSubmitManager, settings.webDashboardUrl);
+
+                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, 토스트 UI가 활성화되었습니다.");
             }
             catch (System.Exception ex)
             {

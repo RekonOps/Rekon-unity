@@ -155,6 +155,9 @@ namespace RekonOps.BugOneTouch
         [Tooltip("Supabase Anon Key")]
         public string supabaseAnonKey = "";
 
+        [Tooltip("웹 대시보드 URL (예: https://your-app.vercel.app). 토스트에서 리포트 링크 생성에 사용됩니다.")]
+        public string webDashboardUrl = "";
+
         [Tooltip("라이선스 키 (워크스페이스 설정 페이지에서 복사)")]
         public string licenseKey = "";
 

@@ -29,7 +29,7 @@ namespace RekonOps.BugOneTouch
 
         /// <summary>
         /// Supabase 토큰이 저장되었을 때 발행되는 이벤트.
-        /// PendingUploadManager 등에서 로그인 감지용으로 구독합니다.
+        /// 로그인 감지용으로 구독합니다.
         /// </summary>
         public event Action OnTokenChanged;
 

@@ -9,6 +9,9 @@ using UnityEngine.Networking;
 
 namespace RekonOps.BugOneTouch
 {
+    // TODO: [데이터 플로우 리팩토링] Web Backend API 준비 후 Supabase/R2 직접 호출을
+    // Web Dashboard URL 기반 API 호출로 교체 (data-flow.md 참조)
+
     /// <summary>
     /// 버그 리포트 제출 서비스.
     /// create-report -> R2 업로드 -> confirm-upload 3단계를 순차적으로 처리하며,

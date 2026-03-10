@@ -145,11 +145,36 @@ namespace RekonOps.BugOneTouch
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
 
-                // ── 10. SubmitToast 초기화 ──────────────────────────────────────────
+                // ── 10. PendingUploadManager 초기화 ──────────────────────────────────
+                var bundleRepository = new BundleRepository();
+                var pendingUploadManager = new PendingUploadManager(
+                    bundleRepository, submitService, tokenStore, settings);
+
+                // SilentSubmitManager에 PendingUploadManager 바인딩
+                silentSubmitManager.BindPendingUploadManager(pendingUploadManager);
+
+                // 앱 시작 시 pending 큐 자동 처리
+                int pendingCount = pendingUploadManager.GetPendingCount();
+                if (pendingCount > 0)
+                {
+                    Debug.Log($"[BugOneTouch] 앱 시작 시 pending 번들 {pendingCount}개 감지. 자동 업로드 시작...");
+                    _ = pendingUploadManager.ProcessAllPendingAsync();
+                }
+
+                // ── 11. SubmitToast 초기화 ──────────────────────────────────────────
                 var submitToast = SubmitToast.EnsureInstance();
                 submitToast.BindSilentSubmitManager(silentSubmitManager, settings.webDashboardUrl);
 
-                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, 토스트 UI가 활성화되었습니다.");
+                // PendingUploadManager 성공 시 토스트 표시
+                pendingUploadManager.OnPendingUploadCompleted += (success, bundleId, message) =>
+                {
+                    if (success)
+                    {
+                        Debug.Log($"[BugOneTouch] Pending 번들 업로드 성공: {bundleId}");
+                    }
+                };
+
+                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, PendingUpload, 토스트 UI가 활성화되었습니다.");
             }
             catch (System.Exception ex)
             {

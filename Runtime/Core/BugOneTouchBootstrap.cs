@@ -1,7 +1,5 @@
 using UnityEngine;
 
-#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 하위 호환성)
-
 namespace RekonOps.BugOneTouch
 {
     /// <summary>
@@ -114,56 +112,6 @@ namespace RekonOps.BugOneTouch
                 // ── 8. CaptureOverlay 초기화 ──────────────────────────────────────
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
-
-                // ── 9. BugReportForm 생성 및 의존성 주입 ──────────────────────────
-                // Auth 관련 의존성
-                var tokenStore      = new SessionTokenStore();
-                var reAuthHandler   = new ReAuthHandler(tokenStore);
-                var brokerClient    = new AuthBrokerClient(settings.authBrokerUrl, tokenStore);
-                var tokenManager    = new TokenRefreshManager(brokerClient, tokenStore, reAuthHandler);
-
-                // Jira API 클라이언트
-                var jiraApiClient   = new JiraApiClient(tokenManager);
-
-                // Jira 서비스
-                var issueCreator        = new JiraIssueCreator(jiraApiClient, settings);
-                var attachmentUploader  = new JiraAttachmentUploader(jiraApiClient);
-                var jiraService         = new JiraSubmissionService(issueCreator, attachmentUploader);
-
-                // 번들 관련
-                var manifestGenerator   = new ManifestGenerator(settings);
-                var bundleWriter        = new BundleWriter(manifestGenerator);
-                var bundleRepository    = new BundleRepository();
-
-                // ── 10. Supabase / 웹 저장 / 라이선스 의존성 (설정된 경우만) ──────────
-                SupabaseAuthClient supabaseAuthClient = null;
-                ReportSubmitter reportSubmitter = null;
-                LicenseValidator licenseValidator = null;
-
-                if (!string.IsNullOrEmpty(settings.supabaseUrl) && !string.IsNullOrEmpty(settings.supabaseAnonKey))
-                {
-                    supabaseAuthClient = new SupabaseAuthClient(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore);
-
-                    var r2Uploader = new R2Uploader();
-                    reportSubmitter = new ReportSubmitter(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore, r2Uploader);
-
-                    if (!string.IsNullOrEmpty(settings.licenseKey))
-                    {
-                        licenseValidator = new LicenseValidator(settings.supabaseUrl, settings.supabaseAnonKey, tokenStore);
-                        Debug.Log("[BugOneTouch] 라이선스 검증기 초기화 완료");
-                    }
-
-                    Debug.Log("[BugOneTouch] Supabase 연동 초기화 완료");
-                }
-
-                // BugReportForm 생성 및 의존성 주입
-                var bugReportForm = BugReportForm.EnsureInstance();
-                bugReportForm.SetDependencies(
-                    jiraService, bundleWriter, bundleRepository, settings,
-                    reportSubmitter, licenseValidator, supabaseAuthClient);
-
-                // ── 11. 캡처 완료 이벤트 → BugReportForm 바인딩 ─────────────────
-                orchestrator.OnCaptureCompleted += bugReportForm.ShowForm;
 
                 Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");
             }

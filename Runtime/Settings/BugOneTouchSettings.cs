@@ -88,8 +88,9 @@ namespace GaoZombie.BugOneTouch
         [Range(100, 5000)]
         public int logBufferSize = 500;
 
-        [Tooltip("Path to custom masking rules JSON")]
-        public string maskingRulesPath = "";
+        [Header("Debug")]
+        [Tooltip("디버그 로그 활성화")]
+        public bool debugLog = false;
 
         [Header("Report")]
         [Tooltip("버그 리포트 제목 접두어")]
@@ -148,6 +149,17 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("사용자 식별자 (UUID). 각 사용자별 고유 값입니다. 비어있으면 자동 생성됩니다.")]
         public string userId = "";
 
+        // ─── 웹 대시보드 연동 ────────────────────────────────────────────────
+        /// <summary>웹 대시보드 기본 URL</summary>
+        public const string WEB_DASHBOARD_URL = "https://app.bugonetouch.com";
+
+        [Header("웹 연동")]
+        [Tooltip("웹 대시보드와 연동 여부")]
+        public bool isLinked = false;
+
+        [Tooltip("연동된 워크스페이스 이름")]
+        public string linkedWorkspaceName = "";
+
         [Header("Supabase")]
         [Tooltip("Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)")]
         public string supabaseUrl = "";
@@ -155,8 +167,7 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("Supabase Anon Key")]
         public string supabaseAnonKey = "";
 
-        [Tooltip("웹 대시보드 URL (예: https://your-app.vercel.app). 토스트에서 리포트 링크 생성에 사용됩니다.")]
-        public string webDashboardUrl = "";
+        // webDashboardUrl 인스턴스 필드 제거됨 — WEB_DASHBOARD_URL 상수를 사용할 것
 
         [Tooltip("라이선스 키 (워크스페이스 설정 페이지에서 복사)")]
         public string licenseKey = "";

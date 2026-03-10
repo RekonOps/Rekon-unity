@@ -127,6 +127,8 @@ namespace GaoZombie.BugOneTouch
                 var manifestGenerator = new ManifestGenerator(settings);
                 var bundleWriter = new BundleWriter(manifestGenerator);
 
+                // TODO: [데이터 플로우 리팩토링] Web Backend API 준비 후 Supabase/R2 직접 호출을
+                // Web Dashboard URL 기반 API 호출로 교체 (data-flow.md 참조)
                 // ReportSubmitService: Supabase 설정이 있는 경우에만 생성
                 ReportSubmitService submitService = null;
                 if (!string.IsNullOrEmpty(settings.supabaseUrl) &&
@@ -149,33 +151,20 @@ namespace GaoZombie.BugOneTouch
                 silentSubmitManager.BindOrchestrator(orchestrator);
 
                 // ── 10. PendingUploadManager 초기화 ──────────────────────────────────
-                var bundleRepository = new BundleRepository();
-                var pendingUploadManager = new PendingUploadManager(
-                    bundleRepository, submitService, tokenStore, settings);
+                var pendingUploadManager = new PendingUploadManager();
 
                 // SilentSubmitManager에 PendingUploadManager 바인딩
                 silentSubmitManager.BindPendingUploadManager(pendingUploadManager);
 
-                // 앱 시작 시 pending 큐 자동 처리
                 int pendingCount = pendingUploadManager.GetPendingCount();
                 if (pendingCount > 0)
                 {
-                    Debug.Log($"[BugOneTouch] 앱 시작 시 pending 번들 {pendingCount}개 감지. 자동 업로드 시작...");
-                    _ = pendingUploadManager.ProcessAllPendingAsync();
+                    Debug.Log($"[BugOneTouch] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
                 }
 
                 // ── 11. SubmitToast 초기화 ──────────────────────────────────────────
                 var submitToast = SubmitToast.EnsureInstance();
-                submitToast.BindSilentSubmitManager(silentSubmitManager, settings.webDashboardUrl);
-
-                // PendingUploadManager 성공 시 토스트 표시
-                pendingUploadManager.OnPendingUploadCompleted += (success, bundleId, message) =>
-                {
-                    if (success)
-                    {
-                        Debug.Log($"[BugOneTouch] Pending 번들 업로드 성공: {bundleId}");
-                    }
-                };
+                submitToast.BindSilentSubmitManager(silentSubmitManager);
 
                 Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, PendingUpload, 토스트 UI가 활성화되었습니다.");
             }

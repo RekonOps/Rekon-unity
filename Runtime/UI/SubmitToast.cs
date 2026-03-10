@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using UnityEngine;
 
 namespace GaoZombie.BugOneTouch
@@ -9,7 +10,7 @@ namespace GaoZombie.BugOneTouch
     /// 기능:
     ///   - 성공: 녹색 배경, "리포트가 저장되었습니다" + [리포트로 이동] [닫기]
     ///   - 로컬 저장: 노란색 배경, "오프라인 저장됨 (로그인 후 자동 업로드)" + [닫기]
-    ///   - 실패: 빨간색 배경, "리포트 저장 실패" + [닫기]
+    ///   - 실패: 빨간색 배경, "웹 저장 실패하여 로컬에 저장" + [이동] [닫기] (pending 폴더 열기)
     ///   - IMGUI (OnGUI) 기반으로 UI Toolkit / uGUI 의존 없이 동작
     ///
     /// 사용법:
@@ -75,7 +76,6 @@ namespace GaoZombie.BugOneTouch
         // ─── 바인딩 ───────────────────────────────────────────────────────────────
 
         private SilentSubmitManager _submitManager;
-        private string _webDashboardUrl = "";
 
         // ─── 싱글톤 캐시 ─────────────────────────────────────────────────────────
 
@@ -107,8 +107,7 @@ namespace GaoZombie.BugOneTouch
         /// SilentSubmitManager의 OnSubmitCompleted 이벤트를 구독합니다.
         /// </summary>
         /// <param name="manager">연동할 SilentSubmitManager</param>
-        /// <param name="webDashboardUrl">웹 대시보드 기본 URL (예: https://your-app.vercel.app)</param>
-        public void BindSilentSubmitManager(SilentSubmitManager manager, string webDashboardUrl = "")
+        public void BindSilentSubmitManager(SilentSubmitManager manager)
         {
             // 기존 바인딩 해제
             if (_submitManager != null)
@@ -117,7 +116,6 @@ namespace GaoZombie.BugOneTouch
             }
 
             _submitManager = manager;
-            _webDashboardUrl = webDashboardUrl ?? "";
 
             if (_submitManager != null)
             {
@@ -234,14 +232,14 @@ namespace GaoZombie.BugOneTouch
                     _toastType = ToastType.Success;
                     _message = "리포트가 저장되었습니다";
 
-                    // 웹 대시보드 URL 구성 (보안 검증 포함)
-                    _reportUrl = BuildSecureReportUrl(_webDashboardUrl, reportIdOrMessage);
+                    // 웹 대시보드 URL 구성 (보안 검증 포함, 상수 URL 사용)
+                    _reportUrl = BuildSecureReportUrl(BugOneTouchSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
                 }
             }
             else
             {
                 _toastType = ToastType.Failure;
-                _message = "리포트 저장 실패";
+                _message = "웹 저장 실패하여 로컬에 저장";
                 _reportUrl = "";
             }
 
@@ -308,7 +306,7 @@ namespace GaoZombie.BugOneTouch
 
             if (_toastType == ToastType.Success && !string.IsNullOrEmpty(_reportUrl))
             {
-                // [리포트로 이동] + [닫기] 버튼
+                // 성공: [리포트로 이동] + [닫기] 버튼
                 float btnWidth = (innerW - 8f) / 2f;
 
                 Rect reportBtnRect = new Rect(innerX, buttonY, btnWidth, buttonHeight);
@@ -332,9 +330,27 @@ namespace GaoZombie.BugOneTouch
                     Hide();
                 }
             }
+            else if (_toastType == ToastType.Failure)
+            {
+                // 실패: [이동] (로컬 pending 폴더 열기) + [닫기] 버튼
+                float btnWidth = (innerW - 8f) / 2f;
+
+                Rect moveBtnRect = new Rect(innerX, buttonY, btnWidth, buttonHeight);
+                if (GUI.Button(moveBtnRect, "이동", _buttonStyle))
+                {
+                    OpenPendingFolder();
+                    Hide();
+                }
+
+                Rect closeBtnRect = new Rect(innerX + btnWidth + 8f, buttonY, btnWidth, buttonHeight);
+                if (GUI.Button(closeBtnRect, "닫기", _buttonStyle))
+                {
+                    Hide();
+                }
+            }
             else
             {
-                // [닫기] 버튼만
+                // 로컬 저장 등: [닫기] 버튼만
                 float closeBtnWidth = 60f;
                 Rect closeBtnRect = new Rect(
                     x + ToastWidth - padding - closeBtnWidth,
@@ -357,6 +373,29 @@ namespace GaoZombie.BugOneTouch
         // ─── 헬퍼 ─────────────────────────────────────────────────────────────────
 
         /// <summary>
+        /// 로컬 pending 폴더를 파일 탐색기에서 엽니다.
+        /// 에디터 모드에서는 RevealInFinder, 런타임에서는 file:// URL로 엽니다.
+        /// </summary>
+        private static void OpenPendingFolder()
+        {
+            string pendingFolderPath = PendingUploadManager.GetPendingDirectory();
+
+            // 폴더가 없으면 생성 (탐색기에서 열 수 있도록)
+            if (!Directory.Exists(pendingFolderPath))
+            {
+                Directory.CreateDirectory(pendingFolderPath);
+            }
+
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.RevealInFinder(pendingFolderPath);
+#else
+            // 경로에 한글/공백 등이 포함될 수 있으므로 Uri 클래스로 안전하게 변환
+            Application.OpenURL(new Uri(pendingFolderPath).AbsoluteUri);
+#endif
+            Debug.Log($"[BugOneTouch] SubmitToast: pending 폴더 열기 → {pendingFolderPath}");
+        }
+
+        /// <summary>
         /// 보안 검증된 리포트 URL을 구성합니다.
         /// Uri.TryCreate로 유효성 검증, https 스킴 강제, reportId를 URI 인코딩합니다.
         /// </summary>
@@ -368,7 +407,7 @@ namespace GaoZombie.BugOneTouch
             // 기본 URL 유효성 검증
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri baseUri))
             {
-                Debug.LogWarning("[BugOneTouch] SubmitToast: webDashboardUrl이 유효한 URI가 아닙니다");
+                Debug.LogWarning("[BugOneTouch] SubmitToast: WEB_DASHBOARD_URL이 유효한 URI가 아닙니다");
                 return "";
             }
 

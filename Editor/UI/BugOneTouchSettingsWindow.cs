@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,12 +9,12 @@ namespace GaoZombie.BugOneTouch.Editor
     /// Window/Bug-OneTouch/Settings 메뉴에서 열립니다.
     ///
     /// 단일 스크롤 윈도우 + 접이식(Foldout) 섹션 구조:
-    ///   웹 연동       - Supabase URL/AnonKey/LicenseKey, 연결 상태, 웹 로그인
+    ///   웹 연동       - 연동 상태 표시, 웹 대시보드 연동 버튼
     ///   캡처 설정     - 영상 프리셋, 해상도/FPS/비트레이트/버퍼, 스크린샷, 로그
     ///   리포트 설정   - 제목 접두어, 타임스탬프 형식, 메타데이터 토글
     ///   단축키        - 캡처 핫키 (Mac/Windows 플랫폼별)
     ///   크래시 복구   - 플러시 간격, 보관 정책
-    ///   고급          - 번들 한도, 디스크 용량, Auth Broker, 팀 ID, 디버그
+    ///   고급          - 디버그 로그, 팀 ID (디버그 시에만)
     ///
     /// SerializedObject 기반으로 변경 감지 및 Undo 지원.
     /// </summary>
@@ -96,14 +95,6 @@ namespace GaoZombie.BugOneTouch.Editor
         private BugOneTouchSettings _settings;
         private SerializedObject _serializedSettings;
 
-        // Supabase 웹 로그인 관련 상태
-        private bool _isWebLoginInProgress;
-        private string _webLoginStatus = "";
-        private SupabaseAuthClient _editorSupabaseAuth;
-        private SessionTokenStore _editorTokenStore;
-        private CancellationTokenSource _loginCts;
-        private string _cachedSupabaseUrl;
-
         // 스크롤 포지션
         private Vector2 _scrollPos;
 
@@ -122,13 +113,6 @@ namespace GaoZombie.BugOneTouch.Editor
         private void OnEnable()
         {
             LoadOrCreateSettings();
-        }
-
-        private void OnDisable()
-        {
-            _loginCts?.Cancel();
-            _loginCts?.Dispose();
-            _loginCts = null;
         }
 
         private void OnGUI()
@@ -205,107 +189,68 @@ namespace GaoZombie.BugOneTouch.Editor
 
             EditorGUI.indentLevel++;
 
-            // Supabase URL
-            SerializedProperty supabaseUrlProp = _serializedSettings.FindProperty("supabaseUrl");
-            EditorGUILayout.PropertyField(
-                supabaseUrlProp,
-                new GUIContent("API URL", "Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)"));
-
-            SerializedProperty supabaseAnonKeyProp = _serializedSettings.FindProperty("supabaseAnonKey");
-            EditorGUILayout.PropertyField(
-                supabaseAnonKeyProp,
-                new GUIContent("Anon Key", "Supabase Anon Key"));
-
-            // 라이선스 키 (마스킹)
-            SerializedProperty licenseKeyProp = _serializedSettings.FindProperty("licenseKey");
-            EditorGUI.BeginChangeCheck();
-            string maskedValue = EditorGUILayout.PasswordField(
-                new GUIContent("라이선스 키", "워크스페이스 설정 페이지에서 복사한 라이선스 키"),
-                licenseKeyProp.stringValue);
-            if (EditorGUI.EndChangeCheck())
-            {
-                licenseKeyProp.stringValue = maskedValue;
-            }
-
-            EditorGUILayout.Space(4f);
-
-            // 연결 상태 및 웹 로그인
-            DrawWebLoginSubSection();
-
-            EditorGUI.indentLevel--;
-            EditorGUILayout.Space(4f);
-            DrawSeparator();
-        }
-
-        private void DrawWebLoginSubSection()
-        {
-            bool hasSupabaseUrl = !string.IsNullOrEmpty(_settings.supabaseUrl)
-                && !string.IsNullOrEmpty(_settings.supabaseAnonKey);
-
-            if (!hasSupabaseUrl)
-            {
-                EditorGUILayout.HelpBox(
-                    "API URL과 Anon Key를 먼저 설정하세요.",
-                    MessageType.Info);
-                return;
-            }
-
-            // 로그인 상태 표시
-            EnsureEditorSupabaseAuth();
-            bool isLoggedIn = _editorTokenStore != null && !_editorTokenStore.IsSupabaseExpired();
+            // 연동 상태 표시
+            SerializedProperty isLinkedProp = _serializedSettings.FindProperty("isLinked");
+            SerializedProperty workspaceNameProp = _serializedSettings.FindProperty("linkedWorkspaceName");
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PrefixLabel("연결 상태");
-            if (isLoggedIn)
+            EditorGUILayout.PrefixLabel("연동 상태");
+            if (isLinkedProp.boolValue)
             {
                 var origColor = GUI.contentColor;
                 GUI.contentColor = new Color(0.2f, 0.8f, 0.3f);
-                EditorGUILayout.LabelField("● 연결됨");
+                string displayName = string.IsNullOrEmpty(workspaceNameProp.stringValue)
+                    ? "연동됨"
+                    : $"연동됨 ({workspaceNameProp.stringValue})";
+                EditorGUILayout.LabelField($"● {displayName}");
                 GUI.contentColor = origColor;
             }
             else
             {
                 var origColor = GUI.contentColor;
                 GUI.contentColor = new Color(0.9f, 0.3f, 0.3f);
-                EditorGUILayout.LabelField("● 미연결");
+                EditorGUILayout.LabelField("○ 미연동");
                 GUI.contentColor = origColor;
             }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4f);
 
-            EditorGUILayout.BeginHorizontal();
-
-            // 웹 로그인 버튼
-            using (new EditorGUI.DisabledScope(_isWebLoginInProgress))
+            // 연동/해제 버튼
+            if (isLinkedProp.boolValue)
             {
-                string loginLabel = _isWebLoginInProgress ? "로그인 중..." : "웹 로그인";
-                if (GUILayout.Button(loginLabel, GUILayout.Width(120f), GUILayout.Height(28f)))
+                // 연동됨 상태: 연동 해제 버튼
+                if (GUILayout.Button("연동 해제", GUILayout.Width(100f), GUILayout.Height(28f)))
                 {
-                    StartWebLogin();
+                    if (EditorUtility.DisplayDialog(
+                        "웹 연동 해제",
+                        "웹 대시보드와의 연동을 해제하시겠습니까?",
+                        "해제", "취소"))
+                    {
+                        isLinkedProp.boolValue = false;
+                        workspaceNameProp.stringValue = "";
+                        Debug.Log("[BugOneTouch] 웹 대시보드 연동 해제됨");
+                        Repaint();
+                    }
                 }
             }
-
-            // 로그아웃 버튼
-            using (new EditorGUI.DisabledScope(!isLoggedIn || _isWebLoginInProgress))
+            else
             {
-                if (GUILayout.Button("로그아웃", GUILayout.Width(80f), GUILayout.Height(28f)))
+                // 미연동 상태: 웹에서 연동하기 버튼
+                if (GUILayout.Button("웹에서 연동하기", GUILayout.Width(140f), GUILayout.Height(28f)))
                 {
-                    _editorTokenStore?.ClearSupabase();
-                    _webLoginStatus = "로그아웃 완료";
-                    Debug.Log("[BugOneTouch] Supabase 에디터 로그아웃 완료");
-                    Repaint();
+                    Application.OpenURL(BugOneTouchSettings.WEB_DASHBOARD_URL + "/unity-link");
                 }
-            }
 
-            EditorGUILayout.EndHorizontal();
-
-            // 상태 메시지 표시
-            if (!string.IsNullOrEmpty(_webLoginStatus))
-            {
                 EditorGUILayout.Space(4f);
-                EditorGUILayout.HelpBox(_webLoginStatus, MessageType.Info);
+                EditorGUILayout.HelpBox(
+                    "웹 대시보드에서 Unity 연동을 완료하세요.\n버튼을 클릭하면 브라우저가 열립니다.",
+                    MessageType.Info);
             }
+
+            EditorGUI.indentLevel--;
+            EditorGUILayout.Space(4f);
+            DrawSeparator();
         }
 
         // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
@@ -340,11 +285,6 @@ namespace GaoZombie.BugOneTouch.Editor
                 logBufferSize,
                 100, 5000,
                 new GUIContent("로그 버퍼 크기", "링 버퍼에 보관할 최대 로그 라인 수"));
-
-            SerializedProperty maskingRulesPath = _serializedSettings.FindProperty("maskingRulesPath");
-            EditorGUILayout.PropertyField(
-                maskingRulesPath,
-                new GUIContent("마스킹 규칙 경로", "민감 정보 마스킹 규칙 JSON 파일 경로 (비워두면 기본 규칙 사용)"));
 
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
@@ -499,10 +439,19 @@ namespace GaoZombie.BugOneTouch.Editor
 
             EditorGUILayout.Space(4f);
 
+            EditorGUILayout.BeginHorizontal();
+
             if (GUILayout.Button("다시 확인", GUILayout.Width(80f)))
             {
                 FfmpegHelper.ClearCache();
             }
+
+            if (GUILayout.Button("FFmpeg 다운로드 페이지", GUILayout.Width(160f)))
+            {
+                Application.OpenURL("https://ffmpeg.org/download.html");
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
 
         // ─── 리포트 설정 섹션 ───────────────────────────────────────────────────
@@ -728,40 +677,19 @@ namespace GaoZombie.BugOneTouch.Editor
 
             EditorGUILayout.Space(4f);
 
-            DrawSectionHeader("번들 한도");
-
-            SerializedProperty maxBundles = _serializedSettings.FindProperty("maxBundles");
-            EditorGUILayout.IntSlider(
-                maxBundles,
-                10, 1000,
-                new GUIContent("최대 번들 수", "디스크에 보관할 번들 최대 개수 (10~1000)"));
-
-            SerializedProperty maxDisk = _serializedSettings.FindProperty("maxDiskUsageMB");
-            EditorGUILayout.IntSlider(
-                maxDisk,
-                500, 20000,
-                new GUIContent("최대 디스크 용량 (MB)", "번들 전체에 허용되는 최대 디스크 사용량 (500~20000MB)"));
-
-            EditorGUILayout.Space(8f);
-
-            DrawSectionHeader("Auth Broker");
-
-            SerializedProperty brokerUrl = _serializedSettings.FindProperty("authBrokerUrl");
+            // 디버그 로그
+            DrawSectionHeader("디버그");
+            SerializedProperty debugLogProp = _serializedSettings.FindProperty("debugLog");
             EditorGUILayout.PropertyField(
-                brokerUrl,
-                new GUIContent("Auth Broker URL", "Supabase Edge Functions 기본 URL"));
+                debugLogProp,
+                new GUIContent("디버그 로그", "디버그 로그 출력 활성화"));
 
-            EditorGUILayout.Space(4f);
-
-            if (GUILayout.Button("URL 형식 검증", GUILayout.Width(140f)))
+            // 팀 ID 관리 (디버그 모드에서만 표시, 읽기전용)
+            if (debugLogProp.boolValue)
             {
-                ValidateAuthBrokerUrl(brokerUrl.stringValue);
+                EditorGUILayout.Space(8f);
+                DrawTeamIdentitySubSection();
             }
-
-            EditorGUILayout.Space(8f);
-
-            // 팀 ID 관리
-            DrawTeamIdentitySubSection();
 
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
@@ -770,85 +698,42 @@ namespace GaoZombie.BugOneTouch.Editor
 
         private void DrawTeamIdentitySubSection()
         {
-            DrawSectionHeader("팀 ID 관리");
+            DrawSectionHeader("팀 ID 관리 (읽기전용)");
 
-            EditorGUILayout.HelpBox("같은 팀의 멤버는 동일한 팀 ID를 사용하세요.", MessageType.Info);
+            EditorGUILayout.HelpBox("디버그 모드에서만 표시됩니다. 값은 자동 생성됩니다.", MessageType.Info);
             EditorGUILayout.Space(4f);
 
             SerializedProperty tenantIdProp = _serializedSettings.FindProperty("tenantId");
             SerializedProperty userIdProp   = _serializedSettings.FindProperty("userId");
 
+            // 읽기전용으로 표시
+            EditorGUI.BeginDisabledGroup(true);
+
             // ── 팀 ID (tenantId) ──
             EditorGUILayout.LabelField("팀 ID (tenantId)", EditorStyles.boldLabel);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUI.BeginChangeCheck();
-                string newTenantId = EditorGUILayout.TextField(tenantIdProp.stringValue);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    if (string.IsNullOrEmpty(newTenantId) || System.Guid.TryParse(newTenantId, out _))
-                    {
-                        tenantIdProp.stringValue = newTenantId;
-                        _serializedSettings.ApplyModifiedProperties();
-                    }
-                    else
-                    {
-                        EditorUtility.DisplayDialog("형식 오류", "팀 ID는 UUID 형식이어야 합니다.\n예: 550e8400-e29b-41d4-a716-446655440000", "확인");
-                    }
-                }
-
-                if (GUILayout.Button("복사", GUILayout.Width(50f)))
-                {
-                    GUIUtility.systemCopyBuffer = tenantIdProp.stringValue;
-                }
-
-                if (GUILayout.Button("새로 생성", GUILayout.Width(80f)))
-                {
-                    tenantIdProp.stringValue = System.Guid.NewGuid().ToString();
-                    _serializedSettings.ApplyModifiedProperties();
-                }
-            }
-
-            EditorGUILayout.Space(6f);
-
-            // ── 사용자 ID (userId) ──
-            EditorGUILayout.LabelField("사용자 ID (userId)", EditorStyles.boldLabel);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUI.BeginChangeCheck();
-                string newUserId = EditorGUILayout.TextField(userIdProp.stringValue);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    if (string.IsNullOrEmpty(newUserId) || System.Guid.TryParse(newUserId, out _))
-                    {
-                        userIdProp.stringValue = newUserId;
-                        _serializedSettings.ApplyModifiedProperties();
-                    }
-                    else
-                    {
-                        EditorUtility.DisplayDialog("형식 오류", "사용자 ID는 UUID 형식이어야 합니다.\n예: 550e8400-e29b-41d4-a716-446655440000", "확인");
-                    }
-                }
-
-                if (GUILayout.Button("복사", GUILayout.Width(50f)))
-                {
-                    GUIUtility.systemCopyBuffer = userIdProp.stringValue;
-                }
-
-                if (GUILayout.Button("새로 생성", GUILayout.Width(80f)))
-                {
-                    userIdProp.stringValue = System.Guid.NewGuid().ToString();
-                    _serializedSettings.ApplyModifiedProperties();
-                }
-            }
+            EditorGUILayout.TextField(tenantIdProp.stringValue);
 
             EditorGUILayout.Space(4f);
 
-            if (GUILayout.Button("빈 ID 자동 생성 (EnsureIdentityIds)", GUILayout.Height(24f)))
+            // ── 사용자 ID (userId) ──
+            EditorGUILayout.LabelField("사용자 ID (userId)", EditorStyles.boldLabel);
+            EditorGUILayout.TextField(userIdProp.stringValue);
+
+            EditorGUI.EndDisabledGroup();
+
+            EditorGUILayout.Space(4f);
+
+            // 복사 버튼은 활성 상태로 유지
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("팀 ID 복사", GUILayout.Width(100f)))
             {
-                _settings.EnsureIdentityIds();
-                _serializedSettings.Update();
+                GUIUtility.systemCopyBuffer = tenantIdProp.stringValue;
             }
+            if (GUILayout.Button("사용자 ID 복사", GUILayout.Width(120f)))
+            {
+                GUIUtility.systemCopyBuffer = userIdProp.stringValue;
+            }
+            EditorGUILayout.EndHorizontal();
         }
 
         // ─── 푸터 ───────────────────────────────────────────────────────────────
@@ -880,93 +765,6 @@ namespace GaoZombie.BugOneTouch.Editor
             }
 
             EditorGUILayout.Space(6f);
-        }
-
-        // ─── Supabase 인증 헬퍼 ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// 에디터용 SupabaseAuthClient 인스턴스를 생성합니다 (지연 초기화).
-        /// </summary>
-        private void EnsureEditorSupabaseAuth()
-        {
-            if (_editorTokenStore == null)
-                _editorTokenStore = new SessionTokenStore();
-
-            // settings의 URL이 변경되면 클라이언트 재생성
-            if (_editorSupabaseAuth != null && _settings.supabaseUrl != _cachedSupabaseUrl)
-            {
-                Debug.Log("[BugOneTouch] Supabase URL 변경 감지. 클라이언트를 재생성합니다.");
-                _editorSupabaseAuth = null;
-            }
-
-            if (_editorSupabaseAuth == null
-                && !string.IsNullOrEmpty(_settings.supabaseUrl)
-                && !string.IsNullOrEmpty(_settings.supabaseAnonKey))
-            {
-                try
-                {
-                    _editorSupabaseAuth = new SupabaseAuthClient(
-                        _settings.supabaseUrl, _settings.supabaseAnonKey, _editorTokenStore);
-                    _cachedSupabaseUrl = _settings.supabaseUrl;
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[BugOneTouch] SupabaseAuthClient 초기화 실패: {ex.Message}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// 웹 브라우저를 통한 Supabase 로그인을 시작합니다.
-        /// </summary>
-        private async void StartWebLogin()
-        {
-            if (_isWebLoginInProgress) return;
-
-            EnsureEditorSupabaseAuth();
-            if (_editorSupabaseAuth == null)
-            {
-                _webLoginStatus = "SupabaseAuthClient 초기화에 실패했습니다. URL과 Anon Key를 확인하세요.";
-                Repaint();
-                return;
-            }
-
-            // 이전 로그인 시도 취소 및 새 CancellationTokenSource 생성
-            _loginCts?.Cancel();
-            _loginCts?.Dispose();
-            _loginCts = new CancellationTokenSource();
-            var ct = _loginCts.Token;
-
-            _isWebLoginInProgress = true;
-            _webLoginStatus = "브라우저에서 로그인을 완료해주세요...";
-            Repaint();
-
-            try
-            {
-                string deviceId = SystemInfo.deviceUniqueIdentifier;
-                var result = await _editorSupabaseAuth.StartWebLoginAsync(deviceId, ct);
-                _webLoginStatus = $"인증 완료! 워크스페이스: {result.WorkspaceName}";
-                Debug.Log($"[BugOneTouch] 에디터 Supabase 웹 로그인 성공: {result.WorkspaceName}");
-            }
-            catch (OperationCanceledException)
-            {
-                _webLoginStatus = "로그인이 취소되었습니다.";
-                Debug.Log("[BugOneTouch] 에디터 Supabase 웹 로그인 취소됨");
-            }
-            catch (TimeoutException)
-            {
-                _webLoginStatus = "로그인 시간이 초과되었습니다. 다시 시도해주세요.";
-            }
-            catch (Exception ex)
-            {
-                _webLoginStatus = $"로그인 실패: {ex.Message}";
-                Debug.LogError($"[BugOneTouch] 에디터 Supabase 웹 로그인 실패: {ex.Message}");
-            }
-            finally
-            {
-                _isWebLoginInProgress = false;
-                Repaint();
-            }
         }
 
         // ─── 헬퍼 메서드 ────────────────────────────────────────────────────────
@@ -1008,27 +806,6 @@ namespace GaoZombie.BugOneTouch.Editor
             _serializedSettings.ApplyModifiedProperties();
             AssetDatabase.SaveAssets();
             Debug.Log("[BugOneTouch] 설정 저장 완료");
-        }
-
-        /// <summary>
-        /// Auth Broker URL 형식을 검증합니다.
-        /// </summary>
-        private static void ValidateAuthBrokerUrl(string url)
-        {
-            if (string.IsNullOrEmpty(url))
-            {
-                EditorUtility.DisplayDialog("URL 검증", "Auth Broker URL이 비어 있습니다.", "확인");
-                return;
-            }
-
-            bool valid = Uri.TryCreate(url, UriKind.Absolute, out Uri result)
-                         && (result.Scheme == Uri.UriSchemeHttp || result.Scheme == Uri.UriSchemeHttps);
-
-            string message = valid
-                ? $"URL 형식이 유효합니다.\n{url}"
-                : $"올바르지 않은 URL 형식입니다.\n{url}\n\n예시: https://xxx.supabase.co/functions/v1";
-
-            EditorUtility.DisplayDialog("URL 검증", message, "확인");
         }
 
         /// <summary>

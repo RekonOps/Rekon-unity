@@ -124,183 +124,19 @@ namespace GaoZombie.BugOneTouch
         [Tooltip("Auth Broker base URL")]
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
 
-        [Header("Jira")]
+        [Header("Jira (Runtime)")]
         [Tooltip("Jira 사이트 기본 URL (예: https://yourcompany.atlassian.net)")]
         public string jiraSiteUrl = "";
 
         [Tooltip("Jira 프로젝트 키 (예: PROJ, BUG)")]
         public string jiraProjectKey = "";
 
-        [Tooltip("기본 이슈 타입")]
-        public string jiraDefaultIssueType = "Bug";
-
-        [Tooltip("기본 우선순위")]
-        public string jiraDefaultPriority = "Medium";
-
         [Tooltip("기본 Jira 라벨")]
         public string[] defaultLabels = new string[0];
-
-        [Header("Jira 메타데이터 캐시")]
-        [HideInInspector] public string[] cachedProjectKeys = new string[0];
-        [HideInInspector] public string[] cachedProjectNames = new string[0];
-
-        [HideInInspector] public string[] cachedIssueTypeIds = new string[0];
-        [HideInInspector] public string[] cachedIssueTypeNames = new string[0];
-
-        [HideInInspector] public string[] cachedFieldIds = new string[0];
-        [HideInInspector] public string[] cachedFieldNames = new string[0];
-        [HideInInspector] public bool[] cachedFieldRequired = new bool[0];
-        [HideInInspector] public string[] cachedFieldTypes = new string[0];
-
-        // 필드별 allowedValues 캐시 (fieldId별로 콤마 구분 문자열)
-        // 예: fieldDefaultAllowedKeys = ["priority"], fieldDefaultAllowedValues = ["Highest,High,Medium,Low,Lowest"]
-        [HideInInspector] public string[] cachedFieldAllowedKeys = new string[0];
-        [HideInInspector] public string[] cachedFieldAllowedValues = new string[0];
-
-        // 필드 기본값 (병렬 배열 = Dictionary 대체)
-        [HideInInspector] public string[] fieldDefaultKeys = new string[0];
-        [HideInInspector] public string[] fieldDefaultValues = new string[0];
-
-        // 특수 필드 캐시 (담당자, 스프린트, 에픽, 이슈, 현재 사용자)
-        [HideInInspector] public string[] cachedAssigneeIds = new string[0];
-        [HideInInspector] public string[] cachedAssigneeNames = new string[0];
-        [HideInInspector] public string[] cachedSprintIds = new string[0];
-        [HideInInspector] public string[] cachedSprintNames = new string[0];
-        [HideInInspector] public string[] cachedEpicKeys = new string[0];
-        [HideInInspector] public string[] cachedEpicNames = new string[0];
-        [HideInInspector] public string[] cachedIssueKeys = new string[0];
-        [HideInInspector] public string[] cachedIssueNames = new string[0];
-        [HideInInspector] public string currentUserAccountId = "";
-        [HideInInspector] public string currentUserDisplayName = "";
-
-        // 선택된 이슈타입 ID (이슈 타입 name → id 매핑용)
-        [HideInInspector] public string jiraSelectedIssueTypeId = "";
 
         // 첨부파일 크기 제한 캐시 (Jira 서버에서 조회한 값)
         /// <summary>Jira 서버에서 조회한 첨부파일 최대 크기(바이트). 0이면 미조회 상태.</summary>
         [HideInInspector] public long cachedAttachmentSizeLimitBytes = 0;
-        /// <summary>첨부파일 크기 제한을 마지막으로 조회한 일시 (ISO 8601 문자열).</summary>
-        [HideInInspector] public string cachedAttachmentSizeLimitFetchedAt = "";
-
-        [HideInInspector] public string[] hiddenFieldIds = new string[0];
-
-        /// <summary>
-        /// 특정 필드의 기본값을 조회합니다.
-        /// </summary>
-        public string GetFieldDefault(string fieldId)
-        {
-            if (fieldDefaultKeys == null) return "";
-            for (int i = 0; i < fieldDefaultKeys.Length; i++)
-            {
-                if (fieldDefaultKeys[i] == fieldId)
-                    return i < fieldDefaultValues.Length ? fieldDefaultValues[i] : "";
-            }
-            return "";
-        }
-
-        /// <summary>
-        /// 특정 필드의 기본값을 설정합니다.
-        /// </summary>
-        public void SetFieldDefault(string fieldId, string value)
-        {
-            if (fieldDefaultKeys == null)
-            {
-                fieldDefaultKeys = new string[0];
-                fieldDefaultValues = new string[0];
-            }
-
-            for (int i = 0; i < fieldDefaultKeys.Length; i++)
-            {
-                if (fieldDefaultKeys[i] == fieldId)
-                {
-                    if (i < fieldDefaultValues.Length)
-                        fieldDefaultValues[i] = value;
-                    return;
-                }
-            }
-
-            // 새 항목 추가 (배열 확장)
-            fieldDefaultKeys = AppendToArray(fieldDefaultKeys, fieldId);
-            fieldDefaultValues = AppendToArray(fieldDefaultValues, value);
-        }
-
-        /// <summary>
-        /// 특정 필드가 숨김 상태인지 확인합니다.
-        /// </summary>
-        public bool IsFieldHidden(string fieldId)
-        {
-            if (hiddenFieldIds == null) return false;
-            for (int i = 0; i < hiddenFieldIds.Length; i++)
-            {
-                if (hiddenFieldIds[i] == fieldId)
-                    return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// 특정 필드의 숨김 상태를 토글합니다.
-        /// </summary>
-        public void ToggleFieldHidden(string fieldId)
-        {
-            if (IsFieldHidden(fieldId))
-            {
-                // 제거
-                var list = new System.Collections.Generic.List<string>(hiddenFieldIds);
-                list.Remove(fieldId);
-                hiddenFieldIds = list.ToArray();
-            }
-            else
-            {
-                // 추가
-                hiddenFieldIds = AppendToArray(hiddenFieldIds, fieldId);
-            }
-        }
-
-        /// <summary>
-        /// 특정 필드의 allowedValues를 조회합니다 (콤마 구분 → 배열).
-        /// </summary>
-        public string[] GetFieldAllowedValues(string fieldId)
-        {
-            if (cachedFieldAllowedKeys == null) return new string[0];
-            for (int i = 0; i < cachedFieldAllowedKeys.Length; i++)
-            {
-                if (cachedFieldAllowedKeys[i] == fieldId && i < cachedFieldAllowedValues.Length)
-                {
-                    string csv = cachedFieldAllowedValues[i];
-                    if (string.IsNullOrEmpty(csv)) return new string[0];
-                    return csv.Split(',');
-                }
-            }
-            return new string[0];
-        }
-
-        /// <summary>
-        /// 특정 필드의 allowedValues를 저장합니다 (배열 → 콤마 구분).
-        /// </summary>
-        public void SetFieldAllowedValues(string fieldId, string[] values)
-        {
-            if (cachedFieldAllowedKeys == null)
-            {
-                cachedFieldAllowedKeys = new string[0];
-                cachedFieldAllowedValues = new string[0];
-            }
-
-            string csv = values != null ? string.Join(",", values) : "";
-
-            for (int i = 0; i < cachedFieldAllowedKeys.Length; i++)
-            {
-                if (cachedFieldAllowedKeys[i] == fieldId)
-                {
-                    if (i < cachedFieldAllowedValues.Length)
-                        cachedFieldAllowedValues[i] = csv;
-                    return;
-                }
-            }
-
-            cachedFieldAllowedKeys = AppendToArray(cachedFieldAllowedKeys, fieldId);
-            cachedFieldAllowedValues = AppendToArray(cachedFieldAllowedValues, csv);
-        }
 
         /// <summary>
         /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.
@@ -324,13 +160,5 @@ namespace GaoZombie.BugOneTouch
 #endif
         }
 
-        private static T[] AppendToArray<T>(T[] arr, T value)
-        {
-            if (arr == null) arr = new T[0];
-            var newArr = new T[arr.Length + 1];
-            Array.Copy(arr, newArr, arr.Length);
-            newArr[arr.Length] = value;
-            return newArr;
-        }
     }
 }

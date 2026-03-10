@@ -136,7 +136,7 @@ namespace GaoZombie.BugOneTouch
         /// <summary>현재 씬 이름 (SceneManager.GetActiveScene().name).</summary>
         public string scene;
 
-        /// <summary>재현 단계 (사용자 입력, BugReportForm에서 설정).</summary>
+        /// <summary>재현 단계 (사용자 입력).</summary>
         public string repro_steps;
 
         /// <summary>예상 결과 (사용자 입력, nullable).</summary>

@@ -37,6 +37,7 @@ namespace GaoZombie.BugOneTouch
         private readonly BundleWriter _bundleWriter;
         private readonly ReportSubmitService _submitService;
         private readonly SessionTokenStore _tokenStore;
+        private PendingUploadManager _pendingUploadManager;
         private ICaptureOrchestrator _orchestrator;
         private bool _disposed;
         private bool _isSubmitting;
@@ -68,6 +69,16 @@ namespace GaoZombie.BugOneTouch
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// PendingUploadManager를 바인딩합니다.
+        /// 전송 실패/미로그인 시 pending 큐에 자동 등록됩니다.
+        /// </summary>
+        public void BindPendingUploadManager(PendingUploadManager pendingUploadManager)
+        {
+            _pendingUploadManager = pendingUploadManager;
+            Debug.Log("[BugOneTouch] SilentSubmitManager: PendingUploadManager 바인딩 완료");
+        }
 
         /// <summary>
         /// CaptureOrchestrator의 OnCaptureCompleted 이벤트를 구독합니다.
@@ -290,7 +301,6 @@ namespace GaoZombie.BugOneTouch
 
                 // AccessToken 확인
                 // SessionTokenStore는 생성자에서 DI로 주입받은 인스턴스 재사용
-                // Phase 6에서 상세 오프라인 폴백 구현 예정
                 string accessToken = null;
                 try
                 {
@@ -298,13 +308,35 @@ namespace GaoZombie.BugOneTouch
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugOneTouch] SilentSubmit: 토큰 로드 실패 (로컬 저장으로 폴백): {ex.Message}");
+                    Debug.LogWarning($"[BugOneTouch] SilentSubmit: 토큰 로드 실패 (pending 큐로 폴백): {ex.Message}");
+
+                    // 토큰 로드 실패 시 pending 큐에 등록
+                    if (_pendingUploadManager != null)
+                    {
+                        await _pendingUploadManager.EnqueueAsync(manifest);
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (토큰 오류): {manifest.id}");
+                    }
+                    else
+                    {
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (토큰 오류): {manifest.id}");
+                    }
+                    return;
                 }
 
                 if (string.IsNullOrEmpty(accessToken))
                 {
-                    Debug.Log("[BugOneTouch] SilentSubmit: 로그인되지 않았습니다. 로컬 저장만 완료합니다.");
-                    OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (미로그인): {manifest.id}");
+                    Debug.Log("[BugOneTouch] SilentSubmit: 로그인되지 않았습니다. pending 큐에 등록합니다.");
+
+                    // pending 큐에 등록 (로그인 시 자동 업로드)
+                    if (_pendingUploadManager != null)
+                    {
+                        await _pendingUploadManager.EnqueueAsync(manifest);
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (미로그인): {manifest.id}");
+                    }
+                    else
+                    {
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (미로그인): {manifest.id}");
+                    }
                     return;
                 }
 
@@ -332,6 +364,14 @@ namespace GaoZombie.BugOneTouch
                 {
                     manifest.state = BundleState.Failed;
                     Debug.LogWarning($"[BugOneTouch] SilentSubmit: 웹 전송 실패: {result.ErrorMessage}");
+
+                    // pending 큐에 등록 (재시도 스케줄)
+                    if (_pendingUploadManager != null)
+                    {
+                        await _pendingUploadManager.EnqueueAsync(manifest);
+                        Debug.Log($"[BugOneTouch] SilentSubmit: pending 큐에 등록 완료 (bundleId={manifest.id})");
+                    }
+
                     OnSubmitCompleted?.Invoke(false, result.ErrorMessage);
                 }
             }
@@ -339,12 +379,28 @@ namespace GaoZombie.BugOneTouch
             {
                 manifest.state = BundleState.Failed;
                 Debug.LogWarning("[BugOneTouch] SilentSubmit: 웹 전송 타임아웃 (60초 초과)");
+
+                // pending 큐에 등록 (재시도 스케줄)
+                if (_pendingUploadManager != null)
+                {
+                    try { await _pendingUploadManager.EnqueueAsync(manifest); }
+                    catch { /* 무시 */ }
+                }
+
                 OnSubmitCompleted?.Invoke(false, "전송 타임아웃");
             }
             catch (Exception ex)
             {
                 manifest.state = BundleState.Failed;
                 Debug.LogError($"[BugOneTouch] SilentSubmit: 웹 전송 중 오류: {ex.Message}");
+
+                // pending 큐에 등록 (재시도 스케줄)
+                if (_pendingUploadManager != null)
+                {
+                    try { await _pendingUploadManager.EnqueueAsync(manifest); }
+                    catch { /* 무시 */ }
+                }
+
                 OnSubmitCompleted?.Invoke(false, ex.Message);
             }
         }

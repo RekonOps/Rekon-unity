@@ -25,6 +25,14 @@ namespace GaoZombie.BugOneTouch
         private const int HmacSize = 32;         // SHA-256 = 32 바이트
         private const int SaltSize = 16;         // PBKDF2 소금 크기
 
+        // ─── 이벤트 ─────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Supabase 토큰이 저장되었을 때 발행되는 이벤트.
+        /// PendingUploadManager 등에서 로그인 감지용으로 구독합니다.
+        /// </summary>
+        public event Action OnTokenChanged;
+
         // ─── 내부 상태 ─────────────────────────────────────────────────────────────
 
         private readonly string _packageName;
@@ -173,7 +181,20 @@ namespace GaoZombie.BugOneTouch
         // ─── Supabase 편의 메서드 ────────────────────────────────────────────────────
 
         /// <summary>Supabase 액세스 토큰을 암호화하여 저장합니다.</summary>
-        public void SaveSupabase(string token) => Save(token, SupabasePrefsKey);
+        public void SaveSupabase(string token)
+        {
+            Save(token, SupabasePrefsKey);
+
+            // 토큰 변경 이벤트 발행 (로그인 감지용)
+            if (!string.IsNullOrEmpty(token))
+            {
+                try { OnTokenChanged?.Invoke(); }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[SessionTokenStore] OnTokenChanged 핸들러 오류: {ex.Message}");
+                }
+            }
+        }
 
         /// <summary>저장된 Supabase 액세스 토큰을 복호화하여 반환합니다.</summary>
         public string LoadSupabase() => Load(SupabasePrefsKey);

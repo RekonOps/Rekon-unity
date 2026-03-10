@@ -3,6 +3,21 @@ using UnityEngine;
 
 namespace GaoZombie.BugOneTouch
 {
+    /// <summary>
+    /// 영상 프리셋 종류.
+    /// </summary>
+    public enum VideoPreset
+    {
+        /// <summary>권장 설정 (1280x720, 30fps, 2Mbps, 30초)</summary>
+        Recommended = 0,
+        /// <summary>고화질 (1920x1080, 60fps, 5Mbps, 60초)</summary>
+        HighQuality = 1,
+        /// <summary>경량 (854x480, 15fps, 1Mbps, 15초)</summary>
+        Lightweight = 2,
+        /// <summary>커스텀 (사용자 직접 설정)</summary>
+        Custom = 3,
+    }
+
     [CreateAssetMenu(fileName = "BugOneTouchSettings", menuName = "Bug-OneTouch/Settings")]
     public class BugOneTouchSettings : ScriptableObject
     {
@@ -44,6 +59,9 @@ namespace GaoZombie.BugOneTouch
         public int screenshotDownscale = 1;
 
         [Header("Video")]
+        [Tooltip("영상 프리셋 (권장/고화질/경량/커스텀)")]
+        public VideoPreset videoPreset = VideoPreset.Recommended;
+
         [Tooltip("Enable video ring buffer")]
         public bool videoEnabled = true;
 
@@ -55,15 +73,15 @@ namespace GaoZombie.BugOneTouch
 
         [Tooltip("Video frames per second")]
         [Range(15, 60)]
-        public int videoFps = 15;
+        public int videoFps = 30;
 
         [Tooltip("Video buffer duration in seconds")]
         [Range(10, 120)]
-        public int videoBufferSeconds = 60;
+        public int videoBufferSeconds = 30;
 
         [Tooltip("Target bitrate in Mbps")]
-        [Range(2, 20)]
-        public float videoBitrateMbps = 10f;
+        [Range(1, 20)]
+        public float videoBitrateMbps = 2f;
 
         [Header("Log")]
         [Tooltip("Maximum log lines in ring buffer")]
@@ -72,6 +90,26 @@ namespace GaoZombie.BugOneTouch
 
         [Tooltip("Path to custom masking rules JSON")]
         public string maskingRulesPath = "";
+
+        [Header("Report")]
+        [Tooltip("버그 리포트 제목 접두어")]
+        public string reportTitlePrefix = "Bug";
+
+        [Tooltip("타임스탬프 형식 인덱스 (0: yyMMdd_HHmm, 1: yyyy-MM-dd HH:mm, 2: MMdd_HHmmss)")]
+        [Range(0, 2)]
+        public int timestampFormat = 0;
+
+        [Tooltip("메타데이터에 Unity 버전 포함")]
+        public bool collectUnityVersion = true;
+
+        [Tooltip("메타데이터에 씬 이름 포함")]
+        public bool collectSceneName = true;
+
+        [Tooltip("메타데이터에 빌드 플랫폼 포함")]
+        public bool collectPlatform = true;
+
+        [Tooltip("메타데이터에 화면 해상도 포함")]
+        public bool collectResolution = true;
 
         [Header("Crash Recovery")]
         [Tooltip("Log flush interval in seconds")]

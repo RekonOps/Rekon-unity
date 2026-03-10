@@ -19,7 +19,6 @@ namespace RekonOps.BugOneTouch
     /// 자동 업로드 트리거:
     ///   1. 앱 시작 시: Bootstrap에서 pending 스캔 → 로그인 상태면 순차 업로드
     ///   2. 로그인 성공 시: SessionTokenStore.OnTokenChanged 이벤트 구독
-    ///   3. 다음 핫키 시: SilentSubmitManager.OnSubmitCompleted 후 함께 처리
     ///
     /// 재시도 정책:
     ///   - 최대 5회, 지수 백오프: 10초, 30초, 1분, 5분, 10분

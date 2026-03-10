@@ -381,7 +381,7 @@ namespace RekonOps.BugOneTouch
 
             // reportId URI 인코딩
             string encodedReportId = Uri.EscapeDataString(reportId);
-            string fullUrl = $"{baseUri.GetLeftPart(UriPartial.Authority)}{baseUri.AbsolutePath.TrimEnd('/')}/reports/{encodedReportId}";
+            string fullUrl = $"{baseUri.AbsoluteUri.TrimEnd('/')}/reports/{encodedReportId}";
 
             // 최종 URL 재검증
             if (!IsValidHttpsUrl(fullUrl))

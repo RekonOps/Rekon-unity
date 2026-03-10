@@ -120,6 +120,9 @@ namespace RekonOps.BugOneTouch
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
 
+                // CaptureOverlay: Silent 모드 활성화 (SilentSubmitManager가 사용되므로)
+                overlay.SetSilentMode(true);
+
                 // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
                 var manifestGenerator = new ManifestGenerator(settings);
                 var bundleWriter = new BundleWriter(manifestGenerator);

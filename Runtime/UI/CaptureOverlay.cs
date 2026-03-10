@@ -82,8 +82,7 @@ namespace GaoZombie.BugOneTouch
         /// <summary>Silent 모드 완료 표시 여부</summary>
         private bool _silentCompleted = false;
 
-        /// <summary>Silent 모드 전송 중 여부</summary>
-        private bool _silentSubmitting = false;
+        // _silentSubmitting 제거됨: CaptureProgressEvent에 "submit" 단계가 없으므로 불필요
 
         // ─── GUI 스타일 캐시 ──────────────────────────────────────────────────────
 
@@ -156,7 +155,6 @@ namespace GaoZombie.BugOneTouch
             _progress  = 0f;
             _stageText = "";
             _silentCompleted = false;
-            _silentSubmitting = false;
         }
 
         // ─── Unity 생명주기 ───────────────────────────────────────────────────────
@@ -229,19 +227,12 @@ namespace GaoZombie.BugOneTouch
             // 단계명을 한글로 변환
             _stageText = TranslateStageName(evt.Stage, evt.IsSuccess);
 
-            // 전송 단계 감지 (Silent 모드용)
-            if (_silentMode && evt.Stage == "submit")
-            {
-                _silentSubmitting = true;
-            }
-
             if (evt.Stage == "complete" || evt.Progress >= 1.0f)
             {
                 if (_silentMode)
                 {
                     // Silent 모드: 완료 체크마크 표시 후 빠르게 숨기기
                     _silentCompleted = true;
-                    _silentSubmitting = false;
                     _blinkVisible = true; // 완료 시 항상 표시
                     Invoke(nameof(Hide), CompletionDisplayDuration);
                 }
@@ -260,7 +251,6 @@ namespace GaoZombie.BugOneTouch
                 _blinkTimer = 0f;
                 _blinkVisible = true;
                 _silentCompleted = false;
-                _silentSubmitting = false;
             }
         }
 
@@ -333,7 +323,7 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>
         /// Silent 모드용 최소 인디케이터를 그립니다.
-        /// 우하단에 작은 원(캡처 중: 녹색, 전송 중: 파란색) 또는 체크마크(완료) 표시.
+        /// 우하단에 작은 원(캡처 중: 녹색) 또는 체크마크(완료) 표시.
         /// </summary>
         private void DrawMinimalIndicator()
         {
@@ -351,10 +341,8 @@ namespace GaoZombie.BugOneTouch
             }
             else if (_blinkVisible)
             {
-                // 캡처/전송 중: 깜빡이는 원
-                Color dotColor = _silentSubmitting
-                    ? new Color(0.3f, 0.5f, 1.0f, 1.0f)  // 파란색 (전송 중)
-                    : new Color(0.2f, 0.9f, 0.2f, 1.0f);  // 녹색 (캡처 중)
+                // 캡처 중: 깜빡이는 녹색 원
+                Color dotColor = new Color(0.2f, 0.9f, 0.2f, 1.0f);
 
                 float dotX = x + (IndicatorSize - IndicatorDotSize) * 0.5f;
                 float dotY = y + (IndicatorSize - IndicatorDotSize) * 0.5f;

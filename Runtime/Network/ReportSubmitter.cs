@@ -10,9 +10,11 @@ using UnityEngine.Networking;
 namespace GaoZombie.BugOneTouch
 {
     /// <summary>
-    /// create-report Edge Function 호출 + R2 업로드를 조율하는 리포트 제출기.
-    /// Unity → [웹 저장] 경로의 핵심 클래스입니다.
+    /// create-report Edge Function 호출 + R2 업로드를 조율하는 리포트 제출기 (레거시).
+    /// 현재는 ReportSubmitService로 대체되었으며, 직접 Supabase를 호출하는 구 버전입니다.
+    /// 신규 코드에서는 ReportSubmitService를 사용하세요.
     /// </summary>
+    [System.Obsolete("ReportSubmitService로 대체됨. Web 프록시 방식을 사용하는 ReportSubmitService를 사용하세요.")]
     public class ReportSubmitter
     {
         // ─── 이벤트 ───────────────────────────────────────────────────────────────

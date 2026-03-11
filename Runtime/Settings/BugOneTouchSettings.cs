@@ -151,7 +151,7 @@ namespace GaoZombie.BugOneTouch
 
         // ─── 웹 대시보드 연동 ────────────────────────────────────────────────
         /// <summary>웹 대시보드 기본 URL</summary>
-        public const string WEB_DASHBOARD_URL = "https://app.bugonetouch.com";
+        public const string WEB_DASHBOARD_URL = "https://app.bug-onetouch.com";
 
         [Header("웹 연동")]
         [Tooltip("웹 대시보드와 연동 여부")]
@@ -161,10 +161,16 @@ namespace GaoZombie.BugOneTouch
         public string linkedWorkspaceName = "";
 
         [Header("Supabase")]
-        [Tooltip("Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)")]
+        // 아래 두 필드는 Web 프록시 도입으로 더 이상 사용되지 않습니다.
+        // Unity 플러그인은 WEB_DASHBOARD_URL 상수를 통해 Web API를 직접 호출합니다.
+        [Tooltip("Supabase 프로젝트 URL (예: https://xxxxx.supabase.co) — Web 프록시로 대체됨")]
+        [System.Obsolete("Web 프록시로 대체됨. BugOneTouchSettings.WEB_DASHBOARD_URL 상수를 사용하세요.")]
+        [UnityEngine.HideInInspector]
         public string supabaseUrl = "";
 
-        [Tooltip("Supabase Anon Key")]
+        [Tooltip("Supabase Anon Key — Web 프록시로 대체됨")]
+        [System.Obsolete("Web 프록시로 대체됨. apikey 헤더는 Web 서버에서 관리합니다.")]
+        [UnityEngine.HideInInspector]
         public string supabaseAnonKey = "";
 
         // webDashboardUrl 인스턴스 필드 제거됨 — WEB_DASHBOARD_URL 상수를 사용할 것
@@ -177,13 +183,21 @@ namespace GaoZombie.BugOneTouch
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
 
         [Header("Jira (Runtime)")]
-        [Tooltip("Jira 사이트 기본 URL (예: https://yourcompany.atlassian.net)")]
+        // 아래 Jira 필드들은 웹 대시보드 연동 방식으로 전환됨.
+        // Jira 설정은 웹 대시보드(https://app.bug-onetouch.com) > 워크스페이스 설정에서 관리합니다.
+        [Tooltip("Jira 사이트 기본 URL — 웹 대시보드에서 관리됨")]
+        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
+        [UnityEngine.HideInInspector]
         public string jiraSiteUrl = "";
 
-        [Tooltip("Jira 프로젝트 키 (예: PROJ, BUG)")]
+        [Tooltip("Jira 프로젝트 키 — 웹 대시보드에서 관리됨")]
+        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
+        [UnityEngine.HideInInspector]
         public string jiraProjectKey = "";
 
-        [Tooltip("기본 Jira 라벨")]
+        [Tooltip("기본 Jira 라벨 — 웹 대시보드에서 관리됨")]
+        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
+        [UnityEngine.HideInInspector]
         public string[] defaultLabels = new string[0];
 
         // 첨부파일 크기 제한 캐시 (Jira 서버에서 조회한 값)

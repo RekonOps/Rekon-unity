@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,13 +8,10 @@ using UnityEngine.Networking;
 
 namespace GaoZombie.BugOneTouch
 {
-    // TODO: [데이터 플로우 리팩토링] Web Backend API 준비 후 Supabase/R2 직접 호출을
-    // Web Dashboard URL 기반 API 호출로 교체 (data-flow.md 참조)
-
     /// <summary>
     /// 버그 리포트 제출 서비스.
-    /// create-report -> R2 업로드 -> confirm-upload 3단계를 순차적으로 처리하며,
-    /// 전체 진행률을 통합 관리합니다.
+    /// Web API 프록시(/api/unity/reports)를 통해 create-report → R2 업로드 → confirm-upload
+    /// 3단계를 순차적으로 처리하며, 전체 진행률을 통합 관리합니다.
     /// </summary>
     public class ReportSubmitService
     {
@@ -34,8 +30,9 @@ namespace GaoZombie.BugOneTouch
         // ─── 의존성 ─────────────────────────────────────────────────────────────
 
         private readonly R2UploadService _uploadService;
-        private readonly string _supabaseUrl;
-        private readonly string _supabaseAnonKey;
+
+        /// <summary>Web API 프록시 기본 URL (BugOneTouchSettings.WEB_DASHBOARD_URL)</summary>
+        private readonly string _webApiBaseUrl;
 
         // ─── JSON 응답 모델 ─────────────────────────────────────────────────────
 
@@ -87,31 +84,15 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>
         /// ReportSubmitService를 초기화합니다.
+        /// Web API 프록시(WEB_DASHBOARD_URL)를 통해 리포트를 제출합니다.
         /// </summary>
         /// <param name="uploadService">R2 업로드 서비스</param>
-        /// <param name="supabaseUrl">Supabase 프로젝트 URL (예: https://xxxxx.supabase.co)</param>
-        /// <param name="supabaseAnonKey">Supabase Anon Key</param>
-        public ReportSubmitService(R2UploadService uploadService, string supabaseUrl, string supabaseAnonKey)
+        public ReportSubmitService(R2UploadService uploadService)
         {
             _uploadService = uploadService ?? throw new ArgumentNullException(nameof(uploadService));
 
-            if (string.IsNullOrEmpty(supabaseUrl))
-                throw new ArgumentNullException(nameof(supabaseUrl), "Supabase URL이 설정되지 않았습니다.");
-            if (string.IsNullOrEmpty(supabaseAnonKey))
-                throw new ArgumentNullException(nameof(supabaseAnonKey), "Supabase Anon Key가 설정되지 않았습니다.");
-
-            _supabaseUrl = supabaseUrl.TrimEnd('/');
-            _supabaseAnonKey = supabaseAnonKey;
-        }
-
-        /// <summary>
-        /// BugOneTouchSettings에서 URL과 AnonKey를 읽어 초기화하는 편의 생성자.
-        /// </summary>
-        /// <param name="uploadService">R2 업로드 서비스</param>
-        /// <param name="settings">BugOneTouch 설정 ScriptableObject</param>
-        public ReportSubmitService(R2UploadService uploadService, BugOneTouchSettings settings)
-            : this(uploadService, settings?.supabaseUrl, settings?.supabaseAnonKey)
-        {
+            // Web 프록시 기본 URL — 상수에서 직접 읽어 Supabase 설정 의존성 제거
+            _webApiBaseUrl = BugOneTouchSettings.WEB_DASHBOARD_URL.TrimEnd('/');
         }
 
         // ─── 공개 메서드 ─────────────────────────────────────────────────────────
@@ -263,13 +244,14 @@ namespace GaoZombie.BugOneTouch
         // ─── 내부 메서드: API 호출 ──────────────────────────────────────────────
 
         /// <summary>
-        /// create-report Edge Function을 호출합니다.
+        /// create-report Web API 프록시를 호출합니다.
         /// </summary>
         private async Task<CreateReportResponse> CallCreateReportAsync(
             ReportSubmitRequest request,
             CancellationToken ct)
         {
-            var url = $"{_supabaseUrl}/functions/v1/create-report";
+            // Web API 프록시 엔드포인트 — Supabase Edge Function을 직접 호출하지 않음
+            var url = $"{_webApiBaseUrl}/api/unity/reports";
 
             // JSON 본문 수동 구성 (JsonUtility는 직렬화 제약이 있으므로)
             var filesJson = new StringBuilder("[");
@@ -293,11 +275,20 @@ namespace GaoZombie.BugOneTouch
                 "}";
 
             var responseJson = await SendWithRetryAsync("POST", url, bodyJson, request.AccessToken, ct);
-            return JsonUtility.FromJson<CreateReportResponse>(responseJson);
+
+            // 응답 JSON 파싱 및 필수 필드 검증
+            var createResponse = JsonUtility.FromJson<CreateReportResponse>(responseJson);
+            if (createResponse == null || string.IsNullOrEmpty(createResponse.report_id))
+            {
+                Debug.LogError($"[BugOneTouch] 리포트 생성 응답 파싱 실패. 응답: {responseJson}");
+                throw new System.Exception("리포트 생성 응답이 올바르지 않습니다 (report_id 누락 또는 파싱 실패)");
+            }
+
+            return createResponse;
         }
 
         /// <summary>
-        /// confirm-upload Edge Function을 호출합니다.
+        /// confirm-upload Web API 프록시를 호출합니다.
         /// </summary>
         private async Task<ConfirmUploadResponse> CallConfirmUploadAsync(
             string accessToken,
@@ -305,7 +296,8 @@ namespace GaoZombie.BugOneTouch
             List<string> fileIds,
             CancellationToken ct)
         {
-            var url = $"{_supabaseUrl}/functions/v1/confirm-upload";
+            // Web API 프록시 엔드포인트 — Supabase Edge Function을 직접 호출하지 않음
+            var url = $"{_webApiBaseUrl}/api/unity/reports/confirm";
 
             var fileIdsJson = new StringBuilder("[");
             for (int i = 0; i < fileIds.Count; i++)
@@ -377,7 +369,7 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>
         /// UnityWebRequest로 단일 HTTP 요청을 전송합니다.
-        /// Bearer 토큰 인증 + Supabase Anon Key 헤더를 포함합니다.
+        /// Bearer 토큰 인증만 사용합니다 (apikey 헤더는 Web 프록시가 대신 처리).
         /// </summary>
         private async Task<string> SendRequestAsync(
             string method,
@@ -416,10 +408,10 @@ namespace GaoZombie.BugOneTouch
                     };
 
                     // 헤더 설정
+                    // apikey 헤더는 Web 프록시가 Supabase 호출 시 대신 추가함
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.SetRequestHeader("Accept", "application/json");
                     request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
-                    request.SetRequestHeader("apikey", _supabaseAnonKey);
 
                     request.timeout = RequestTimeoutSeconds;
 

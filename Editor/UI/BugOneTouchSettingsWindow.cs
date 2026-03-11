@@ -81,6 +81,11 @@ namespace RekonOps.BugOneTouch.Editor
             "MMdd_HHmmss",
         };
 
+        // ─── 개발자 모드 EditorPrefs 키 ─────────────────────────────────────────
+        // EditorPrefs.SetBool("BugOneTouch_DevMode", true) 으로 수동 활성화.
+        // 고급 섹션은 개발자 모드일 때만 표시됩니다.
+        private const string DEV_MODE_PREF_KEY = "BugOneTouch_DevMode";
+
         // ─── Foldout 상태 ────────────────────────────────────────────────────────
 
         private bool _foldWeb = true;
@@ -140,7 +145,13 @@ namespace RekonOps.BugOneTouch.Editor
             DrawReportSection();
             DrawHotkeySection();
             DrawCrashRecoverySection();
-            DrawAdvancedSection();
+
+            // 개발자 모드일 때만 고급 섹션 표시
+            // 활성화: EditorPrefs.SetBool("BugOneTouch_DevMode", true)
+            if (EditorPrefs.GetBool(DEV_MODE_PREF_KEY, false))
+            {
+                DrawAdvancedSection();
+            }
 
             EditorGUILayout.EndScrollView();
 

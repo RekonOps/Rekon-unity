@@ -127,18 +127,17 @@ namespace RekonOps.BugOneTouch
                 var manifestGenerator = new ManifestGenerator(settings);
                 var bundleWriter = new BundleWriter(manifestGenerator);
 
-                // TODO: [데이터 플로우 리팩토링] Web Backend API 준비 후 Supabase/R2 직접 호출을
-                // Web Dashboard URL 기반 API 호출로 교체 (data-flow.md 참조)
-                // ReportSubmitService: Supabase 설정이 있는 경우에만 생성
+                // ReportSubmitService: 웹 대시보드 연동 시에만 생성
+                // Web API 프록시(WEB_DASHBOARD_URL)를 통해 Supabase에 접근하므로
+                // supabaseUrl/supabaseAnonKey 설정은 더 이상 필요하지 않음
                 ReportSubmitService submitService = null;
-                if (!string.IsNullOrEmpty(settings.supabaseUrl) &&
-                    !string.IsNullOrEmpty(settings.supabaseAnonKey))
+                if (settings.isLinked)
                 {
                     try
                     {
                         var r2UploadService = new R2UploadService();
-                        submitService = new ReportSubmitService(r2UploadService, settings);
-                        Debug.Log("[BugOneTouch] ReportSubmitService 초기화 완료");
+                        submitService = new ReportSubmitService(r2UploadService);
+                        Debug.Log("[BugOneTouch] ReportSubmitService 초기화 완료 (Web 프록시 모드)");
                     }
                     catch (System.Exception submitEx)
                     {

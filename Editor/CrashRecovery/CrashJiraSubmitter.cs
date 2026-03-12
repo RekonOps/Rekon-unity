@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-#pragma warning disable CS0618 // Obsolete 경고 억제 (JiraAttachmentUploader 하위 호환성)
-
 namespace RekonOps.BugOneTouch.Editor
 {
     /// <summary>
@@ -19,6 +17,10 @@ namespace RekonOps.BugOneTouch.Editor
     ///   - 제출 후 manifest.json의 jira_issue_key + registered_at + registered 갱신
     ///   - JiraSubmissionService 활용 (실제 API 호출은 Runtime 레이어로 위임)
     ///   - auto-crash-report 레이블 자동 추가 (AC-23)
+    ///
+    /// ⚠️ JAM.dev 패턴 적용 (ADR-047):
+    /// 크래시 번들 파일은 R2에 저장되며, Jira description에 R2 URL 링크로 삽입됩니다.
+    /// Jira 직접 첨부파일 업로드는 더 이상 지원되지 않습니다.
     ///
     /// 주의: Editor 전용. Runtime 환경에서는 사용 불가.
     /// </summary>
@@ -77,9 +79,8 @@ namespace RekonOps.BugOneTouch.Editor
         /// 크래시 번들을 Jira 이슈로 제출합니다.
         ///
         /// JiraSubmissionService가 주입된 경우 실제 Jira API를 호출하여:
-        ///   1. JiraIssueCreator로 이슈 생성
-        ///   2. JiraAttachmentUploader로 크래시 번들 첨부파일 업로드
-        ///   3. 성공 시 manifest에 jira_issue_key + registered_at + registered=true 갱신
+        ///   1. JiraIssueCreator로 이슈 생성 (R2 URL 있으면 description에 링크 자동 삽입)
+        ///   2. 성공 시 manifest에 jira_issue_key + registered_at + registered=true 갱신
         ///
         /// JiraSubmissionService가 없는 경우(null) 시뮬레이션 모드로 동작합니다.
         /// </summary>
@@ -164,8 +165,9 @@ namespace RekonOps.BugOneTouch.Editor
 
         /// <summary>
         /// JiraSubmissionService를 통해 실제 Jira API로 크래시 이슈를 제출합니다.
-        ///   1. JiraIssueCreator로 이슈 생성
-        ///   2. 크래시 번들 첨부파일 업로드
+        ///   1. JiraIssueCreator로 이슈 생성 (R2 URL이 있으면 description에 링크 자동 삽입)
+        ///
+        /// ⚠️ JAM.dev 패턴 (ADR-047): Jira 직접 첨부파일 업로드 대신 R2 URL 링크를 사용합니다.
         /// </summary>
         private async Task<string> SubmitViaServiceAsync(
             CrashBundleManifest manifest,
@@ -174,9 +176,6 @@ namespace RekonOps.BugOneTouch.Editor
             string description,
             CancellationToken cancellationToken)
         {
-            // 크래시 번들 디렉토리에서 첨부파일 목록 수집
-            var attachments = CollectCrashBundleAttachments(manifest);
-
             var submissionRequest = new JiraSubmissionService.SubmissionRequest
             {
                 BundleId = manifest.id,
@@ -189,8 +188,9 @@ namespace RekonOps.BugOneTouch.Editor
                     // AC-23: auto-crash-report 레이블을 기본으로 추가
                     AdditionalLabels = new[] { AutoCrashReportLabel },
                     Priority   = "High",
+                    // R2Urls는 크래시 번들의 경우 현재 미지원 (R2 업로드 파이프라인 미연결)
+                    // TODO: CrashBundleWriter에서 R2 업로드 연동 후 R2Urls 설정
                 },
-                Attachments = attachments,
             };
 
             var result = await _submissionService.SubmitAsync(submissionRequest, cancellationToken);
@@ -198,64 +198,7 @@ namespace RekonOps.BugOneTouch.Editor
             if (!result.Success)
                 throw new InvalidOperationException(result.ErrorMessage ?? "Jira 이슈 생성에 실패했습니다.");
 
-            if (result.IsPartialSuccess)
-                Debug.LogWarning($"[BugOneTouch] 크래시 Jira 제출 부분 성공: 이슈 {result.IssueKey} 생성됨, 일부 첨부파일 업로드 실패.");
-
             return result.IssueKey;
-        }
-
-        /// <summary>
-        /// 크래시 번들 디렉토리에서 첨부파일 목록을 수집합니다.
-        /// </summary>
-        private static System.Collections.Generic.List<JiraAttachmentUploader.AttachmentItem> CollectCrashBundleAttachments(
-            CrashBundleManifest manifest)
-        {
-            var attachments = new System.Collections.Generic.List<JiraAttachmentUploader.AttachmentItem>();
-            string bundleDir = Path.Combine(CrashBundleWriter.CrashBundlesDir, manifest.id);
-
-            if (!Directory.Exists(bundleDir))
-                return attachments;
-
-            // 파일 첨부 (logs_flush.zip, state_flush.json, crash_info.json)
-            foreach (string filePath in Directory.GetFiles(bundleDir))
-            {
-                try
-                {
-                    var data = File.ReadAllBytes(filePath);
-                    var fileName = Path.GetFileName(filePath);
-                    attachments.Add(new JiraAttachmentUploader.AttachmentItem
-                    {
-                        FileName    = fileName,
-                        Data        = data,
-                        ContentType = GuessContentType(fileName),
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[BugOneTouch] 첨부파일 로드 실패 ({filePath}): {ex.Message}");
-                }
-            }
-
-            return attachments;
-        }
-
-        /// <summary>
-        /// 파일 확장자로 MIME 타입을 추측합니다.
-        /// </summary>
-        private static string GuessContentType(string fileName)
-        {
-            if (string.IsNullOrEmpty(fileName)) return "application/octet-stream";
-
-            var ext = Path.GetExtension(fileName).ToLowerInvariant();
-            return ext switch
-            {
-                ".json" => "application/json",
-                ".zip"  => "application/zip",
-                ".log"  => "text/plain",
-                ".txt"  => "text/plain",
-                ".png"  => "image/png",
-                _       => "application/octet-stream",
-            };
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -424,5 +367,3 @@ namespace RekonOps.BugOneTouch.Editor
         }
     }
 }
-
-#pragma warning restore CS0618

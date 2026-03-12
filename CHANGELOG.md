@@ -7,33 +7,56 @@
 
 ## [Unreleased]
 
+---
+
+## [1.0.0] - 2026-03-XX
+
 ### 추가
 
-#### Supabase Auth 웹 로그인
+#### Supabase Auth 웹 로그인 (auth-unity-start 폴링 방식)
 - 브라우저 기반 Supabase Auth 인증 플로우 (auth-unity-start/status 폴링)
 - `SupabaseAuthClient` -- Supabase Auth HTTP 클라이언트
 - Unity 에디터 Settings 패널에서 [웹 로그인] 버튼으로 원클릭 인증
+- 로그인 완료 시 `workspace_id`를 `Settings.tenantId`에 자동 저장
+
+#### [웹 저장] 원클릭 제출 (JAM.dev 패턴)
+- [웹 저장]: 웹 로그인만 되어있으면 항상 사용 가능 (무료/유료)
+- Unity 플러그인에서 Jira에 직접 연결하지 않음 -- Jira 이슈 등록은 웹 대시보드에서만 수행
+- Web Proxy 방식: 모든 API 호출이 웹 백엔드(Next.js API Routes)를 경유
 
 #### Cloudflare R2 파일 업로드
 - 영상(MP4), 스크린샷(PNG), 로그 파일 R2 업로드
-- Signed URL 기반 직접 업로드
+- Presigned URL 기반 직접 업로드 (PUT)
 - 재시도 로직 (최대 3회, 지수 백오프)
-- 업로드 실패 시 로컬 저장 (네트워크 복구 시 백그라운드 재시도)
+- 업로드 완료 후 `confirm-upload` API 호출로 서버에 완료 알림
+- 업로드 실패 시 `pending/` 로컬 저장 (네트워크 복구 시 백그라운드 재시도)
 
 #### 라이선스 검증 시스템
 - `LicenseValidator` -- 서버 기반 라이선스 키 검증 (1시간 캐시)
 - 오프라인 Grace Period 72시간 (서버 타임스탬프 기준)
-- 라이선스 무효 시 Jira 제출만 차단 (로컬 캡처는 허용)
+- 라이선스 무효 시 로컬 캡처는 허용 (웹 저장만 차단)
 - AES 암호화 로컬 캐시 (EditorPrefs)
-
-#### [웹 저장] / [Jira 등록] 이중 경로
-- [웹 저장]: 웹 로그인만 되어있으면 항상 사용 가능 (무료/유료)
-- [Jira 등록]: Jira OAuth 연동 완료 시에만 활성화, 클라이언트 직접 Jira API 호출
-- 두 경로 모두 R2 파일 업로드 + Supabase 메타데이터 저장
 
 #### AES-256-CBC 세션 암호화
 - `SessionTokenStore` -- OAuth 토큰 및 세션 데이터 암호화 영속 저장
 - `TokenEncryptor` -- AES-256 암호화/복호화 유틸리티
+
+### 변경
+
+- **ADR-047 반영**: Unity Jira 직접 연동 제거 -- Web Proxy 방식으로 전환
+  - 기존: Unity → Supabase Edge Functions 직접 호출
+  - 변경: Unity → 웹 백엔드(Next.js API Routes) → Supabase Edge Functions
+- Jira 이슈 등록 위치 변경: Unity 플러그인 → 웹 대시보드 (`/workspace/[id]`)
+- `JiraIssueCreator`: Unity 플러그인에서 직접 호출하지 않음. 웹 백엔드의 `push-to-jira`에서 유사 로직 사용
+
+### 폐기 예정
+
+- `ReportSubmitter` -- 레거시 리포트 제출 클래스. `ReportSubmitService` (Services/)로 대체됨
+- `JiraAttachmentUploader` -- Jira API 직접 업로드 방식. R2 URL 링크 방식(`JiraIssueCreator` + R2 URL)으로 대체됨
+
+### 제거
+
+- Unity에서 Supabase Edge Functions 직접 호출 코드 제거 (Web Proxy 경유로 전환)
 
 ---
 
@@ -72,8 +95,8 @@
 
 #### M4: Jira Cloud 연동
 - `JiraApiClient` -- Jira REST API v3 HTTP 클라이언트
-- `JiraIssueCreator` -- 이슈 생성 요청 빌더
-- `JiraAttachmentUploader` -- 첨부 파일 업로드
+- `JiraIssueCreator` -- 이슈 생성 요청 빌더 (R2 URL 링크 방식)
+- `JiraAttachmentUploader` -- 첨부 파일 업로드 (v1.0.0에서 폐기 예정)
 - `JiraSubmissionService` -- 번들에서 Jira 이슈 전체 제출 플로우 조율
 
 #### M5: 에디터 UI
@@ -106,5 +129,6 @@
 
 ---
 
-[Unreleased]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/releases/tag/v0.1.0

@@ -1,6 +1,9 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace GaoZombie.BugOneTouch.Editor
 {
@@ -86,6 +89,33 @@ namespace GaoZombie.BugOneTouch.Editor
         // 고급 섹션은 개발자 모드일 때만 표시됩니다.
         private const string DEV_MODE_PREF_KEY = "BugOneTouch_DevMode";
 
+        // ─── 웹 로그인 플로우 상태 ───────────────────────────────────────────────
+
+        /// <summary>웹 로그인 플로우 상태 열거형</summary>
+        private enum WebLoginState
+        {
+            /// <summary>대기 (초기 상태)</summary>
+            Idle,
+            /// <summary>브라우저 열기 + 폴링 중</summary>
+            Polling,
+            /// <summary>로그인 완료</summary>
+            Completed,
+            /// <summary>에러 또는 타임아웃</summary>
+            Failed,
+        }
+
+        /// <summary>현재 웹 로그인 플로우 상태</summary>
+        private WebLoginState _webLoginState = WebLoginState.Idle;
+
+        /// <summary>auth-unity-start에서 받은 connect_id</summary>
+        private string _webLoginConnectId;
+
+        /// <summary>폴링 취소 토큰 소스. 창 닫힐 때 취소.</summary>
+        private CancellationTokenSource _pollingCts;
+
+        /// <summary>마지막 에러 메시지</summary>
+        private string _webLoginErrorMessage;
+
         // ─── Foldout 상태 ────────────────────────────────────────────────────────
 
         private bool _foldWeb = true;
@@ -99,6 +129,9 @@ namespace GaoZombie.BugOneTouch.Editor
 
         private BugOneTouchSettings _settings;
         private SerializedObject _serializedSettings;
+
+        /// <summary>Supabase access_token 암호화 저장소</summary>
+        private readonly SessionTokenStore _tokenStore = new SessionTokenStore();
 
         // 스크롤 포지션
         private Vector2 _scrollPos;
@@ -118,6 +151,22 @@ namespace GaoZombie.BugOneTouch.Editor
         private void OnEnable()
         {
             LoadOrCreateSettings();
+        }
+
+        private void OnDisable()
+        {
+            // 창이 닫히거나 비활성화되면 폴링 즉시 중단
+            _pollingCts?.Cancel();
+            _pollingCts?.Dispose();
+            _pollingCts = null;
+        }
+
+        private void OnDestroy()
+        {
+            // 창 파괴 시 폴링 중단
+            _pollingCts?.Cancel();
+            _pollingCts?.Dispose();
+            _pollingCts = null;
         }
 
         private void OnGUI()
@@ -240,6 +289,11 @@ namespace GaoZombie.BugOneTouch.Editor
                     {
                         isLinkedProp.boolValue = false;
                         workspaceNameProp.stringValue = "";
+                        // tenantId는 서버 값이므로 연동 해제 시 초기화
+                        SerializedProperty tenantIdProp = _serializedSettings.FindProperty("tenantId");
+                        tenantIdProp.stringValue = "";
+                        _webLoginState = WebLoginState.Idle;
+                        _webLoginErrorMessage = null;
                         Debug.Log("[BugOneTouch] 웹 대시보드 연동 해제됨");
                         Repaint();
                     }
@@ -247,16 +301,51 @@ namespace GaoZombie.BugOneTouch.Editor
             }
             else
             {
-                // 미연동 상태: 웹에서 연동하기 버튼
-                if (GUILayout.Button("웹에서 연동하기", GUILayout.Width(140f), GUILayout.Height(28f)))
+                // 미연동 상태: 폴링 중인지 여부에 따라 버튼 다르게 표시
+                if (_webLoginState == WebLoginState.Polling)
                 {
-                    Application.OpenURL(BugOneTouchSettings.WEB_DASHBOARD_URL + "/unity-link");
+                    // 폴링 중: 대기 메시지 + 취소 버튼
+                    EditorGUILayout.HelpBox(
+                        "브라우저에서 로그인을 완료해주세요...",
+                        MessageType.Info);
+                    EditorGUILayout.Space(4f);
+
+                    if (GUILayout.Button("로그인 대기 중... (취소)", GUILayout.Height(28f)))
+                    {
+                        // 폴링 취소
+                        _pollingCts?.Cancel();
+                        _webLoginState = WebLoginState.Idle;
+                        _webLoginErrorMessage = null;
+                        Debug.Log("[BugOneTouch] 웹 로그인 플로우 취소됨");
+                        Repaint();
+                    }
+                }
+                else
+                {
+                    // Idle / Failed 상태: 웹 로그인 버튼
+                    if (GUILayout.Button("웹 로그인", GUILayout.Width(120f), GUILayout.Height(28f)))
+                    {
+                        // 이전 폴링 정리
+                        _pollingCts?.Cancel();
+                        _pollingCts?.Dispose();
+                        _pollingCts = new CancellationTokenSource();
+
+                        // 비동기 로그인 플로우 시작
+                        _ = StartWebLoginFlowAsync(_pollingCts.Token);
+                    }
+
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.HelpBox(
+                        "버튼을 클릭하면 브라우저가 열립니다.\n웹에서 로그인하면 자동으로 연동이 완료됩니다.",
+                        MessageType.Info);
                 }
 
-                EditorGUILayout.Space(4f);
-                EditorGUILayout.HelpBox(
-                    "웹 대시보드에서 Unity 연동을 완료하세요.\n버튼을 클릭하면 브라우저가 열립니다.",
-                    MessageType.Info);
+                // 에러 메시지 표시 (Failed 상태)
+                if (_webLoginState == WebLoginState.Failed && !string.IsNullOrEmpty(_webLoginErrorMessage))
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.HelpBox(_webLoginErrorMessage, MessageType.Error);
+                }
             }
 
             EditorGUI.indentLevel--;
@@ -776,6 +865,280 @@ namespace GaoZombie.BugOneTouch.Editor
             }
 
             EditorGUILayout.Space(6f);
+        }
+
+        // ─── 웹 로그인 플로우 ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 웹 로그인 플로우를 시작합니다.
+        /// 1) auth-unity-start POST → connect_id + login_url 수신
+        /// 2) 브라우저 열기
+        /// 3) auth-unity-status 폴링 시작
+        /// </summary>
+        private async Task StartWebLoginFlowAsync(CancellationToken ct)
+        {
+            _webLoginState = WebLoginState.Polling;
+            _webLoginErrorMessage = null;
+            EditorApplication.delayCall += Repaint;
+
+            try
+            {
+                // ── 1. auth-unity-start POST ─────────────────────────────────
+                string startUrl = BugOneTouchSettings.WEB_DASHBOARD_URL + "/api/unity/auth/start";
+                string deviceId = SystemInfo.deviceUniqueIdentifier;
+                // JSON 특수문자 이스케이프 처리 (쌍따옴표, 백슬래시)
+                string escapedDeviceId = deviceId
+                    .Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"");
+                string requestBody = $"{{\"device_id\":\"{escapedDeviceId}\"}}";
+
+                Debug.Log("[BugOneTouch] 웹 로그인 플로우 시작: device_id=" + deviceId);
+
+                string startResponseJson = await PostJsonAsync(startUrl, requestBody, ct);
+                if (startResponseJson == null)
+                {
+                    SetWebLoginFailed("서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요.");
+                    return;
+                }
+
+                // ── 2. connect_id / login_url 파싱 ───────────────────────────
+                string connectId = ParseJsonString(startResponseJson, "connect_id");
+                string loginUrl  = ParseJsonString(startResponseJson, "login_url");
+
+                if (string.IsNullOrEmpty(connectId) || string.IsNullOrEmpty(loginUrl))
+                {
+                    Debug.LogError("[BugOneTouch] auth-unity-start 응답 파싱 실패: " + startResponseJson);
+                    SetWebLoginFailed("서버 응답을 파싱할 수 없습니다. 잠시 후 다시 시도해주세요.");
+                    return;
+                }
+
+                _webLoginConnectId = connectId;
+                Debug.Log("[BugOneTouch] connect_id 수신: " + connectId);
+
+                // ── 3. 브라우저 열기 ─────────────────────────────────────────
+                Application.OpenURL(loginUrl);
+                Debug.Log("[BugOneTouch] 브라우저 열기: " + loginUrl);
+                EditorApplication.delayCall += Repaint;
+
+                // ── 4. 폴링 시작 ─────────────────────────────────────────────
+                await PollAuthStatusAsync(connectId, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // 취소: Idle 상태로 돌아감
+                if (_webLoginState == WebLoginState.Polling)
+                {
+                    _webLoginState = WebLoginState.Idle;
+                    EditorApplication.delayCall += Repaint;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[BugOneTouch] 웹 로그인 플로우 예외: " + ex);
+                SetWebLoginFailed("오류가 발생했습니다: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// auth-unity-status를 3초 간격으로 폴링합니다.
+        /// 최대 10분(200회) 후 타임아웃.
+        /// </summary>
+        private async Task PollAuthStatusAsync(string connectId, CancellationToken ct)
+        {
+            const int maxAttempts = 200; // 3초 × 200 = 600초 = 10분
+            string statusUrl = BugOneTouchSettings.WEB_DASHBOARD_URL
+                + "/api/unity/auth/status?connect_id=" + Uri.EscapeDataString(connectId);
+
+            for (int i = 0; i < maxAttempts; i++)
+            {
+                // 3초 대기
+                await Task.Delay(3000, ct);
+
+                if (ct.IsCancellationRequested) return;
+
+                // 상태 조회
+                string responseJson = await GetJsonAsync(statusUrl, ct);
+                if (responseJson == null)
+                {
+                    // 네트워크 오류 시 다음 폴링 회차에서 재시도 (연속 실패는 나중에 처리)
+                    Debug.LogWarning("[BugOneTouch] 폴링 응답 없음 (" + (i + 1) + "/" + maxAttempts + ")");
+                    continue;
+                }
+
+                string status = ParseJsonString(responseJson, "status");
+                Debug.Log("[BugOneTouch] 폴링 상태: " + status + " (" + (i + 1) + "/" + maxAttempts + ")");
+
+                if (status == "completed")
+                {
+                    // ── 로그인 완료: 토큰 + workspace 정보 저장 ───────────────
+                    string workspaceId   = ParseJsonString(responseJson, "workspace_id");
+                    string workspaceName = ParseJsonString(responseJson, "workspace_name");
+                    string accessToken   = ParseJsonString(responseJson, "access_token");
+
+                    // SerializedObject를 통해 Settings 업데이트 (Undo 지원)
+                    _serializedSettings.Update();
+
+                    SerializedProperty isLinkedProp      = _serializedSettings.FindProperty("isLinked");
+                    SerializedProperty workspaceNameProp = _serializedSettings.FindProperty("linkedWorkspaceName");
+                    SerializedProperty tenantIdProp      = _serializedSettings.FindProperty("tenantId");
+
+                    isLinkedProp.boolValue          = true;
+                    workspaceNameProp.stringValue   = workspaceName ?? "";
+                    // 서버의 workspace_id를 tenantId에 저장 (H1 이슈 수정: 서버 값으로 동기화)
+                    if (!string.IsNullOrEmpty(workspaceId))
+                        tenantIdProp.stringValue = workspaceId;
+
+                    _serializedSettings.ApplyModifiedProperties();
+                    EditorUtility.SetDirty(_settings);
+                    AssetDatabase.SaveAssets();
+
+                    // access_token을 SessionTokenStore에 암호화 저장
+                    if (!string.IsNullOrEmpty(accessToken))
+                    {
+                        try
+                        {
+                            _tokenStore.SaveSupabase(accessToken);
+                            Debug.Log("[BugOneTouch] access_token 암호화 저장 완료 (길이: " + accessToken.Length + ")");
+                        }
+                        catch (Exception saveEx)
+                        {
+                            // 토큰 저장 실패 시 로그인 상태를 Failed로 전환
+                            Debug.LogError("[BugOneTouch] access_token 저장 실패: " + saveEx.Message);
+                            SetWebLoginFailed("토큰 저장에 실패했습니다. 다시 시도해주세요.");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[BugOneTouch] 서버 응답에 access_token이 없습니다.");
+                    }
+
+                    _webLoginState = WebLoginState.Completed;
+                    _webLoginErrorMessage = null;
+
+                    Debug.Log("[BugOneTouch] 웹 로그인 완료. workspace: "
+                        + workspaceName + " / tenantId: " + workspaceId);
+
+                    EditorApplication.delayCall += Repaint;
+                    return;
+                }
+
+                if (status == "expired")
+                {
+                    SetWebLoginFailed("로그인 세션이 만료되었습니다. 다시 시도해주세요.");
+                    return;
+                }
+
+                // status == "pending": 계속 대기
+                EditorApplication.delayCall += Repaint;
+            }
+
+            // 10분 후 타임아웃
+            SetWebLoginFailed("로그인 대기 시간(10분)이 초과되었습니다. 다시 시도해주세요.");
+        }
+
+        /// <summary>
+        /// 웹 로그인 실패 상태로 전환합니다.
+        /// </summary>
+        private void SetWebLoginFailed(string message)
+        {
+            _webLoginState = WebLoginState.Failed;
+            _webLoginErrorMessage = message;
+            Debug.LogWarning("[BugOneTouch] 웹 로그인 실패: " + message);
+            EditorApplication.delayCall += Repaint;
+        }
+
+        /// <summary>
+        /// JSON POST 요청을 비동기로 보냅니다.
+        /// 성공 시 응답 바디 문자열 반환, 실패 시 null 반환.
+        /// </summary>
+        private async Task<string> PostJsonAsync(string url, string jsonBody, CancellationToken ct)
+        {
+            using var www = new UnityWebRequest(url, UnityWebRequest.kHttpVerbPOST);
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonBody);
+            www.uploadHandler   = new UploadHandlerRaw(bodyRaw);
+            www.downloadHandler = new DownloadHandlerBuffer();
+            www.SetRequestHeader("Content-Type", "application/json");
+            // 네트워크 응답 무한 대기 방지: 15초 타임아웃
+            www.timeout = 15;
+
+            var op = www.SendWebRequest();
+
+            // UnityWebRequest를 Task로 래핑
+            while (!op.isDone)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    www.Abort();
+                    return null;
+                }
+                await Task.Yield();
+            }
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning("[BugOneTouch] POST 실패 (" + url + "): " + www.error);
+                return null;
+            }
+
+            return www.downloadHandler.text;
+        }
+
+        /// <summary>
+        /// JSON GET 요청을 비동기로 보냅니다.
+        /// 성공 시 응답 바디 문자열 반환, 실패 시 null 반환.
+        /// </summary>
+        private async Task<string> GetJsonAsync(string url, CancellationToken ct)
+        {
+            using var www = UnityWebRequest.Get(url);
+            www.SetRequestHeader("Accept", "application/json");
+            // 네트워크 응답 무한 대기 방지: 15초 타임아웃
+            www.timeout = 15;
+
+            var op = www.SendWebRequest();
+
+            while (!op.isDone)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    www.Abort();
+                    return null;
+                }
+                await Task.Yield();
+            }
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning("[BugOneTouch] GET 실패 (" + url + "): " + www.error);
+                return null;
+            }
+
+            return www.downloadHandler.text;
+        }
+
+        /// <summary>
+        /// JSON 문자열에서 특정 키의 값을 단순 파싱합니다.
+        /// JsonUtility 없이 문자열 처리로 동작 (에디터 전용, 성능 비중요).
+        /// </summary>
+        private static string ParseJsonString(string json, string key)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+
+            // "key":"value" 또는 "key": "value" 패턴 탐색
+            string searchKey = "\"" + key + "\"";
+            int keyIndex = json.IndexOf(searchKey, StringComparison.Ordinal);
+            if (keyIndex < 0) return null;
+
+            int colonIndex = json.IndexOf(':', keyIndex + searchKey.Length);
+            if (colonIndex < 0) return null;
+
+            int quoteStart = json.IndexOf('"', colonIndex + 1);
+            if (quoteStart < 0) return null;
+
+            int quoteEnd = json.IndexOf('"', quoteStart + 1);
+            if (quoteEnd < 0) return null;
+
+            return json.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
         }
 
         // ─── 헬퍼 메서드 ────────────────────────────────────────────────────────

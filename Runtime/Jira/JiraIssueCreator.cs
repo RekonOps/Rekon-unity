@@ -12,6 +12,11 @@ namespace GaoZombie.BugOneTouch
     /// POST /rest/api/3/issue
     /// ADF(Atlassian Document Format)로 설명을 작성하고,
     /// BugOneTouchSettings의 defaultLabels를 자동으로 추가합니다.
+    ///
+    /// ⚠️ JAM.dev 패턴 적용 (ADR-047):
+    /// 이 클래스는 웹 대시보드(Bug-OneTouch-web)의 push-to-jira API에서만 호출됩니다.
+    /// Unity 플러그인(런타임)에서는 직접 호출하지 마세요.
+    /// Unity → Web Backend → Jira 순서로만 동작해야 합니다.
     /// </summary>
     public class JiraIssueCreator
     {

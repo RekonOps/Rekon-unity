@@ -16,6 +16,18 @@ namespace RekonOps.BugOneTouch
         // 플러그인 버전 상수 (package.json과 동기화)
         private const string PluginVersion = "0.1.0";
 
+        /// <summary>Jira 연동 초기값 구성에 사용하는 설정 객체.</summary>
+        private readonly BugOneTouchSettings _settings;
+
+        /// <summary>
+        /// ManifestGenerator 생성자.
+        /// </summary>
+        /// <param name="settings">BugOneTouchSettings. null 허용 (연동 정보 미설정 시 기본값 사용).</param>
+        public ManifestGenerator(BugOneTouchSettings settings = null)
+        {
+            _settings = settings;
+        }
+
         /// <summary>
         /// CaptureResult를 기반으로 BundleManifest 초안을 생성합니다.
         /// SHA-256 해시는 BundleWriter에서 파일 복사 후 채워집니다.
@@ -68,6 +80,17 @@ namespace RekonOps.BugOneTouch
                 jira_issue_key  = null,
                 registered_at   = null,
                 retry_count     = 0,
+                integrations    = new BundleIntegrations
+                {
+                    jira = new JiraIntegrationInfo
+                    {
+                        // jiraProjectKey가 설정된 경우 connected = true로 초기화
+                        connected  = !string.IsNullOrEmpty(_settings?.jiraProjectKey),
+                        cloudId    = "",  // jiraSiteUrl에서 cloudId를 별도 파싱하지 않으므로 빈 문자열
+                        projectKey = _settings?.jiraProjectKey ?? "",
+                        issueKey   = "", // 제출 성공 후 갱신됨
+                    }
+                },
             };
 
             manifest.RecalculateTotalSize();
@@ -123,9 +146,21 @@ namespace RekonOps.BugOneTouch
                 });
             }
 
-            // 영상 세그먼트 (디렉토리)
-            if (!string.IsNullOrEmpty(result.VideoPath) && Directory.Exists(result.VideoPath))
+            // 영상 (MP4 단일 파일 또는 raw 프레임 디렉토리)
+            if (!string.IsNullOrEmpty(result.VideoPath) && File.Exists(result.VideoPath))
             {
+                // MP4 단일 파일
+                artifacts.Add(new BundleArtifact
+                {
+                    type        = BundleArtifactType.Video,
+                    file_name   = Path.GetFileName(result.VideoPath),
+                    size_bytes  = new FileInfo(result.VideoPath).Length,
+                    sha256_hash = string.Empty, // BundleWriter에서 채움
+                });
+            }
+            else if (!string.IsNullOrEmpty(result.VideoPath) && Directory.Exists(result.VideoPath))
+            {
+                // raw 프레임 디렉토리
                 long dirSize = CalculateDirectorySize(result.VideoPath);
                 artifacts.Add(new BundleArtifact
                 {

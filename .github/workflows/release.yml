@@ -1,0 +1,33 @@
+# ============================================
+# Unity UPM 패키지 릴리스 워크플로우
+# ============================================
+# 트리거: v* 태그 푸시 시 GitHub Release 자동 생성
+# 예시: git tag v1.0.0 && git push origin v1.0.0
+
+name: Unity Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+" # 시멘틱 버전 태그만 (예: v1.0.0)
+
+jobs:
+  release:
+    name: GitHub Release 생성
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Release 생성 권한
+
+    steps:
+      # 1. 소스 체크아웃
+      - name: 소스 코드 체크아웃
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      # 2. GitHub Release 자동 생성
+      #    - 태그 기반 릴리스 노트 자동 생성
+      #    - 이전 태그 이후 커밋 내역 포함
+      - name: GitHub Release 생성
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v2
+        with:
+          generate_release_notes: true # 자동 릴리스 노트 생성

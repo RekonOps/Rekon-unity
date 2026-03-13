@@ -140,7 +140,7 @@ namespace RekonOps.BugOneTouch
         {
             try
             {
-                await _encoder.EncodeAsync(frames, segDir, _config);
+                await _encoder.EncodeAsync(frames, segDir, _config, cancellationToken: default);
 
                 _segmentPaths.Enqueue(segDir);
 

@@ -79,6 +79,22 @@ namespace RekonOps.BugOneTouch
         }
 
         /// <summary>
+        /// 이미 저장된 manifest.json을 갱신합니다.
+        /// title, metadata 등이 WriteAsync 이후에 변경된 경우 호출합니다.
+        /// </summary>
+        /// <param name="manifest">갱신할 BundleManifest.</param>
+        public async Task RewriteManifestAsync(BundleManifest manifest)
+        {
+            if (manifest == null)
+                throw new ArgumentNullException(nameof(manifest));
+
+            string bundleDir = GetBundleDirectory(manifest.id);
+            await WriteManifestAtomicAsync(manifest, bundleDir);
+
+            Debug.Log($"[BugOneTouch] manifest.json 재저장 완료 (id={manifest.id})");
+        }
+
+        /// <summary>
         /// 번들 디렉토리 경로를 반환합니다.
         /// </summary>
         public static string GetBundleDirectory(string bundleId)
@@ -120,7 +136,16 @@ namespace RekonOps.BugOneTouch
                         break;
 
                     case BundleArtifactType.Video:
-                        await CopyDirectoryArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        if (!string.IsNullOrEmpty(source.VideoPath) && File.Exists(source.VideoPath))
+                        {
+                            // MP4 단일 파일
+                            await CopyFileArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        }
+                        else if (!string.IsNullOrEmpty(source.VideoPath) && Directory.Exists(source.VideoPath))
+                        {
+                            // raw 프레임 디렉토리
+                            await CopyDirectoryArtifactAsync(source.VideoPath, bundleDir, artifact);
+                        }
                         break;
 
                     default:

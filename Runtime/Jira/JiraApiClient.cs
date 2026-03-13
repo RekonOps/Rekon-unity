@@ -17,6 +17,7 @@ namespace RekonOps.BugOneTouch
         // ─── 상수 ─────────────────────────────────────────────────────────────────
 
         private const string JiraApiBaseTemplate = "https://api.atlassian.com/ex/jira/{0}/rest/api/3";
+        private const string JiraBaseTemplate = "https://api.atlassian.com/ex/jira/{0}";
         private const float RequestTimeoutSeconds = 60f;
         private const int MaxRetryCount = 3;
         private const float RetryBaseDelaySeconds = 2f;
@@ -91,9 +92,15 @@ namespace RekonOps.BugOneTouch
 
         /// <summary>
         /// Jira API 전체 URL을 구성합니다.
+        /// /rest/agile/ 또는 /rest/api/ 로 시작하는 경로는 절대 경로로 처리하여
+        /// 기본 /rest/api/3 없이 cloudId base URL에 바로 붙입니다.
         /// </summary>
         private static string BuildUrl(string cloudId, string path)
         {
+            if (path.StartsWith("/rest/agile/") || path.StartsWith("/rest/api/"))
+            {
+                return string.Format(JiraBaseTemplate, cloudId) + path;
+            }
             var baseUrl = string.Format(JiraApiBaseTemplate, cloudId);
             return baseUrl + (path.StartsWith("/") ? path : "/" + path);
         }
@@ -227,9 +234,13 @@ namespace RekonOps.BugOneTouch
                     request.timeout = (int)RequestTimeoutSeconds;
 
                     // 취소 등록
+                    // 플레이모드 종료 등으로 Unity 네이티브 오브젝트가 이미 파괴된 경우
+                    // request.Abort() 호출 시 _unity_self ArgumentNullException이 발생할 수 있으므로
+                    // try-catch로 안전하게 처리합니다.
                     cancellationToken.Register(() =>
                     {
-                        request?.Abort();
+                        try { request?.Abort(); }
+                        catch (Exception) { /* Unity 오브젝트 파괴 후 접근 시 예외 무시 */ }
                         tcs.TrySetCanceled();
                     });
 
@@ -316,9 +327,13 @@ namespace RekonOps.BugOneTouch
                     request.SetRequestHeader("X-Atlassian-Token", "no-check");
                     request.timeout = (int)RequestTimeoutSeconds;
 
+                    // 플레이모드 종료 등으로 Unity 네이티브 오브젝트가 이미 파괴된 경우
+                    // request.Abort() 호출 시 _unity_self ArgumentNullException이 발생할 수 있으므로
+                    // try-catch로 안전하게 처리합니다.
                     cancellationToken.Register(() =>
                     {
-                        request?.Abort();
+                        try { request?.Abort(); }
+                        catch (Exception) { /* Unity 오브젝트 파괴 후 접근 시 예외 무시 */ }
                         tcs.TrySetCanceled();
                     });
 

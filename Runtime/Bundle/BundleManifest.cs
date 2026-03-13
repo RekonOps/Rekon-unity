@@ -4,6 +4,53 @@ using System.Collections.Generic;
 namespace RekonOps.BugOneTouch
 {
     /// <summary>
+    /// 메타데이터 키-값 쌍. JsonUtility 직렬화를 위해 클래스로 정의.
+    /// </summary>
+    [Serializable]
+    public class MetadataEntry
+    {
+        public string key;
+        public string value;
+
+        public MetadataEntry() { }
+
+        public MetadataEntry(string key, string value)
+        {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    /// <summary>
+    /// Jira 연동 정보.
+    /// </summary>
+    [Serializable]
+    public class JiraIntegrationInfo
+    {
+        /// <summary>Jira 연결 여부.</summary>
+        public bool connected;
+
+        /// <summary>Jira Cloud ID.</summary>
+        public string cloudId = "";
+
+        /// <summary>Jira 프로젝트 키 (예: BUG, PROJ).</summary>
+        public string projectKey = "";
+
+        /// <summary>생성된 Jira 이슈 키 (예: BUG-123). 제출 전 빈 문자열.</summary>
+        public string issueKey = "";
+    }
+
+    /// <summary>
+    /// 번들의 외부 시스템 연동 정보.
+    /// </summary>
+    [Serializable]
+    public class BundleIntegrations
+    {
+        /// <summary>Jira 연동 정보.</summary>
+        public JiraIntegrationInfo jira = new JiraIntegrationInfo();
+    }
+
+    /// <summary>
     /// 번들에 포함된 개별 아티팩트의 메타데이터.
     /// </summary>
     [Serializable]
@@ -107,7 +154,7 @@ namespace RekonOps.BugOneTouch
         /// <summary>현재 씬 이름 (SceneManager.GetActiveScene().name).</summary>
         public string scene;
 
-        /// <summary>재현 단계 (사용자 입력, BugReportForm에서 설정).</summary>
+        /// <summary>재현 단계 (사용자 입력).</summary>
         public string repro_steps;
 
         /// <summary>예상 결과 (사용자 입력, nullable).</summary>
@@ -146,6 +193,12 @@ namespace RekonOps.BugOneTouch
         /// 재시도 횟수. SubmissionQueue에서 관리합니다.
         /// </summary>
         public int retry_count;
+
+        /// <summary>사용자 정의 메타데이터 (키-값 쌍). Silent Submit 시 환경 정보 저장용.</summary>
+        public List<MetadataEntry> metadata = new List<MetadataEntry>();
+
+        /// <summary>외부 시스템 연동 정보 (Jira 등).</summary>
+        public BundleIntegrations integrations = new BundleIntegrations();
 
         /// <summary>
         /// 필수 필드가 모두 유효한지 검사합니다.

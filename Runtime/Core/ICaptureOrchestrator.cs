@@ -16,6 +16,12 @@ namespace RekonOps.BugOneTouch
         event Action<CaptureProgressEvent> OnProgress;
 
         /// <summary>
+        /// 캡처가 완전히 완료되었을 때 발행되는 이벤트.
+        /// CaptureResult를 인자로 전달합니다.
+        /// </summary>
+        event Action<CaptureResult> OnCaptureCompleted;
+
+        /// <summary>
         /// 모든 서브시스템에서 병렬로 데이터를 수집하고 결과를 반환합니다.
         /// 내부적으로 5초 타임아웃이 적용됩니다.
         /// </summary>

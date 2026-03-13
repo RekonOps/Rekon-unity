@@ -14,12 +14,19 @@ namespace RekonOps.BugOneTouch
     ///   6. HotkeyManager MonoBehaviour 생성 및 설정 주입
     ///   7. HotkeyManager ↔ CaptureOrchestrator 바인딩
     ///   8. CaptureOverlay 초기화 및 오케스트레이터 바인딩
+    ///   9. SilentSubmitManager 초기화
+    ///  10. SubmitToast 초기화 및 SilentSubmitManager 바인딩
     /// </summary>
     public static class BugOneTouchBootstrap
     {
+        private static bool _initialized;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
         {
+            if (_initialized) return;
+            _initialized = true;
+
             // ── 1. Settings 로드 ───────────────────────────────────────────────────
             BugOneTouchSettings settings = BugOneTouchSettingsProvider.Settings;
 
@@ -43,8 +50,8 @@ namespace RekonOps.BugOneTouch
                 // 로그 링버퍼: Application.logMessageReceivedThreaded 구독 시작
                 var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
 
-                // 로그 직렬화기: 생성자 파라미터 없음
-                var logSerializer = new LogSerializer();
+                // 로그 직렬화기: 마스킹 활성화
+                var logSerializer = new LogSerializer(enableMasking: true);
 
                 // 스크린샷 캡처기: settings 주입
                 var screenshotCapturer = new ScreenshotCapturer(settings);
@@ -66,7 +73,21 @@ namespace RekonOps.BugOneTouch
                     int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
                     frameRingBuffer = new FrameRingBuffer(frameCapacity);
 
-                    videoEncoder = new VideoEncoder();
+                    // FFmpeg 설치 여부에 따라 인코더 선택
+#if UNITY_STANDALONE || UNITY_EDITOR
+                    // 최초 호출 시 최대 3초 소요 (FFmpeg 프로세스 실행 및 응답 대기)
+                    // 이후 호출은 캐시된 결과를 즉시 반환합니다.
+                    if (FfmpegHelper.IsInstalled())
+                    {
+                        videoEncoder = new Mp4VideoEncoder();
+                        Debug.Log("[BugOneTouch] MP4 인코더 활성화 (FFmpeg 감지됨)");
+                    }
+                    else
+#endif
+                    {
+                        videoEncoder = new VideoEncoder();
+                        Debug.Log("[BugOneTouch] raw 프레임 인코더 사용");
+                    }
                     videoConfig = VideoEncoderConfig.FromSettings(settings);
 
                     // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
@@ -99,7 +120,52 @@ namespace RekonOps.BugOneTouch
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
 
-                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템과 캡처 파이프라인이 활성화되었습니다.");
+                // CaptureOverlay: Silent 모드 활성화 (SilentSubmitManager가 사용되므로)
+                overlay.SetSilentMode(true);
+
+                // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
+                var manifestGenerator = new ManifestGenerator(settings);
+                var bundleWriter = new BundleWriter(manifestGenerator);
+
+                // ReportSubmitService: 웹 대시보드 연동 시에만 생성
+                // Web API 프록시(WEB_DASHBOARD_URL)를 통해 Supabase에 접근하므로
+                // supabaseUrl/supabaseAnonKey 설정은 더 이상 필요하지 않음
+                ReportSubmitService submitService = null;
+                if (settings.isLinked)
+                {
+                    try
+                    {
+                        var r2UploadService = new R2UploadService();
+                        submitService = new ReportSubmitService(r2UploadService);
+                        Debug.Log("[BugOneTouch] ReportSubmitService 초기화 완료 (Web 프록시 모드)");
+                    }
+                    catch (System.Exception submitEx)
+                    {
+                        Debug.LogWarning($"[BugOneTouch] ReportSubmitService 초기화 실패 (로컬 저장만 가능): {submitEx.Message}");
+                    }
+                }
+
+                var tokenStore = new SessionTokenStore();
+                var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
+                silentSubmitManager.BindOrchestrator(orchestrator);
+
+                // ── 10. PendingUploadManager 초기화 ──────────────────────────────────
+                var pendingUploadManager = new PendingUploadManager();
+
+                // SilentSubmitManager에 PendingUploadManager 바인딩
+                silentSubmitManager.BindPendingUploadManager(pendingUploadManager);
+
+                int pendingCount = pendingUploadManager.GetPendingCount();
+                if (pendingCount > 0)
+                {
+                    Debug.Log($"[BugOneTouch] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
+                }
+
+                // ── 11. SubmitToast 초기화 ──────────────────────────────────────────
+                var submitToast = SubmitToast.EnsureInstance();
+                submitToast.BindSilentSubmitManager(silentSubmitManager);
+
+                Debug.Log("[BugOneTouch] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, PendingUpload, 토스트 UI가 활성화되었습니다.");
             }
             catch (System.Exception ex)
             {

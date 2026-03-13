@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,6 +12,11 @@ namespace RekonOps.BugOneTouch
     /// POST /rest/api/3/issue
     /// ADF(Atlassian Document Format)로 설명을 작성하고,
     /// BugOneTouchSettings의 defaultLabels를 자동으로 추가합니다.
+    ///
+    /// ⚠️ JAM.dev 패턴 적용 (ADR-047):
+    /// 이 클래스는 웹 대시보드(Bug-OneTouch-web)의 push-to-jira API에서만 호출됩니다.
+    /// Unity 플러그인(런타임)에서는 직접 호출하지 마세요.
+    /// Unity → Web Backend → Jira 순서로만 동작해야 합니다.
     /// </summary>
     public class JiraIssueCreator
     {
@@ -41,6 +47,25 @@ namespace RekonOps.BugOneTouch
 
             /// <summary>우선순위 이름 (예: "High", "Medium", "Low")</summary>
             public string Priority { get; set; } = "Medium";
+
+            /// <summary>보고자 accountId</summary>
+            public string ReporterAccountId { get; set; }
+
+            /// <summary>담당자 accountId</summary>
+            public string AssigneeAccountId { get; set; }
+
+            /// <summary>스프린트 ID (숫자 문자열)</summary>
+            public string SprintId { get; set; }
+
+            /// <summary>상위 항목 이슈 키 (예: "PROJ-123")</summary>
+            public string ParentKey { get; set; }
+
+            /// <summary>
+            /// R2에 업로드된 파일들의 공개 URL 목록.
+            /// 키: 파일 유형 설명(예: "스크린샷", "로그", "영상"), 값: R2 공개 URL.
+            /// null 또는 빈 사전이면 첨부파일 섹션을 추가하지 않습니다.
+            /// </summary>
+            public Dictionary<string, string> R2Urls { get; set; }
         }
 
         /// <summary>이슈 생성 결과</summary>
@@ -93,8 +118,11 @@ namespace RekonOps.BugOneTouch
             // 레이블 병합: 기본 레이블 + 추가 레이블
             var labels = MergeLabels(_settings.defaultLabels, request.AdditionalLabels);
 
+            // R2 URL이 있으면 description에 첨부파일 섹션 추가
+            string fullDescription = BuildDescriptionWithR2Links(request.Description, request.R2Urls);
+
             // ADF 본문 생성
-            var adfDescription = AdfBuilder.CreateFromText(request.Description ?? "");
+            var adfDescription = AdfBuilder.CreateFromText(fullDescription);
 
             // Jira 이슈 생성 JSON 빌드
             var requestJson = BuildCreateIssueJson(request, labels, adfDescription);
@@ -120,6 +148,43 @@ namespace RekonOps.BugOneTouch
         }
 
         // ─── 내부 메서드 ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// R2 URL이 있으면 description 끝에 첨부파일 섹션을 추가합니다.
+        /// </summary>
+        private static string BuildDescriptionWithR2Links(string description, Dictionary<string, string> r2Urls)
+        {
+            var desc = description ?? "";
+
+            if (r2Urls == null || r2Urls.Count == 0)
+                return desc;
+
+            var sb = new StringBuilder(desc);
+            if (sb.Length > 0)
+                sb.Append("\n\n");
+
+            sb.AppendLine("## 첨부파일");
+            sb.AppendLine();
+
+            foreach (var kvp in r2Urls)
+            {
+                if (!string.IsNullOrEmpty(kvp.Value))
+                {
+                    // URL 스킴 검증: http 또는 https만 허용
+                    if (!Uri.TryCreate(kvp.Value, UriKind.Absolute, out var uri)
+                        || (uri.Scheme != "https" && uri.Scheme != "http"))
+                    {
+                        Debug.LogWarning($"[JiraIssueCreator] 잘못된 R2 URL 스킴, 건너뜀: {kvp.Value}");
+                        continue;
+                    }
+
+                    // 마크다운 링크 형식: [파일 유형](URL)
+                    sb.AppendLine($"- [{kvp.Key}]({kvp.Value})");
+                }
+            }
+
+            return sb.ToString().TrimEnd();
+        }
 
         private static void ValidateRequest(CreateIssueRequest request)
         {
@@ -178,6 +243,23 @@ namespace RekonOps.BugOneTouch
             sb.Append($"\"description\":{adfDescriptionJson},");
             sb.Append($"\"labels\":{labelsJson},");
             sb.Append($"\"priority\":{{\"name\":\"{EscapeJson(request.Priority ?? "Medium")}\"}}");
+
+            // reporter
+            if (!string.IsNullOrEmpty(request.ReporterAccountId))
+                sb.Append($",\"reporter\":{{\"accountId\":\"{EscapeJson(request.ReporterAccountId)}\"}}");
+
+            // assignee
+            if (!string.IsNullOrEmpty(request.AssigneeAccountId))
+                sb.Append($",\"assignee\":{{\"accountId\":\"{EscapeJson(request.AssigneeAccountId)}\"}}");
+
+            // sprint (customfield_10020이 일반적이나, 프로젝트마다 다를 수 있음)
+            if (!string.IsNullOrEmpty(request.SprintId))
+                sb.Append($",\"customfield_10020\":{request.SprintId}");
+
+            // parent (에픽 등 상위 항목)
+            if (!string.IsNullOrEmpty(request.ParentKey))
+                sb.Append($",\"parent\":{{\"key\":\"{EscapeJson(request.ParentKey)}\"}}");
+
             sb.Append("}}");
 
             return sb.ToString();

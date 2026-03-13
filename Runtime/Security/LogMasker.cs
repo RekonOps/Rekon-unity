@@ -36,6 +36,11 @@ namespace RekonOps.BugOneTouch
             RegexOptions.Compiled | RegexOptions.IgnoreCase
         );
 
+        /// <summary>Bearer 토큰 탐지 패턴</summary>
+        private static readonly Regex BearerRegex = new Regex(
+            @"Bearer\s+[A-Za-z0-9\-._~+/]+=*",
+            RegexOptions.Compiled);
+
         // ──────────────────────────────────────────────────────────────
         // 마스킹 형식 상수
         // ──────────────────────────────────────────────────────────────
@@ -89,15 +94,39 @@ namespace RekonOps.BugOneTouch
 
         /// <summary>
         /// 입력 문자열에서 IPv4 주소를 마스킹합니다.
+        /// 로컬 및 사설망 IP(127.0.0.1, 10.x.x.x, 192.168.x.x, 172.16~31.x.x 등)는 마스킹하지 않습니다.
         /// </summary>
         /// <param name="input">원본 문자열</param>
-        /// <returns>IP가 마스킹된 문자열</returns>
+        /// <returns>공인 IP가 마스킹된 문자열</returns>
         public static string MaskIp(string input)
         {
             if (string.IsNullOrEmpty(input))
                 return input;
 
-            return IpRegex.Replace(input, IpMask);
+            return IpRegex.Replace(input, match =>
+            {
+                string ip = match.Value;
+                if (IsPrivateOrLocalIp(ip)) return ip;
+                return IpMask;
+            });
+        }
+
+        /// <summary>
+        /// IP 주소가 로컬 또는 사설망 주소인지 판별합니다.
+        /// </summary>
+        /// <param name="ip">판별할 IPv4 주소 문자열</param>
+        /// <returns>로컬/사설망이면 true, 공인 IP이면 false</returns>
+        private static bool IsPrivateOrLocalIp(string ip)
+        {
+            if (ip == "127.0.0.1" || ip == "0.0.0.0") return true;
+            var parts = ip.Split('.');
+            if (parts.Length != 4) return false;
+            if (!int.TryParse(parts[0], out int first)) return false;
+            if (!int.TryParse(parts[1], out int second)) return false;
+            if (first == 10) return true;
+            if (first == 172 && second >= 16 && second <= 31) return true;
+            if (first == 192 && second == 168) return true;
+            return false;
         }
 
         /// <summary>
@@ -111,6 +140,17 @@ namespace RekonOps.BugOneTouch
                 return input;
 
             return TokenRegex.Replace(input, TokenPrefix);
+        }
+
+        /// <summary>
+        /// 입력 문자열에서 Bearer 토큰을 마스킹합니다.
+        /// </summary>
+        /// <param name="input">원본 문자열</param>
+        /// <returns>Bearer 토큰이 마스킹된 문자열</returns>
+        public static string MaskBearer(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return input;
+            return BearerRegex.Replace(input, "Bearer [MASKED:TOKEN]");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -127,10 +167,11 @@ namespace RekonOps.BugOneTouch
             if (string.IsNullOrEmpty(input))
                 return input;
 
-            // 기본 규칙 3종 적용
+            // 기본 규칙 4종 적용
             var result = MaskEmail(input);
             result = MaskIp(result);
             result = MaskToken(result);
+            result = MaskBearer(result);
 
             // 커스텀 규칙 적용
             _rulesLock.EnterReadLock();

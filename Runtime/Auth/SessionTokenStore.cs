@@ -17,17 +17,25 @@ namespace GaoZombie.BugOneTouch
     {
         // ─── 상수 ─────────────────────────────────────────────────────────────────
 
-        private const string PrefsKey = "GaoZombie.BugOneTouch.SessionToken";
+        private const string JiraPrefsKey = "GaoZombie.BugOneTouch.SessionToken";
+        private const string SupabasePrefsKey = "GaoZombie.BugOneTouch.SupabaseToken";
         private const int Pbkdf2Iterations = 100_000;
         private const int AesKeySize = 32;       // 256 비트
         private const int AesIvSize = 16;        // 128 비트
         private const int HmacSize = 32;         // SHA-256 = 32 바이트
         private const int SaltSize = 16;         // PBKDF2 소금 크기
 
+        // ─── 이벤트 ─────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Supabase 토큰이 저장되었을 때 발행되는 이벤트.
+        /// 로그인 감지용으로 구독합니다.
+        /// </summary>
+        public event Action OnTokenChanged;
+
         // ─── 내부 상태 ─────────────────────────────────────────────────────────────
 
         private readonly string _packageName;
-        private byte[] _cachedKey;   // 파생된 암호화 키 캐시
 
         // ─── 생성자 ────────────────────────────────────────────────────────────────
 
@@ -43,10 +51,17 @@ namespace GaoZombie.BugOneTouch
         // ─── 공개 메서드 ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// JWT 토큰을 암호화하여 저장합니다.
+        /// JWT 토큰을 암호화하여 저장합니다 (Jira 세션용).
         /// </summary>
         /// <param name="token">저장할 JWT 토큰</param>
-        public void Save(string token)
+        public void Save(string token) => Save(token, JiraPrefsKey);
+
+        /// <summary>
+        /// JWT 토큰을 암호화하여 지정된 키에 저장합니다.
+        /// </summary>
+        /// <param name="token">저장할 JWT 토큰</param>
+        /// <param name="prefsKey">저장 키</param>
+        public void Save(string token, string prefsKey)
         {
             if (string.IsNullOrEmpty(token))
             {
@@ -57,9 +72,9 @@ namespace GaoZombie.BugOneTouch
             try
             {
                 var encrypted = Encrypt(token);
-                SetPrefs(PrefsKey, encrypted);
+                SetPrefs(prefsKey, encrypted);
                 SavePrefs();
-                Debug.Log("[SessionTokenStore] 세션 토큰 암호화 저장 완료");
+                Debug.Log($"[SessionTokenStore] 토큰 암호화 저장 완료 (키: {prefsKey})");
             }
             catch (Exception ex)
             {
@@ -69,14 +84,20 @@ namespace GaoZombie.BugOneTouch
         }
 
         /// <summary>
-        /// 저장된 JWT 토큰을 복호화하여 반환합니다.
+        /// 저장된 JWT 토큰을 복호화하여 반환합니다 (Jira 세션용).
         /// 토큰이 없거나 복호화 실패 시 null을 반환합니다.
         /// </summary>
-        public string Load()
+        public string Load() => Load(JiraPrefsKey);
+
+        /// <summary>
+        /// 지정된 키에서 JWT 토큰을 복호화하여 반환합니다.
+        /// </summary>
+        /// <param name="prefsKey">저장 키</param>
+        public string Load(string prefsKey)
         {
             try
             {
-                var encrypted = GetPrefs(PrefsKey);
+                var encrypted = GetPrefs(prefsKey);
                 if (string.IsNullOrEmpty(encrypted))
                     return null;
 
@@ -90,25 +111,38 @@ namespace GaoZombie.BugOneTouch
         }
 
         /// <summary>
-        /// 저장된 토큰을 삭제합니다.
+        /// 저장된 토큰을 삭제합니다 (Jira 세션용).
         /// </summary>
-        public void Clear()
+        public void Clear() => Clear(JiraPrefsKey);
+
+        /// <summary>
+        /// 지정된 키의 토큰을 삭제합니다.
+        /// </summary>
+        /// <param name="prefsKey">저장 키</param>
+        public void Clear(string prefsKey)
         {
-            DeletePrefs(PrefsKey);
+            DeletePrefs(prefsKey);
             SavePrefs();
-            _cachedKey = null;
-            Debug.Log("[SessionTokenStore] 세션 토큰 삭제 완료");
+            Debug.Log($"[SessionTokenStore] 토큰 삭제 완료 (키: {prefsKey})");
         }
 
         /// <summary>
-        /// 저장된 토큰이 만료되었는지 확인합니다.
+        /// 저장된 토큰이 만료되었는지 확인합니다 (Jira 세션용).
         /// JWT payload의 exp 필드를 파싱합니다.
         /// </summary>
         /// <param name="marginSeconds">만료 여유 시간 (기본 300초 = 5분)</param>
         /// <returns>만료되었으면 true</returns>
-        public bool IsExpired(int marginSeconds = 300)
+        public bool IsExpired(int marginSeconds = 300) => IsExpired(JiraPrefsKey, marginSeconds);
+
+        /// <summary>
+        /// 지정된 키의 토큰이 만료되었는지 확인합니다.
+        /// </summary>
+        /// <param name="prefsKey">저장 키</param>
+        /// <param name="marginSeconds">만료 여유 시간 (기본 300초 = 5분)</param>
+        /// <returns>만료되었으면 true</returns>
+        public bool IsExpired(string prefsKey, int marginSeconds = 300)
         {
-            var token = Load();
+            var token = Load(prefsKey);
             if (string.IsNullOrEmpty(token))
                 return true;
 
@@ -130,13 +164,49 @@ namespace GaoZombie.BugOneTouch
         }
 
         /// <summary>
-        /// 저장된 토큰이 존재하고 유효한지 확인합니다.
+        /// 저장된 토큰이 존재하고 유효한지 확인합니다 (Jira 세션용).
         /// </summary>
-        public bool HasValidToken()
+        public bool HasValidToken() => HasValidToken(JiraPrefsKey);
+
+        /// <summary>
+        /// 지정된 키의 토큰이 존재하고 유효한지 확인합니다.
+        /// </summary>
+        /// <param name="prefsKey">저장 키</param>
+        public bool HasValidToken(string prefsKey)
         {
-            var token = Load();
-            return !string.IsNullOrEmpty(token) && !IsExpired(0);
+            var token = Load(prefsKey);
+            return !string.IsNullOrEmpty(token) && !IsExpired(prefsKey, 0);
         }
+
+        // ─── Supabase 편의 메서드 ────────────────────────────────────────────────────
+
+        /// <summary>Supabase 액세스 토큰을 암호화하여 저장합니다.</summary>
+        public void SaveSupabase(string token)
+        {
+            Save(token, SupabasePrefsKey);
+
+            // 토큰 변경 이벤트 발행 (로그인 감지용)
+            if (!string.IsNullOrEmpty(token))
+            {
+                try { OnTokenChanged?.Invoke(); }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[SessionTokenStore] OnTokenChanged 핸들러 오류: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>저장된 Supabase 액세스 토큰을 복호화하여 반환합니다.</summary>
+        public string LoadSupabase() => Load(SupabasePrefsKey);
+
+        /// <summary>저장된 Supabase 토큰을 삭제합니다.</summary>
+        public void ClearSupabase() => Clear(SupabasePrefsKey);
+
+        /// <summary>Supabase 토큰이 존재하고 유효한지 확인합니다.</summary>
+        public bool HasValidSupabaseToken() => HasValidToken(SupabasePrefsKey);
+
+        /// <summary>Supabase 토큰이 만료되었는지 확인합니다.</summary>
+        public bool IsSupabaseExpired(int marginSeconds = 300) => IsExpired(SupabasePrefsKey, marginSeconds);
 
         // ─── JWT 유틸리티 ──────────────────────────────────────────────────────────
 
@@ -260,10 +330,7 @@ namespace GaoZombie.BugOneTouch
         /// </summary>
         private byte[] DeriveKey(byte[] salt)
         {
-            if (_cachedKey != null)
-                return _cachedKey;
-
-            // 머신 고유 식별자 (Unity SystemInfo)
+            // salt가 매번 다르므로 캐시를 사용하지 않고 항상 새로 파생
             var machineId = SystemInfo.deviceUniqueIdentifier;
             var keyMaterial = $"{machineId}:{_packageName}";
             var keyMaterialBytes = Encoding.UTF8.GetBytes(keyMaterial);
@@ -274,8 +341,7 @@ namespace GaoZombie.BugOneTouch
                 iterations: Pbkdf2Iterations,
                 hashAlgorithm: HashAlgorithmName.SHA256);
 
-            _cachedKey = pbkdf2.GetBytes(AesKeySize);
-            return _cachedKey;
+            return pbkdf2.GetBytes(AesKeySize);
         }
 
         // ─── 유틸리티 ─────────────────────────────────────────────────────────────

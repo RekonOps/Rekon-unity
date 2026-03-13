@@ -93,7 +93,11 @@ namespace GaoZombie.BugOneTouch
 
             _isCapturing = true;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            // 인코더별 권장 타임아웃 적용 (인코딩 방식에 따라 소요 시간이 다름)
+            float effectiveTimeout = (_videoEncoder != null)
+                ? _videoEncoder.RecommendedTimeoutSeconds
+                : TimeoutSeconds;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(effectiveTimeout));
             var result = new CaptureResult { Timestamp = DateTime.UtcNow };
 
             // 임시 디렉토리 생성
@@ -114,7 +118,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (OperationCanceledException)
             {
-                Debug.LogWarning("[BugOneTouch] 캡처 타임아웃 (5초 초과). 수집된 아티팩트만 반환합니다.");
+                Debug.LogWarning($"[BugOneTouch] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
                 ReportProgress("complete", 1.0f, "타임아웃");
             }
             catch (Exception ex)
@@ -240,9 +244,105 @@ namespace GaoZombie.BugOneTouch
                 FrameData[] frames = _frameBuffer.GetFrames();
                 if (frames.Length > 0)
                 {
-                    string videoDir = Path.Combine(dir, "video");
-                    await _videoEncoder.EncodeAsync(frames, videoDir, _videoConfig);
-                    result.VideoPath = videoDir;
+                    // 인코더의 OutputExtension을 사용하여 출력 경로 결정 (OCP 적용)
+                    string ext = _videoEncoder.OutputExtension;
+                    string videoPath = string.IsNullOrEmpty(ext)
+                        ? Path.Combine(dir, "video")
+                        : Path.Combine(dir, $"video{ext}");
+
+                    // 첨부파일 크기 제한을 config에 반영
+                    var activeConfig = _videoConfig;
+                    if (_settings.cachedAttachmentSizeLimitBytes > 0)
+                    {
+                        // 클론하여 원본 config를 수정하지 않음
+                        activeConfig = new VideoEncoderConfig
+                        {
+                            Width             = _videoConfig.Width,
+                            Height            = _videoConfig.Height,
+                            Fps               = _videoConfig.Fps,
+                            BitrateMbps       = _videoConfig.BitrateMbps,
+                            Crf               = _videoConfig.Crf,
+                            TargetMaxSizeBytes = _settings.cachedAttachmentSizeLimitBytes,
+                        };
+                    }
+
+                    await _videoEncoder.EncodeAsync(frames, videoPath, activeConfig, token);
+
+                    // 파일 크기 초과 시 CRF를 올려 최대 2회 재인코딩 (무한 루프 방지)
+                    if (activeConfig.TargetMaxSizeBytes > 0 && File.Exists(videoPath))
+                    {
+                        // CRF 단계: 23 → 28 → 33
+                        int[] crfSteps = { 28, 33 };
+                        long currentSize = new FileInfo(videoPath).Length;
+                        for (int attempt = 0; attempt < crfSteps.Length; attempt++)
+                        {
+                            if (currentSize <= activeConfig.TargetMaxSizeBytes)
+                                break; // 크기 제한 이내 → 재인코딩 불필요
+
+                            int nextCrf = crfSteps[attempt];
+                            Debug.LogWarning(
+                                $"[BugOneTouch] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
+                                $"CRF {nextCrf}으로 재인코딩합니다. (시도 {attempt + 1}/2)");
+
+                            var reencodeConfig = new VideoEncoderConfig
+                            {
+                                Width             = activeConfig.Width,
+                                Height            = activeConfig.Height,
+                                Fps               = activeConfig.Fps,
+                                BitrateMbps       = activeConfig.BitrateMbps,
+                                Crf               = nextCrf,
+                                TargetMaxSizeBytes = activeConfig.TargetMaxSizeBytes,
+                            };
+
+                            // 원본 파일 보호를 위해 임시 경로에 인코딩 후 성공 시 교체
+                            string tempPath = videoPath + ".tmp";
+                            try
+                            {
+                                await _videoEncoder.EncodeAsync(frames, tempPath, reencodeConfig, token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                                throw;
+                            }
+                            if (File.Exists(tempPath))
+                            {
+                                long newSize = new FileInfo(tempPath).Length;
+                                if (newSize > 0 && newSize < currentSize)
+                                {
+                                    File.Delete(videoPath);
+                                    File.Move(tempPath, videoPath);
+                                    currentSize = newSize; // 다음 반복 비교용으로 업데이트
+                                }
+                                else
+                                {
+                                    File.Delete(tempPath); // 더 커지거나 0이면 원본 유지
+                                    break; // 더 이상 재인코딩 무의미
+                                }
+                            }
+                        }
+
+                        // 최종 크기 확인 로그
+                        if (File.Exists(videoPath))
+                        {
+                            long finalSize = new FileInfo(videoPath).Length;
+                            if (finalSize > activeConfig.TargetMaxSizeBytes)
+                            {
+                                Debug.LogWarning(
+                                    $"[BugOneTouch] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                    $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
+                                    "Jira 업로드 시 거부될 수 있습니다.");
+                            }
+                        }
+                    }
+
+                    result.VideoPath = videoPath;
                 }
 
                 ReportProgress("video", 1.0f);

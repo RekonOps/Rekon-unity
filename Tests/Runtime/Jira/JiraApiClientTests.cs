@@ -225,113 +225,10 @@ namespace GaoZombie.BugOneTouch.Tests
             Assert.IsTrue(result.IssueUrl.Contains("PROJ-456"), "이슈 URL에 이슈 키가 포함되어야 합니다.");
         }
 
-        // ─── JiraAttachmentUploader 요청 모델 테스트 ──────────────────────────────
-
-        [Test]
-        public void AttachmentItem_필드_정상_초기화()
-        {
-            // Act
-            var item = new JiraAttachmentUploader.AttachmentItem
-            {
-                FileName = "screenshot.png",
-                Data = new byte[1024],
-                ContentType = "image/png"
-            };
-
-            // Assert
-            Assert.AreEqual("screenshot.png", item.FileName);
-            Assert.AreEqual(1024, item.Data.Length);
-            Assert.AreEqual("image/png", item.ContentType);
-        }
-
-        [Test]
-        public void AttachmentItem_기본_ContentType_octet_stream()
-        {
-            // Act
-            var item = new JiraAttachmentUploader.AttachmentItem
-            {
-                FileName = "data.bin",
-                Data = new byte[10]
-            };
-
-            // Assert
-            Assert.AreEqual("application/octet-stream", item.ContentType,
-                "기본 ContentType은 application/octet-stream이어야 합니다.");
-        }
-
-        [Test]
-        public void UploadResult_초기_상태_빈_목록()
-        {
-            // Act
-            var result = new JiraAttachmentUploader.UploadResult();
-
-            // Assert
-            Assert.AreEqual(0, result.SucceededFiles.Count);
-            Assert.AreEqual(0, result.SkippedFiles.Count);
-            Assert.AreEqual(0, result.FailedFiles.Count);
-            Assert.IsFalse(result.IsFullySuccessful, "빈 결과는 완전 성공이 아니어야 합니다.");
-            Assert.IsFalse(result.HasAnySuccess, "빈 결과는 어떤 성공도 없어야 합니다.");
-        }
-
-        [Test]
-        public void UploadResult_성공_파일_추가_후_HasAnySuccess_true()
-        {
-            // Arrange
-            var result = new JiraAttachmentUploader.UploadResult();
-
-            // Act
-            result.SucceededFiles.Add("screenshot.png");
-
-            // Assert
-            Assert.IsTrue(result.HasAnySuccess, "성공 파일이 있을 때 HasAnySuccess는 true여야 합니다.");
-        }
-
-        [Test]
-        public void UploadResult_성공만_있을_때_IsFullySuccessful_true()
-        {
-            // Arrange
-            var result = new JiraAttachmentUploader.UploadResult();
-
-            // Act
-            result.SucceededFiles.Add("screenshot.png");
-            result.SucceededFiles.Add("video.mp4");
-
-            // Assert
-            Assert.IsTrue(result.IsFullySuccessful, "건너뜀/실패 없이 성공만 있을 때 IsFullySuccessful은 true여야 합니다.");
-        }
-
-        [Test]
-        public void UploadResult_건너뜀_파일_있을_때_IsFullySuccessful_false()
-        {
-            // Arrange
-            var result = new JiraAttachmentUploader.UploadResult();
-
-            // Act
-            result.SucceededFiles.Add("screenshot.png");
-            result.SkippedFiles.Add("large-video.mp4");
-
-            // Assert
-            Assert.IsFalse(result.IsFullySuccessful, "건너뜀 파일이 있을 때 IsFullySuccessful은 false여야 합니다.");
-        }
-
-        [Test]
-        public void UploadResult_실패_파일_있을_때_IsFullySuccessful_false()
-        {
-            // Arrange
-            var result = new JiraAttachmentUploader.UploadResult();
-
-            // Act
-            result.SucceededFiles.Add("screenshot.png");
-            result.FailedFiles.Add(("broken.txt", "업로드 실패"));
-
-            // Assert
-            Assert.IsFalse(result.IsFullySuccessful, "실패 파일이 있을 때 IsFullySuccessful은 false여야 합니다.");
-        }
-
         // ─── JiraSubmissionService 요청 모델 테스트 ───────────────────────────────
 
         [Test]
-        public void SubmissionRequest_기본_첨부파일_목록_비어있음()
+        public void SubmissionRequest_필수_필드_설정()
         {
             // Act
             var request = new JiraSubmissionService.SubmissionRequest
@@ -345,8 +242,9 @@ namespace GaoZombie.BugOneTouch.Tests
             };
 
             // Assert
-            Assert.IsNotNull(request.Attachments, "Attachments는 null이 아니어야 합니다.");
-            Assert.AreEqual(0, request.Attachments.Count, "기본 Attachments는 빈 목록이어야 합니다.");
+            Assert.AreEqual("bundle-123", request.BundleId, "BundleId가 올바르게 설정되어야 합니다.");
+            Assert.IsNotNull(request.IssueRequest, "IssueRequest는 null이 아니어야 합니다.");
+            Assert.AreEqual("PROJ", request.IssueRequest.ProjectKey, "ProjectKey가 올바르게 설정되어야 합니다.");
         }
 
         [Test]
@@ -359,47 +257,24 @@ namespace GaoZombie.BugOneTouch.Tests
             Assert.IsFalse(result.Success, "초기 Success는 false여야 합니다.");
             Assert.IsNull(result.IssueKey, "초기 IssueKey는 null이어야 합니다.");
             Assert.IsNull(result.IssueUrl, "초기 IssueUrl은 null이어야 합니다.");
-            Assert.IsNull(result.AttachmentResult, "초기 AttachmentResult는 null이어야 합니다.");
             Assert.IsNull(result.ErrorMessage, "초기 ErrorMessage는 null이어야 합니다.");
         }
 
         [Test]
-        public void SubmissionResult_IsPartialSuccess_이슈성공_첨부실패()
+        public void SubmissionResult_성공_상태_확인()
         {
-            // Arrange
-            var uploadResult = new JiraAttachmentUploader.UploadResult();
-            uploadResult.SucceededFiles.Add("ok.png");
-            uploadResult.FailedFiles.Add(("fail.log", "오류"));
-
+            // Arrange & Act
             var result = new JiraSubmissionService.SubmissionResult
             {
                 Success = true,
                 IssueKey = "PROJ-789",
-                AttachmentResult = uploadResult
+                IssueUrl = "https://example.atlassian.net/browse/PROJ-789"
             };
 
             // Assert
-            Assert.IsTrue(result.IsPartialSuccess,
-                "이슈 생성 성공 + 첨부파일 부분 실패 시 IsPartialSuccess는 true여야 합니다.");
-        }
-
-        [Test]
-        public void SubmissionResult_IsPartialSuccess_전체성공_false()
-        {
-            // Arrange
-            var uploadResult = new JiraAttachmentUploader.UploadResult();
-            uploadResult.SucceededFiles.Add("ok.png");
-
-            var result = new JiraSubmissionService.SubmissionResult
-            {
-                Success = true,
-                IssueKey = "PROJ-789",
-                AttachmentResult = uploadResult
-            };
-
-            // Assert
-            Assert.IsFalse(result.IsPartialSuccess,
-                "전체 성공 시 IsPartialSuccess는 false여야 합니다.");
+            Assert.IsTrue(result.Success, "Success가 true여야 합니다.");
+            Assert.AreEqual("PROJ-789", result.IssueKey, "IssueKey가 올바르게 설정되어야 합니다.");
+            Assert.IsNotNull(result.IssueUrl, "IssueUrl은 null이 아니어야 합니다.");
         }
 
         // ─── IBundleStateUpdater 인터페이스 존재 확인 ────────────────────────────
@@ -429,14 +304,5 @@ namespace GaoZombie.BugOneTouch.Tests
             Assert.IsNotNull(updateSubmitting, "UpdateSubmittingAsync 메서드가 존재해야 합니다.");
         }
 
-        // ─── 크기 제한 상수 테스트 ────────────────────────────────────────────────
-
-        [Test]
-        public void JiraAttachmentUploader_기본_크기제한_10MB()
-        {
-            // Assert
-            Assert.AreEqual(10 * 1024 * 1024, JiraAttachmentUploader.DefaultMaxFileSizeBytes,
-                "기본 파일 크기 제한은 10MB(10 * 1024 * 1024 bytes)여야 합니다.");
-        }
     }
 }

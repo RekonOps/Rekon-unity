@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch.Tests.Integration
+namespace RekonOps.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.2 성능 테스트 - FPS 영향 프로파일링.

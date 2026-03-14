@@ -5,11 +5,11 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace RekonOps.BugOneTouch.Editor
+namespace RekonOps.BugBeacon.Editor
 {
     /// <summary>
-    /// Bug-OneTouch 설정 에디터 윈도우.
-    /// Window/Bug-OneTouch/Settings 메뉴에서 열립니다.
+    /// BugBeacon 설정 에디터 윈도우.
+    /// Window/BugBeacon/Settings 메뉴에서 열립니다.
     ///
     /// 단일 스크롤 윈도우 + 접이식(Foldout) 섹션 구조:
     ///   웹 연동       - 연동 상태 표시, 웹 대시보드 연동 버튼
@@ -21,7 +21,7 @@ namespace RekonOps.BugOneTouch.Editor
     ///
     /// SerializedObject 기반으로 변경 감지 및 Undo 지원.
     /// </summary>
-    public class BugOneTouchSettingsWindow : EditorWindow
+    public class BugBeaconSettingsWindow : EditorWindow
     {
         // ─── 플랫폼별 메인 키 목록 ────────────────────────────────────────────────
 
@@ -85,9 +85,9 @@ namespace RekonOps.BugOneTouch.Editor
         };
 
         // ─── 개발자 모드 EditorPrefs 키 ─────────────────────────────────────────
-        // EditorPrefs.SetBool("BugOneTouch_DevMode", true) 으로 수동 활성화.
+        // EditorPrefs.SetBool("BugBeacon_DevMode", true) 으로 수동 활성화.
         // 고급 섹션은 개발자 모드일 때만 표시됩니다.
-        private const string DEV_MODE_PREF_KEY = "BugOneTouch_DevMode";
+        private const string DEV_MODE_PREF_KEY = "BugBeacon_DevMode";
 
         // ─── 웹 로그인 플로우 상태 ───────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ namespace RekonOps.BugOneTouch.Editor
 
         // ─── 내부 상태 ───────────────────────────────────────────────────────────
 
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
         private SerializedObject _serializedSettings;
 
         /// <summary>Supabase access_token 암호화 저장소</summary>
@@ -138,10 +138,10 @@ namespace RekonOps.BugOneTouch.Editor
 
         // ─── 메뉴 등록 ───────────────────────────────────────────────────────────
 
-        [MenuItem(BugOneTouchEditorInfo.MenuRoot + "/Settings")]
+        [MenuItem(BugBeaconEditorInfo.MenuRoot + "/Settings")]
         public static void OpenWindow()
         {
-            var window = GetWindow<BugOneTouchSettingsWindow>("Bug-OneTouch Settings");
+            var window = GetWindow<BugBeaconSettingsWindow>("BugBeacon Settings");
             window.minSize = new Vector2(420f, 500f);
             window.Show();
         }
@@ -176,7 +176,7 @@ namespace RekonOps.BugOneTouch.Editor
                 LoadOrCreateSettings();
                 if (_settings == null)
                 {
-                    EditorGUILayout.HelpBox("BugOneTouchSettings 에셋을 찾을 수 없습니다.", MessageType.Error);
+                    EditorGUILayout.HelpBox("BugBeaconSettings 에셋을 찾을 수 없습니다.", MessageType.Error);
                     return;
                 }
             }
@@ -196,7 +196,7 @@ namespace RekonOps.BugOneTouch.Editor
             DrawCrashRecoverySection();
 
             // 개발자 모드일 때만 고급 섹션 표시
-            // 활성화: EditorPrefs.SetBool("BugOneTouch_DevMode", true)
+            // 활성화: EditorPrefs.SetBool("BugBeacon_DevMode", true)
             if (EditorPrefs.GetBool(DEV_MODE_PREF_KEY, false))
             {
                 DrawAdvancedSection();
@@ -219,7 +219,7 @@ namespace RekonOps.BugOneTouch.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                EditorGUILayout.LabelField("Bug-OneTouch 설정", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("BugBeacon 설정", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
             }
 
@@ -294,7 +294,7 @@ namespace RekonOps.BugOneTouch.Editor
                         tenantIdProp.stringValue = "";
                         _webLoginState = WebLoginState.Idle;
                         _webLoginErrorMessage = null;
-                        Debug.Log("[BugOneTouch] 웹 대시보드 연동 해제됨");
+                        Debug.Log("[BugBeacon] 웹 대시보드 연동 해제됨");
                         Repaint();
                     }
                 }
@@ -316,7 +316,7 @@ namespace RekonOps.BugOneTouch.Editor
                         _pollingCts?.Cancel();
                         _webLoginState = WebLoginState.Idle;
                         _webLoginErrorMessage = null;
-                        Debug.Log("[BugOneTouch] 웹 로그인 플로우 취소됨");
+                        Debug.Log("[BugBeacon] 웹 로그인 플로우 취소됨");
                         Repaint();
                     }
                 }
@@ -884,7 +884,7 @@ namespace RekonOps.BugOneTouch.Editor
             try
             {
                 // ── 1. auth-unity-start POST ─────────────────────────────────
-                string startUrl = BugOneTouchSettings.WEB_DASHBOARD_URL + "/api/unity/auth/start";
+                string startUrl = BugBeaconSettings.WEB_DASHBOARD_URL + "/api/unity/auth/start";
                 string deviceId = SystemInfo.deviceUniqueIdentifier;
                 // JSON 특수문자 이스케이프 처리 (쌍따옴표, 백슬래시)
                 string escapedDeviceId = deviceId
@@ -892,7 +892,7 @@ namespace RekonOps.BugOneTouch.Editor
                     .Replace("\"", "\\\"");
                 string requestBody = $"{{\"device_id\":\"{escapedDeviceId}\"}}";
 
-                Debug.Log("[BugOneTouch] 웹 로그인 플로우 시작: device_id=" + deviceId);
+                Debug.Log("[BugBeacon] 웹 로그인 플로우 시작: device_id=" + deviceId);
 
                 string startResponseJson = await PostJsonAsync(startUrl, requestBody, ct);
                 if (startResponseJson == null)
@@ -907,17 +907,17 @@ namespace RekonOps.BugOneTouch.Editor
 
                 if (string.IsNullOrEmpty(connectId) || string.IsNullOrEmpty(loginUrl))
                 {
-                    Debug.LogError("[BugOneTouch] auth-unity-start 응답 파싱 실패: " + startResponseJson);
+                    Debug.LogError("[BugBeacon] auth-unity-start 응답 파싱 실패: " + startResponseJson);
                     SetWebLoginFailed("서버 응답을 파싱할 수 없습니다. 잠시 후 다시 시도해주세요.");
                     return;
                 }
 
                 _webLoginConnectId = connectId;
-                Debug.Log("[BugOneTouch] connect_id 수신: " + connectId);
+                Debug.Log("[BugBeacon] connect_id 수신: " + connectId);
 
                 // ── 3. 브라우저 열기 ─────────────────────────────────────────
                 Application.OpenURL(loginUrl);
-                Debug.Log("[BugOneTouch] 브라우저 열기: " + loginUrl);
+                Debug.Log("[BugBeacon] 브라우저 열기: " + loginUrl);
                 EditorApplication.delayCall += Repaint;
 
                 // ── 4. 폴링 시작 ─────────────────────────────────────────────
@@ -934,7 +934,7 @@ namespace RekonOps.BugOneTouch.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError("[BugOneTouch] 웹 로그인 플로우 예외: " + ex);
+                Debug.LogError("[BugBeacon] 웹 로그인 플로우 예외: " + ex);
                 SetWebLoginFailed("오류가 발생했습니다: " + ex.Message);
             }
         }
@@ -946,7 +946,7 @@ namespace RekonOps.BugOneTouch.Editor
         private async Task PollAuthStatusAsync(string connectId, CancellationToken ct)
         {
             const int maxAttempts = 200; // 3초 × 200 = 600초 = 10분
-            string statusUrl = BugOneTouchSettings.WEB_DASHBOARD_URL
+            string statusUrl = BugBeaconSettings.WEB_DASHBOARD_URL
                 + "/api/unity/auth/status?connect_id=" + Uri.EscapeDataString(connectId);
 
             for (int i = 0; i < maxAttempts; i++)
@@ -961,12 +961,12 @@ namespace RekonOps.BugOneTouch.Editor
                 if (responseJson == null)
                 {
                     // 네트워크 오류 시 다음 폴링 회차에서 재시도 (연속 실패는 나중에 처리)
-                    Debug.LogWarning("[BugOneTouch] 폴링 응답 없음 (" + (i + 1) + "/" + maxAttempts + ")");
+                    Debug.LogWarning("[BugBeacon] 폴링 응답 없음 (" + (i + 1) + "/" + maxAttempts + ")");
                     continue;
                 }
 
                 string status = ParseJsonString(responseJson, "status");
-                Debug.Log("[BugOneTouch] 폴링 상태: " + status + " (" + (i + 1) + "/" + maxAttempts + ")");
+                Debug.Log("[BugBeacon] 폴링 상태: " + status + " (" + (i + 1) + "/" + maxAttempts + ")");
 
                 if (status == "completed")
                 {
@@ -998,25 +998,25 @@ namespace RekonOps.BugOneTouch.Editor
                         try
                         {
                             _tokenStore.SaveSupabase(accessToken);
-                            Debug.Log("[BugOneTouch] access_token 암호화 저장 완료 (길이: " + accessToken.Length + ")");
+                            Debug.Log("[BugBeacon] access_token 암호화 저장 완료 (길이: " + accessToken.Length + ")");
                         }
                         catch (Exception saveEx)
                         {
                             // 토큰 저장 실패 시 로그인 상태를 Failed로 전환
-                            Debug.LogError("[BugOneTouch] access_token 저장 실패: " + saveEx.Message);
+                            Debug.LogError("[BugBeacon] access_token 저장 실패: " + saveEx.Message);
                             SetWebLoginFailed("토큰 저장에 실패했습니다. 다시 시도해주세요.");
                             return;
                         }
                     }
                     else
                     {
-                        Debug.LogWarning("[BugOneTouch] 서버 응답에 access_token이 없습니다.");
+                        Debug.LogWarning("[BugBeacon] 서버 응답에 access_token이 없습니다.");
                     }
 
                     _webLoginState = WebLoginState.Completed;
                     _webLoginErrorMessage = null;
 
-                    Debug.Log("[BugOneTouch] 웹 로그인 완료. workspace: "
+                    Debug.Log("[BugBeacon] 웹 로그인 완료. workspace: "
                         + workspaceName + " / tenantId: " + workspaceId);
 
                     EditorApplication.delayCall += Repaint;
@@ -1044,7 +1044,7 @@ namespace RekonOps.BugOneTouch.Editor
         {
             _webLoginState = WebLoginState.Failed;
             _webLoginErrorMessage = message;
-            Debug.LogWarning("[BugOneTouch] 웹 로그인 실패: " + message);
+            Debug.LogWarning("[BugBeacon] 웹 로그인 실패: " + message);
             EditorApplication.delayCall += Repaint;
         }
 
@@ -1077,7 +1077,7 @@ namespace RekonOps.BugOneTouch.Editor
 
             if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning("[BugOneTouch] POST 실패 (" + url + "): " + www.error);
+                Debug.LogWarning("[BugBeacon] POST 실패 (" + url + "): " + www.error);
                 return null;
             }
 
@@ -1109,7 +1109,7 @@ namespace RekonOps.BugOneTouch.Editor
 
             if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning("[BugOneTouch] GET 실패 (" + url + "): " + www.error);
+                Debug.LogWarning("[BugBeacon] GET 실패 (" + url + "): " + www.error);
                 return null;
             }
 
@@ -1144,29 +1144,29 @@ namespace RekonOps.BugOneTouch.Editor
         // ─── 헬퍼 메서드 ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// BugOneTouchSettings 에셋을 로드하거나 찾을 수 없으면 생성합니다.
+        /// BugBeaconSettings 에셋을 로드하거나 찾을 수 없으면 생성합니다.
         /// </summary>
         private void LoadOrCreateSettings()
         {
-            string[] guids = AssetDatabase.FindAssets("t:BugOneTouchSettings");
+            string[] guids = AssetDatabase.FindAssets("t:BugBeaconSettings");
             if (guids.Length > 0)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                _settings = AssetDatabase.LoadAssetAtPath<BugOneTouchSettings>(path);
+                _settings = AssetDatabase.LoadAssetAtPath<BugBeaconSettings>(path);
             }
 
             if (_settings == null)
             {
                 const string ResourcesPath = "Assets/Resources";
-                const string AssetPath     = ResourcesPath + "/BugOneTouchSettings.asset";
+                const string AssetPath     = ResourcesPath + "/BugBeaconSettings.asset";
 
                 if (!AssetDatabase.IsValidFolder(ResourcesPath))
                     AssetDatabase.CreateFolder("Assets", "Resources");
 
-                _settings = CreateInstance<BugOneTouchSettings>();
+                _settings = CreateInstance<BugBeaconSettings>();
                 AssetDatabase.CreateAsset(_settings, AssetPath);
                 AssetDatabase.SaveAssets();
-                Debug.Log("[BugOneTouch] BugOneTouchSettings 에셋 생성: " + AssetPath);
+                Debug.Log("[BugBeacon] BugBeaconSettings 에셋 생성: " + AssetPath);
             }
 
             _serializedSettings = new SerializedObject(_settings);
@@ -1179,7 +1179,7 @@ namespace RekonOps.BugOneTouch.Editor
         {
             _serializedSettings.ApplyModifiedProperties();
             AssetDatabase.SaveAssets();
-            Debug.Log("[BugOneTouch] 설정 저장 완료");
+            Debug.Log("[BugBeacon] 설정 저장 완료");
         }
 
         /// <summary>

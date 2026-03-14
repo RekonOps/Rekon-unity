@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// Jira OAuth 2.0 브라우저 인증 플로우를 관리합니다.

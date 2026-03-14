@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// Supabase Edge Functions (auth-unity-start / auth-unity-status)를 호출하여
@@ -111,43 +111,43 @@ namespace RekonOps.BugOneTouch
             try
             {
                 // 1단계: auth-unity-start 호출 (재시도 포함)
-                Debug.Log("[BugOneTouch] Supabase 웹 로그인 시작 요청 중...");
+                Debug.Log("[BugBeacon] Supabase 웹 로그인 시작 요청 중...");
                 var startResponse = await PostAuthUnityStartAsync(deviceId, ct);
 
                 if (string.IsNullOrEmpty(startResponse.connect_id) || string.IsNullOrEmpty(startResponse.login_url))
                 {
                     var error = "auth-unity-start 응답에 connect_id 또는 login_url이 없습니다.";
-                    Debug.LogError($"[BugOneTouch] {error}");
+                    Debug.LogError($"[BugBeacon] {error}");
                     OnAuthFailed?.Invoke(error);
                     throw new InvalidOperationException(error);
                 }
 
-                Debug.Log($"[BugOneTouch] 로그인 URL 수신 완료. connect_id: {startResponse.connect_id}");
+                Debug.Log($"[BugBeacon] 로그인 URL 수신 완료. connect_id: {startResponse.connect_id}");
 
                 // 2단계: 브라우저로 로그인 URL 열기
                 Application.OpenURL(startResponse.login_url);
-                Debug.Log("[BugOneTouch] 웹 브라우저에서 로그인 페이지를 열었습니다.");
+                Debug.Log("[BugBeacon] 웹 브라우저에서 로그인 페이지를 열었습니다.");
 
                 // 3단계: auth-unity-status 폴링
-                Debug.Log("[BugOneTouch] 인증 완료 대기 중 (최대 5분)...");
+                Debug.Log("[BugBeacon] 인증 완료 대기 중 (최대 5분)...");
                 var result = await PollAuthUnityStatusAsync(startResponse.connect_id, ct);
 
                 // 4단계: 토큰 저장 및 이벤트 발생
                 _tokenStore.SaveSupabase(result.AccessToken);
-                Debug.Log($"[BugOneTouch] Supabase 인증 완료. 워크스페이스: {result.WorkspaceName}");
+                Debug.Log($"[BugBeacon] Supabase 인증 완료. 워크스페이스: {result.WorkspaceName}");
                 OnAuthCompleted?.Invoke(result);
 
                 return result;
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("[BugOneTouch] Supabase 웹 로그인이 취소되었습니다.");
+                Debug.Log("[BugBeacon] Supabase 웹 로그인이 취소되었습니다.");
                 throw;
             }
             catch (Exception ex) when (!(ex is OperationCanceledException))
             {
                 var errorMsg = $"Supabase 웹 로그인 실패: {ex.Message}";
-                Debug.LogError($"[BugOneTouch] {errorMsg}");
+                Debug.LogError($"[BugBeacon] {errorMsg}");
                 OnAuthFailed?.Invoke(errorMsg);
                 throw;
             }
@@ -159,7 +159,7 @@ namespace RekonOps.BugOneTouch
         public void Logout()
         {
             _tokenStore.ClearSupabase();
-            Debug.Log("[BugOneTouch] Supabase 로그아웃 완료.");
+            Debug.Log("[BugBeacon] Supabase 로그아웃 완료.");
         }
 
         // ─── 유틸리티 ────────────────────────────────────────────────────────────────
@@ -237,14 +237,14 @@ namespace RekonOps.BugOneTouch
                             break;
 
                         default:
-                            Debug.LogWarning($"[BugOneTouch] 알 수 없는 상태: {status.status}");
+                            Debug.LogWarning($"[BugBeacon] 알 수 없는 상태: {status.status}");
                             break;
                     }
                 }
                 catch (Exception ex) when (!(ex is OperationCanceledException) && !(ex is TimeoutException))
                 {
                     // 폴링 중 네트워크 오류는 무시하고 다음 폴링 시도
-                    Debug.LogWarning($"[BugOneTouch] 폴링 중 오류 (무시): {ex.Message}");
+                    Debug.LogWarning($"[BugBeacon] 폴링 중 오류 (무시): {ex.Message}");
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(PollIntervalSeconds), ct);
@@ -286,7 +286,7 @@ namespace RekonOps.BugOneTouch
                     if (attempt < MaxRetryCount)
                     {
                         float delay = RetryBaseDelaySeconds * Mathf.Pow(2f, attempt - 1);
-                        Debug.LogWarning($"[BugOneTouch] Supabase 요청 실패 (시도 {attempt}/{MaxRetryCount}), " +
+                        Debug.LogWarning($"[BugBeacon] Supabase 요청 실패 (시도 {attempt}/{MaxRetryCount}), " +
                                          $"{delay:F1}초 후 재시도. 에러: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), ct);
                     }

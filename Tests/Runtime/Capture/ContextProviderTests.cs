@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
-    /// ContextProviderRegistry 및 BugOneTouchContext 단위 테스트.
+    /// ContextProviderRegistry 및 BugBeaconContext 단위 테스트.
     /// </summary>
     [TestFixture]
     public class ContextProviderTests
@@ -17,13 +17,13 @@ namespace RekonOps.BugOneTouch.Tests
         public void SetUp()
         {
             _registry = new ContextProviderRegistry();
-            BugOneTouchContext.Clear();
+            BugBeaconContext.Clear();
         }
 
         [TearDown]
         public void TearDown()
         {
-            BugOneTouchContext.Clear();
+            BugBeaconContext.Clear();
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -173,77 +173,77 @@ namespace RekonOps.BugOneTouch.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
-        // BugOneTouchContext 테스트
+        // BugBeaconContext 테스트
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public void BugOneTouchContext_Add_StoresValue()
+        public void BugBeaconContext_Add_StoresValue()
         {
-            BugOneTouchContext.Add("testKey", "testValue");
-            var snapshot = BugOneTouchContext.GetSnapshot();
+            BugBeaconContext.Add("testKey", "testValue");
+            var snapshot = BugBeaconContext.GetSnapshot();
             Assert.IsTrue(snapshot.ContainsKey("testKey"));
             Assert.AreEqual("testValue", snapshot["testKey"]);
         }
 
         [Test]
-        public void BugOneTouchContext_Add_UpdatesExistingKey()
+        public void BugBeaconContext_Add_UpdatesExistingKey()
         {
-            BugOneTouchContext.Add("key", "first");
-            BugOneTouchContext.Add("key", "second");
-            var snapshot = BugOneTouchContext.GetSnapshot();
+            BugBeaconContext.Add("key", "first");
+            BugBeaconContext.Add("key", "second");
+            var snapshot = BugBeaconContext.GetSnapshot();
             Assert.AreEqual("second", snapshot["key"]);
         }
 
         [Test]
-        public void BugOneTouchContext_Add_NullKey_ThrowsException()
+        public void BugBeaconContext_Add_NullKey_ThrowsException()
         {
-            Assert.Throws<System.ArgumentNullException>(() => BugOneTouchContext.Add(null, "value"));
-            Assert.Throws<System.ArgumentNullException>(() => BugOneTouchContext.Add("", "value"));
+            Assert.Throws<System.ArgumentNullException>(() => BugBeaconContext.Add(null, "value"));
+            Assert.Throws<System.ArgumentNullException>(() => BugBeaconContext.Add("", "value"));
         }
 
         [Test]
-        public void BugOneTouchContext_Remove_DeletesKey()
+        public void BugBeaconContext_Remove_DeletesKey()
         {
-            BugOneTouchContext.Add("removeMe", "value");
-            BugOneTouchContext.Remove("removeMe");
-            var snapshot = BugOneTouchContext.GetSnapshot();
+            BugBeaconContext.Add("removeMe", "value");
+            BugBeaconContext.Remove("removeMe");
+            var snapshot = BugBeaconContext.GetSnapshot();
             Assert.IsFalse(snapshot.ContainsKey("removeMe"));
         }
 
         [Test]
-        public void BugOneTouchContext_Remove_NonExistentKey_NoError()
+        public void BugBeaconContext_Remove_NonExistentKey_NoError()
         {
-            Assert.DoesNotThrow(() => BugOneTouchContext.Remove("nonexistent"));
+            Assert.DoesNotThrow(() => BugBeaconContext.Remove("nonexistent"));
         }
 
         [Test]
-        public void BugOneTouchContext_Clear_RemovesAll()
+        public void BugBeaconContext_Clear_RemovesAll()
         {
-            BugOneTouchContext.Add("a", "1");
-            BugOneTouchContext.Add("b", "2");
-            BugOneTouchContext.Clear();
-            Assert.AreEqual(0, BugOneTouchContext.Count);
+            BugBeaconContext.Add("a", "1");
+            BugBeaconContext.Add("b", "2");
+            BugBeaconContext.Clear();
+            Assert.AreEqual(0, BugBeaconContext.Count);
         }
 
         [Test]
-        public void BugOneTouchContext_AsProvider_ReturnsContextData()
+        public void BugBeaconContext_AsProvider_ReturnsContextData()
         {
-            BugOneTouchContext.Add("level", "42");
-            var provider = BugOneTouchContext.AsProvider();
+            BugBeaconContext.Add("level", "42");
+            var provider = BugBeaconContext.AsProvider();
             var context = provider.GetContext();
             Assert.IsTrue(context.ContainsKey("level"));
             Assert.AreEqual("42", context["level"]);
         }
 
         [Test]
-        public void BugOneTouchContext_GetSnapshot_ReturnsCopy()
+        public void BugBeaconContext_GetSnapshot_ReturnsCopy()
         {
-            BugOneTouchContext.Add("original", "value");
-            var snapshot = BugOneTouchContext.GetSnapshot();
+            BugBeaconContext.Add("original", "value");
+            var snapshot = BugBeaconContext.GetSnapshot();
 
             // 스냅샷 수정이 원본에 영향을 주지 않아야 함
             snapshot["original"] = "modified";
-            var snapshot2 = BugOneTouchContext.GetSnapshot();
+            var snapshot2 = BugBeaconContext.GetSnapshot();
             Assert.AreEqual("value", snapshot2["original"], "스냅샷은 복사본이어야 합니다.");
         }
 

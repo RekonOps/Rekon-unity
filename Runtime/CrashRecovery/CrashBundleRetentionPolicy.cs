@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 크래시 번들 보존 정책을 적용하는 클래스.
@@ -45,10 +45,10 @@ namespace RekonOps.BugOneTouch
         }
 
         /// <summary>
-        /// BugOneTouchSettings에서 정책 설정을 읽어 초기화합니다.
+        /// BugBeaconSettings에서 정책 설정을 읽어 초기화합니다.
         /// </summary>
-        /// <param name="settings">Bug-OneTouch 설정</param>
-        public CrashBundleRetentionPolicy(BugOneTouchSettings settings)
+        /// <param name="settings">BugBeacon 설정</param>
+        public CrashBundleRetentionPolicy(BugBeaconSettings settings)
             : this(settings?.maxCrashBundles ?? 10, settings?.crashBundleRetentionDays ?? 30)
         {
         }
@@ -97,7 +97,7 @@ namespace RekonOps.BugOneTouch
                     {
                         deletedCount++;
                         bundles.Remove(manifest);
-                        Debug.Log($"[BugOneTouch] 기간 초과 크래시 번들 삭제: {manifest.id} (생성: {manifest.created_at})");
+                        Debug.Log($"[BugBeacon] 기간 초과 크래시 번들 삭제: {manifest.id} (생성: {manifest.created_at})");
                     }
                 }
 
@@ -114,17 +114,17 @@ namespace RekonOps.BugOneTouch
                     if (TryDeleteBundle(oldest.id))
                     {
                         deletedCount++;
-                        Debug.Log($"[BugOneTouch] 최대 개수 초과 크래시 번들 삭제 (FIFO): {oldest.id}");
+                        Debug.Log($"[BugBeacon] 최대 개수 초과 크래시 번들 삭제 (FIFO): {oldest.id}");
                     }
                     bundles.RemoveAt(0);
                 }
 
                 if (deletedCount > 0)
-                    Debug.Log($"[BugOneTouch] 크래시 번들 보존 정책 적용 완료: {deletedCount}개 삭제, {bundles.Count}개 유지.");
+                    Debug.Log($"[BugBeacon] 크래시 번들 보존 정책 적용 완료: {deletedCount}개 삭제, {bundles.Count}개 유지.");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 크래시 번들 보존 정책 적용 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 크래시 번들 보존 정책 적용 실패: {ex.Message}");
             }
 
             return deletedCount;
@@ -202,7 +202,7 @@ namespace RekonOps.BugOneTouch
             if (!manifest.registered)
             {
                 Debug.LogWarning(
-                    $"[BugOneTouch] 미등록 크래시 번들이 삭제됩니다: {manifest.id} " +
+                    $"[BugBeacon] 미등록 크래시 번들이 삭제됩니다: {manifest.id} " +
                     $"(사유: {deleteReason}, 생성: {manifest.created_at}). " +
                     $"Jira에 등록되지 않은 크래시 데이터가 영구 삭제됩니다.");
             }
@@ -219,7 +219,7 @@ namespace RekonOps.BugOneTouch
 
                 if (!Directory.Exists(bundleDir))
                 {
-                    Debug.LogWarning($"[BugOneTouch] 삭제할 크래시 번들 디렉토리가 없습니다: {bundleId}");
+                    Debug.LogWarning($"[BugBeacon] 삭제할 크래시 번들 디렉토리가 없습니다: {bundleId}");
                     return true; // 이미 없는 것은 성공으로 처리
                 }
 
@@ -228,7 +228,7 @@ namespace RekonOps.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 크래시 번들 삭제 실패 ({bundleId}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 크래시 번들 삭제 실패 ({bundleId}): {ex.Message}");
                 return false;
             }
         }

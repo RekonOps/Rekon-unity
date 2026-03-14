@@ -1,8 +1,8 @@
 {
-  "name": "BugOneTouch.Runtime",
-  "rootNamespace": "RekonOps.BugOneTouch",
-  "references": [],
-  "includePlatforms": [],
+  "name": "BugBeacon.Editor",
+  "rootNamespace": "RekonOps.BugBeacon.Editor",
+  "references": ["BugBeacon.Runtime"],
+  "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": false,

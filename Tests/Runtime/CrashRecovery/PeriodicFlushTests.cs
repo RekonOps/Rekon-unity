@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// PeriodicFlushManager 및 MappedFileWriter 단위 테스트.

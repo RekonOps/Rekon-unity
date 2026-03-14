@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 단일 로그 항목을 나타내는 불변 구조체.

@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// Silent Submit 완료 후 인게임 화면 우하단에 결과 알림 토스트를 표시하는 컴포넌트.
@@ -95,7 +95,7 @@ namespace RekonOps.BugOneTouch
             _instance = FindObjectOfType<SubmitToast>();
             if (_instance != null) return _instance;
 
-            GameObject go = new GameObject("[BugOneTouch] SubmitToast");
+            GameObject go = new GameObject("[BugBeacon] SubmitToast");
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<SubmitToast>();
             return _instance;
@@ -120,7 +120,7 @@ namespace RekonOps.BugOneTouch
             if (_submitManager != null)
             {
                 _submitManager.OnSubmitCompleted += HandleSubmitCompleted;
-                Debug.Log("[BugOneTouch] SubmitToast: SilentSubmitManager 바인딩 완료");
+                Debug.Log("[BugBeacon] SubmitToast: SilentSubmitManager 바인딩 완료");
             }
         }
 
@@ -140,7 +140,7 @@ namespace RekonOps.BugOneTouch
             // 싱글톤 캐시 등록 (중복 인스턴스 방지)
             if (_instance != null && _instance != this)
             {
-                Debug.LogWarning("[BugOneTouch] SubmitToast: 중복 인스턴스 감지, 제거합니다");
+                Debug.LogWarning("[BugBeacon] SubmitToast: 중복 인스턴스 감지, 제거합니다");
                 Destroy(gameObject);
                 return;
             }
@@ -233,7 +233,7 @@ namespace RekonOps.BugOneTouch
                     _message = "리포트가 저장되었습니다";
 
                     // 웹 대시보드 URL 구성 (보안 검증 포함, 상수 URL 사용)
-                    _reportUrl = BuildSecureReportUrl(BugOneTouchSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
+                    _reportUrl = BuildSecureReportUrl(BugBeaconSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
                 }
             }
             else
@@ -248,7 +248,7 @@ namespace RekonOps.BugOneTouch
             _stateStartTime = Time.realtimeSinceStartup;
             _currentAlpha = 0f;
 
-            Debug.Log($"[BugOneTouch] SubmitToast: 표시 (유형={_toastType}, 메시지={_message})");
+            Debug.Log($"[BugBeacon] SubmitToast: 표시 (유형={_toastType}, 메시지={_message})");
         }
 
         // ─── 렌더링 ───────────────────────────────────────────────────────────────
@@ -319,7 +319,7 @@ namespace RekonOps.BugOneTouch
                     }
                     else
                     {
-                        Debug.LogWarning("[BugOneTouch] SubmitToast: 유효하지 않은 URL이므로 열지 않음");
+                        Debug.LogWarning("[BugBeacon] SubmitToast: 유효하지 않은 URL이므로 열지 않음");
                     }
                     Hide();
                 }
@@ -392,7 +392,7 @@ namespace RekonOps.BugOneTouch
             // 경로에 한글/공백 등이 포함될 수 있으므로 Uri 클래스로 안전하게 변환
             Application.OpenURL(new Uri(pendingFolderPath).AbsoluteUri);
 #endif
-            Debug.Log($"[BugOneTouch] SubmitToast: pending 폴더 열기 → {pendingFolderPath}");
+            Debug.Log($"[BugBeacon] SubmitToast: pending 폴더 열기 → {pendingFolderPath}");
         }
 
         /// <summary>
@@ -407,14 +407,14 @@ namespace RekonOps.BugOneTouch
             // 기본 URL 유효성 검증
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri baseUri))
             {
-                Debug.LogWarning("[BugOneTouch] SubmitToast: WEB_DASHBOARD_URL이 유효한 URI가 아닙니다");
+                Debug.LogWarning("[BugBeacon] SubmitToast: WEB_DASHBOARD_URL이 유효한 URI가 아닙니다");
                 return "";
             }
 
             // https 스킴 강제 확인
             if (!string.Equals(baseUri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
             {
-                Debug.LogWarning($"[BugOneTouch] SubmitToast: https가 아닌 스킴 거부 ({baseUri.Scheme})");
+                Debug.LogWarning($"[BugBeacon] SubmitToast: https가 아닌 스킴 거부 ({baseUri.Scheme})");
                 return "";
             }
 
@@ -425,7 +425,7 @@ namespace RekonOps.BugOneTouch
             // 최종 URL 재검증
             if (!IsValidHttpsUrl(fullUrl))
             {
-                Debug.LogWarning("[BugOneTouch] SubmitToast: 구성된 최종 URL이 유효하지 않습니다");
+                Debug.LogWarning("[BugBeacon] SubmitToast: 구성된 최종 URL이 유효하지 않습니다");
                 return "";
             }
 

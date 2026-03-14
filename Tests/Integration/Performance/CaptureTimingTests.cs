@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch.Tests.Integration
+namespace RekonOps.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.2 성능 테스트 - 캡처 완료 시간 측정.
@@ -37,7 +37,7 @@ namespace RekonOps.BugOneTouch.Tests.Integration
         [SetUp]
         public void SetUp()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "BugOneTouch_Timing_" + Guid.NewGuid().ToString("N")[..8]);
+            _tempDir = Path.Combine(Path.GetTempPath(), "BugBeacon_Timing_" + Guid.NewGuid().ToString("N")[..8]);
             Directory.CreateDirectory(_tempDir);
         }
 

@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch.Editor
+namespace RekonOps.BugBeacon.Editor
 {
     /// <summary>
     /// 로컬 번들 목록을 표시하고 관리하는 에디터 윈도우.
-    /// Window/Bug-OneTouch/Bundles 메뉴에서 열립니다.
+    /// Window/BugBeacon/Bundles 메뉴에서 열립니다.
     ///
     /// 기능:
     ///   - 번들 목록 표시 (날짜, 제목, 상태 배지 색상 코딩)
@@ -61,7 +61,7 @@ namespace RekonOps.BugOneTouch.Editor
 
         // ─── 메뉴 등록 ────────────────────────────────────────────────────────────
 
-        [MenuItem(BugOneTouchEditorInfo.MenuRoot + "/Bundles")]
+        [MenuItem(BugBeaconEditorInfo.MenuRoot + "/Bundles")]
         public static void OpenWindow()
         {
             var window = GetWindow<BundleManagerWindow>("번들 관리자");
@@ -391,7 +391,7 @@ namespace RekonOps.BugOneTouch.Editor
             catch (Exception ex)
             {
                 _loadError = $"번들 로딩 오류: {ex.Message}";
-                Debug.LogError($"[BugOneTouch] BundleManagerWindow 로딩 오류: {ex}");
+                Debug.LogError($"[BugBeacon] BundleManagerWindow 로딩 오류: {ex}");
             }
             finally
             {
@@ -444,7 +444,7 @@ namespace RekonOps.BugOneTouch.Editor
             catch (Exception ex)
             {
                 SetActionStatus($"오류: {ex.Message}");
-                Debug.LogError($"[BugOneTouch] 번들 제출 준비 오류: {ex}");
+                Debug.LogError($"[BugBeacon] 번들 제출 준비 오류: {ex}");
             }
         }
 
@@ -463,7 +463,7 @@ namespace RekonOps.BugOneTouch.Editor
             catch (Exception ex)
             {
                 SetActionStatus($"재시도 준비 오류: {ex.Message}");
-                Debug.LogError($"[BugOneTouch] 재시도 준비 오류: {ex}");
+                Debug.LogError($"[BugBeacon] 재시도 준비 오류: {ex}");
             }
         }
 
@@ -482,7 +482,7 @@ namespace RekonOps.BugOneTouch.Editor
             catch (Exception ex)
             {
                 SetActionStatus($"삭제 오류: {ex.Message}");
-                Debug.LogError($"[BugOneTouch] 번들 삭제 오류: {ex}");
+                Debug.LogError($"[BugBeacon] 번들 삭제 오류: {ex}");
             }
         }
 
@@ -510,7 +510,7 @@ namespace RekonOps.BugOneTouch.Editor
         /// </summary>
         private async Task ApplyRetentionPolicyAsync()
         {
-            BugOneTouchSettings settings = BugOneTouchSettingsProvider.Settings;
+            BugBeaconSettings settings = BugBeaconSettingsProvider.Settings;
 
             bool confirm = EditorUtility.DisplayDialog(
                 "보관 정책 적용",
@@ -533,7 +533,7 @@ namespace RekonOps.BugOneTouch.Editor
             catch (Exception ex)
             {
                 SetActionStatus($"보관 정책 오류: {ex.Message}");
-                Debug.LogError($"[BugOneTouch] 보관 정책 오류: {ex}");
+                Debug.LogError($"[BugBeacon] 보관 정책 오류: {ex}");
             }
         }
 
@@ -541,7 +541,7 @@ namespace RekonOps.BugOneTouch.Editor
         /// 보관 정책 내부 로직: 초과 번들 삭제.
         /// Submitted, Failed, Created 순서로 오래된 것부터 삭제합니다.
         /// </summary>
-        private async Task<int> ApplyRetentionInternal(BugOneTouchSettings settings)
+        private async Task<int> ApplyRetentionInternal(BugBeaconSettings settings)
         {
             int deleted = 0;
             long maxBytes = (long)settings.maxDiskUsageMB * 1024 * 1024;
@@ -563,7 +563,7 @@ namespace RekonOps.BugOneTouch.Editor
                 totalBytes -= oldest.total_size_bytes;
                 all.RemoveAt(0);
                 deleted++;
-                Debug.Log($"[BugOneTouch] 보관 정책 삭제(개수 초과): {oldest.id}");
+                Debug.Log($"[BugBeacon] 보관 정책 삭제(개수 초과): {oldest.id}");
             }
 
             // 최대 디스크 용량 초과 제거 (오래된 순)
@@ -574,7 +574,7 @@ namespace RekonOps.BugOneTouch.Editor
                 totalBytes -= oldest.total_size_bytes;
                 all.RemoveAt(0);
                 deleted++;
-                Debug.Log($"[BugOneTouch] 보관 정책 삭제(용량 초과): {oldest.id}");
+                Debug.Log($"[BugBeacon] 보관 정책 삭제(용량 초과): {oldest.id}");
             }
 
             return deleted;

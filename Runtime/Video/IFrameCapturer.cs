@@ -1,4 +1,4 @@
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 프레임 캡처 인터페이스.

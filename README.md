@@ -1,4 +1,4 @@
-# Bug-OneTouch Unity 플러그인
+# BugBeacon Unity 플러그인
 
 > Unity 게임 개발자를 위한 원클릭 버그 리포팅 플러그인 -- 플레이 모드에서 영상/스크린샷/로그를 자동 캡처하여 **웹 대시보드에 저장**하고, Jira 이슈 등록은 웹 대시보드에서 수행합니다.
 
@@ -10,7 +10,7 @@
 
 ## 개요
 
-Bug-OneTouch는 **JAM.dev 패턴**을 채택합니다.
+BugBeacon는 **JAM.dev 패턴**을 채택합니다.
 
 - **Unity 플러그인**: 버그 캡처 → 웹 백엔드를 통해 Cloudflare R2에 파일 업로드 → 웹 대시보드에 저장 (primary)
 - **Jira 등록**: Unity 플러그인이 Jira에 직접 연결하지 않습니다. Jira 이슈 등록은 **웹 대시보드**(`/workspace/[id]`)에서 수행됩니다.
@@ -60,7 +60,7 @@ Unity 플러그인
 3. 아래 URL 입력:
 
 ```
-https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity.git#v1.0.0
+https://github.com/Project-BugBeacon/BugBeacon-unity.git#v1.0.0
 ```
 
 4. **Add** 클릭 -- Unity가 패키지를 자동으로 다운로드합니다.
@@ -70,12 +70,12 @@ https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity.git#v1.0.0
 ```json
 {
   "dependencies": {
-    "com.rekonops.bug-onetouch": "https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity.git#v1.0.0"
+    "com.rekonops.bugbeacon": "https://github.com/Project-BugBeacon/BugBeacon-unity.git#v1.0.0"
   }
 }
 ```
 
-> **최신 버전 확인**: [GitHub Releases](https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/releases) 페이지에서 최신 태그를 확인하세요.
+> **최신 버전 확인**: [GitHub Releases](https://github.com/Project-BugBeacon/BugBeacon-unity/releases) 페이지에서 최신 태그를 확인하세요.
 
 ---
 
@@ -83,7 +83,7 @@ https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity.git#v1.0.0
 
 ### 1. 웹 로그인 (auth-unity-start 폴링 방식)
 
-Unity 에디터에서 **Project Settings > Bug OneTouch** 열기 > **[웹 로그인]** 버튼 클릭
+Unity 에디터에서 **Project Settings > BugBeacon** 열기 > **[웹 로그인]** 버튼 클릭
 
 내부 동작 흐름:
 1. 플러그인이 백엔드 `auth-unity-start` API에 `device_id`를 전송하여 `connect_id`와 `login_url`을 받습니다.
@@ -94,8 +94,8 @@ Unity 에디터에서 **Project Settings > Bug OneTouch** 열기 > **[웹 로그
 
 ### 2. 라이선스 키 입력 (팀 사용 시)
 
-관리자가 [웹 대시보드](https://bug-onetouch.com)에서 발급한 라이선스 키를 Settings에 입력:
-- **Project Settings > Bug OneTouch > License Key** 에 `BOT-XXXX-XXXX-XXXX-XXXX` 입력
+관리자가 [웹 대시보드](https://bugbeacon.com)에서 발급한 라이선스 키를 Settings에 입력:
+- **Project Settings > BugBeacon > License Key** 에 `BOT-XXXX-XXXX-XXXX-XXXX` 입력
 
 ### 3. 버그 캡처
 
@@ -104,7 +104,7 @@ Unity 에디터에서 **Project Settings > Bug OneTouch** 열기 > **[웹 로그
 3. 제목과 설명 입력
 4. **[웹 저장]** 버튼 클릭하여 제출 (웹 대시보드에 저장됨)
 
-> **Jira 이슈 등록**: Unity 플러그인에서 Jira에 직접 등록하지 않습니다. 버그 리포트가 웹 대시보드에 저장된 후, [웹 대시보드](https://bug-onetouch.com)의 **워크스페이스 > 이슈 상세** 페이지에서 [Jira 등록] 버튼을 클릭하여 Jira 이슈를 생성하세요.
+> **Jira 이슈 등록**: Unity 플러그인에서 Jira에 직접 등록하지 않습니다. 버그 리포트가 웹 대시보드에 저장된 후, [웹 대시보드](https://bugbeacon.com)의 **워크스페이스 > 이슈 상세** 페이지에서 [Jira 등록] 버튼을 클릭하여 Jira 이슈를 생성하세요.
 
 ### 4. Jira 연동 (웹 대시보드에서)
 
@@ -113,9 +113,9 @@ Unity 에디터에서 **Project Settings > Bug OneTouch** 열기 > **[웹 로그
 
 ---
 
-## 설정 (BugOneTouchSettings)
+## 설정 (BugBeaconSettings)
 
-`Project Settings > Bug OneTouch`에서 설정 가능한 항목:
+`Project Settings > BugBeacon`에서 설정 가능한 항목:
 
 | 설정 | 설명 | 기본값 |
 |------|------|--------|
@@ -191,8 +191,8 @@ docs/              # 사용자 가이드, API 레퍼런스
 
 | 저장소 | 설명 |
 |--------|------|
-| [Bug-OneTouch-backend](https://github.com/Project-Bug-OneTouch/Bug-OneTouch-backend) | Supabase 백엔드 (Edge Functions, DB) |
-| [Bug-OneTouch-web](https://github.com/Project-Bug-OneTouch/Bug-OneTouch-web) | 웹 대시보드 (Next.js) |
+| [BugBeacon-backend](https://github.com/Project-BugBeacon/BugBeacon-backend) | Supabase 백엔드 (Edge Functions, DB) |
+| [BugBeacon-web](https://github.com/Project-BugBeacon/BugBeacon-web) | 웹 대시보드 (Next.js) |
 
 ---
 

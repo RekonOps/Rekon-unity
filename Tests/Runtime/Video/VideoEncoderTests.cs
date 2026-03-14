@@ -3,9 +3,9 @@ using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// VideoEncoder 단위 테스트.
@@ -174,7 +174,7 @@ namespace RekonOps.BugOneTouch.Tests
         [Test]
         public void VideoEncoderConfig_FromSettings_ReadsCorrectValues()
         {
-            var settings = ScriptableObject.CreateInstance<BugOneTouchSettings>();
+            var settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
             settings.videoWidth = 1280;
             settings.videoHeight = 720;
             settings.videoFps = 30;

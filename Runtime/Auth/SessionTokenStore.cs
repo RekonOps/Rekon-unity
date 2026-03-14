@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// JWT 세션 토큰을 AES-256 암호화하여 EditorPrefs(에디터) 또는 PlayerPrefs(빌드)에 저장합니다.
@@ -17,8 +17,8 @@ namespace RekonOps.BugOneTouch
     {
         // ─── 상수 ─────────────────────────────────────────────────────────────────
 
-        private const string JiraPrefsKey = "RekonOps.BugOneTouch.SessionToken";
-        private const string SupabasePrefsKey = "RekonOps.BugOneTouch.SupabaseToken";
+        private const string JiraPrefsKey = "RekonOps.BugBeacon.SessionToken";
+        private const string SupabasePrefsKey = "RekonOps.BugBeacon.SupabaseToken";
         private const int Pbkdf2Iterations = 100_000;
         private const int AesKeySize = 32;       // 256 비트
         private const int AesIvSize = 16;        // 128 비트
@@ -43,7 +43,7 @@ namespace RekonOps.BugOneTouch
         /// SessionTokenStore를 초기화합니다.
         /// </summary>
         /// <param name="packageName">패키지명 (키 파생에 사용됨)</param>
-        public SessionTokenStore(string packageName = "com.rekonops.bug-onetouch")
+        public SessionTokenStore(string packageName = "com.rekonops.bugbeacon")
         {
             _packageName = packageName;
         }

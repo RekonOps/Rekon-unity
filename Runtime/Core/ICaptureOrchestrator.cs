@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 캡처 파이프라인 오케스트레이터 인터페이스.

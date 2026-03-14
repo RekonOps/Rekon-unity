@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve Bug-OneTouch-unity
+about: Report a bug to help us improve BugBeacon-unity
 title: "[BUG] "
 labels: bug
 assignees: ''
@@ -38,7 +38,7 @@ assignees: ''
 |-------|-------|
 | Unity Version | e.g. 2022.3.45f1 |
 | Target Platform | e.g. iOS, Android, Windows |
-| Bug-OneTouch version | e.g. 0.1.0 |
+| BugBeacon version | e.g. 0.1.0 |
 | Jira Cloud (if applicable) | e.g. myorg.atlassian.net |
 | OS | e.g. macOS 14.5 |
 

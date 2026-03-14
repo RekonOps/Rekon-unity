@@ -2,7 +2,7 @@
 
 ## 개요
 
-Bug-OneTouch-unity의 Jira Cloud 연동 Unity 클라이언트 설계 문서입니다.
+BugBeacon-unity의 Jira Cloud 연동 Unity 클라이언트 설계 문서입니다.
 Auth Broker (Supabase Edge Functions)와 통신하여 Jira OAuth 인증 및 이슈 제출을 처리합니다.
 
 ---
@@ -162,7 +162,7 @@ https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3
 - `issuetype.name`: 이슈 유형 (기본: "Bug")
 - `summary`: 요약 (제목)
 - `description`: ADF 형식 본문
-- `labels`: BugOneTouchSettings.defaultLabels 자동 추가
+- `labels`: BugBeaconSettings.defaultLabels 자동 추가
 - `priority.name`: 우선순위
 
 ---

@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// AbnormalExitDetector 단위 테스트.

@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// Unity ScreenCapture API 기반 스크린샷 캡처 구현체.
@@ -17,20 +17,20 @@ namespace RekonOps.BugOneTouch
     /// </summary>
     public class ScreenshotCapturer : IScreenshotCapturer
     {
-        private readonly BugOneTouchSettings _settings;
+        private readonly BugBeaconSettings _settings;
 
         /// <summary>
-        /// BugOneTouchSettings를 주입하여 인스턴스를 생성합니다.
+        /// BugBeaconSettings를 주입하여 인스턴스를 생성합니다.
         /// </summary>
         /// <param name="settings">screenshotDownscale 등 설정이 포함된 에셋</param>
-        public ScreenshotCapturer(BugOneTouchSettings settings)
+        public ScreenshotCapturer(BugBeaconSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }
 
         /// <summary>
         /// 현재 화면을 PNG 바이트 배열로 캡처합니다.
-        /// BugOneTouchSettings.screenshotDownscale 배율로 해상도를 축소합니다.
+        /// BugBeaconSettings.screenshotDownscale 배율로 해상도를 축소합니다.
         ///
         /// 반드시 Unity 메인 스레드에서 호출해야 합니다.
         /// </summary>
@@ -46,7 +46,7 @@ namespace RekonOps.BugOneTouch
 
                 if (texture == null)
                 {
-                    Debug.LogWarning("[BugOneTouch] CaptureScreenshotAsTexture가 null을 반환했습니다.");
+                    Debug.LogWarning("[BugBeacon] CaptureScreenshotAsTexture가 null을 반환했습니다.");
                     return Task.FromResult<byte[]>(null);
                 }
 
@@ -58,7 +58,7 @@ namespace RekonOps.BugOneTouch
 
                 if (pngBytes == null || pngBytes.Length == 0)
                 {
-                    Debug.LogWarning("[BugOneTouch] EncodeToPNG가 빈 바이트 배열을 반환했습니다.");
+                    Debug.LogWarning("[BugBeacon] EncodeToPNG가 빈 바이트 배열을 반환했습니다.");
                     return Task.FromResult<byte[]>(null);
                 }
 
@@ -66,7 +66,7 @@ namespace RekonOps.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 스크린샷 캡처 중 오류 발생: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 스크린샷 캡처 중 오류 발생: {ex.Message}");
                 return Task.FromResult<byte[]>(null);
             }
         }
@@ -81,7 +81,7 @@ namespace RekonOps.BugOneTouch
         {
             if (pngBytes == null || pngBytes.Length == 0)
             {
-                Debug.LogWarning("[BugOneTouch] 저장할 PNG 데이터가 없습니다.");
+                Debug.LogWarning("[BugBeacon] 저장할 PNG 데이터가 없습니다.");
                 return;
             }
 
@@ -97,11 +97,11 @@ namespace RekonOps.BugOneTouch
                 // ThreadPool에서 파일 쓰기 (메인 스레드 블로킹 방지)
                 await Task.Run(() => File.WriteAllBytes(filePath, pngBytes));
 
-                Debug.Log($"[BugOneTouch] 스크린샷 저장 완료: {filePath} ({pngBytes.Length:N0} bytes)");
+                Debug.Log($"[BugBeacon] 스크린샷 저장 완료: {filePath} ({pngBytes.Length:N0} bytes)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 스크린샷 저장 실패 (경로: {filePath}): {ex.Message}");
+                Debug.LogError($"[BugBeacon] 스크린샷 저장 실패 (경로: {filePath}): {ex.Message}");
                 throw;
             }
         }

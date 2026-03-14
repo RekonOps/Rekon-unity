@@ -4,7 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch.Editor
+namespace RekonOps.BugBeacon.Editor
 {
     /// <summary>
     /// Unity Editor 시작 시 자동으로 크래시 번들을 스캔하는 클래스.
@@ -96,7 +96,7 @@ namespace RekonOps.BugOneTouch.Editor
                 }
 
                 Debug.LogWarning(
-                    $"[BugOneTouch] 크래시 복구 스캔 결과: " +
+                    $"[BugBeacon] 크래시 복구 스캔 결과: " +
                     $"미등록 번들 {unregisteredBundles.Count}개" +
                     $"{(flagExists ? ", 비정상 종료 플래그 감지" : "")}");
 
@@ -108,7 +108,7 @@ namespace RekonOps.BugOneTouch.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 크래시 번들 스캔 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 크래시 번들 스캔 실패: {ex.Message}");
             }
         }
 
@@ -160,10 +160,10 @@ namespace RekonOps.BugOneTouch.Editor
         /// 스캔을 수동으로 재실행합니다.
         /// 메뉴 항목이나 버튼에서 호출할 수 있습니다.
         /// </summary>
-        [MenuItem(BugOneTouchEditorInfo.MenuRoot + "/크래시 복구 스캔 실행")]
+        [MenuItem(BugBeaconEditorInfo.MenuRoot + "/크래시 복구 스캔 실행")]
         public static void ManualScan()
         {
-            Debug.Log("[BugOneTouch] 수동 크래시 복구 스캔 시작...");
+            Debug.Log("[BugBeacon] 수동 크래시 복구 스캔 시작...");
             PerformScan();
         }
     }

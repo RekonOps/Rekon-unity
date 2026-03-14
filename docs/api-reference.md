@@ -1,24 +1,24 @@
-# Bug-OneTouch API 레퍼런스
+# BugBeacon API 레퍼런스
 
-> 네임스페이스: `RekonOps.BugOneTouch`
+> 네임스페이스: `RekonOps.BugBeacon`
 
 ---
 
 ## 목차
 
-1. [BugOneTouchContext](#bugonетouchcontext)
+1. [BugBeaconContext](#bugonетouchcontext)
 2. [IContextProvider](#icontextprovider)
 3. [ContextProviderRegistry](#contextproviderregistry)
-4. [BugOneTouchSettings](#bugonетouchsettings)
+4. [BugBeaconSettings](#bugonетouchsettings)
 5. [CaptureOrchestrator](#captureorchestrator)
 6. [LogMasker](#logmasker)
 7. [MaskingRuleLoader](#maskingruleloader)
 
 ---
 
-## BugOneTouchContext
+## BugBeaconContext
 
-`Runtime/Capture/BugOneTouchContext.cs`
+`Runtime/Capture/BugBeaconContext.cs`
 
 버그 리포트에 포함될 커스텀 키-값 데이터를 관리하는 정적 API 클래스입니다. 스레드 안전하게 구현되어 있으며, 어느 스레드에서도 호출할 수 있습니다.
 
@@ -46,12 +46,12 @@ public static void Add(string key, string value)
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 void OnLevelStart(int levelIndex)
 {
-    BugOneTouchContext.Add("current_level", levelIndex.ToString());
-    BugOneTouchContext.Add("difficulty", GameSettings.Difficulty.ToString());
+    BugBeaconContext.Add("current_level", levelIndex.ToString());
+    BugBeaconContext.Add("difficulty", GameSettings.Difficulty.ToString());
 }
 ```
 
@@ -74,12 +74,12 @@ public static void Remove(string key)
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 void OnLevelEnd()
 {
     // 레벨 종료 시 해당 레벨의 컨텍스트 제거
-    BugOneTouchContext.Remove("current_level");
+    BugBeaconContext.Remove("current_level");
 }
 ```
 
@@ -96,12 +96,12 @@ public static void Clear()
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 void OnSceneUnloaded(Scene scene)
 {
     // 씬 전환 시 이전 씬의 컨텍스트 초기화
-    BugOneTouchContext.Clear();
+    BugBeaconContext.Clear();
 }
 ```
 
@@ -120,11 +120,11 @@ public static Dictionary<string, string> GetSnapshot()
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 void DebugPrintContext()
 {
-    var snapshot = BugOneTouchContext.GetSnapshot();
+    var snapshot = BugBeaconContext.GetSnapshot();
     foreach (var kvp in snapshot)
     {
         Debug.Log($"[Context] {kvp.Key}: {kvp.Value}");
@@ -140,17 +140,17 @@ void DebugPrintContext()
 public static IContextProvider AsProvider()
 ```
 
-`BugOneTouchContext`를 `IContextProvider`로 감싸는 어댑터를 반환합니다. `ContextProviderRegistry`에 등록할 때 사용합니다.
+`BugBeaconContext`를 `IContextProvider`로 감싸는 어댑터를 반환합니다. `ContextProviderRegistry`에 등록할 때 사용합니다.
 
-**반환값:** `IContextProvider` - BugOneTouchContext를 감싸는 프로바이더
+**반환값:** `IContextProvider` - BugBeaconContext를 감싸는 프로바이더
 
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 // ContextProviderRegistry에 정적 컨텍스트 등록
-registry.Register(BugOneTouchContext.AsProvider());
+registry.Register(BugBeaconContext.AsProvider());
 ```
 
 ---
@@ -178,7 +178,7 @@ public static int Count { get; }
 ### 인터페이스 정의
 
 ```csharp
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     public interface IContextProvider
     {
@@ -209,7 +209,7 @@ Dictionary<string, string> GetContext()
 
 ```csharp
 using System.Collections.Generic;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 public class GameStateContextProvider : IContextProvider
 {
@@ -259,7 +259,7 @@ public void Register(IContextProvider provider)
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 public class GameBootstrapper : MonoBehaviour
 {
@@ -268,12 +268,12 @@ public class GameBootstrapper : MonoBehaviour
     void Awake()
     {
         _contextProvider = new GameStateContextProvider();
-        BugOneTouch.Instance.ContextRegistry.Register(_contextProvider);
+        BugBeacon.Instance.ContextRegistry.Register(_contextProvider);
     }
 
     void OnDestroy()
     {
-        BugOneTouch.Instance.ContextRegistry.Unregister(_contextProvider);
+        BugBeacon.Instance.ContextRegistry.Unregister(_contextProvider);
     }
 }
 ```
@@ -335,17 +335,17 @@ public int Count { get; }
 
 ---
 
-## BugOneTouchSettings
+## BugBeaconSettings
 
-`Runtime/Settings/BugOneTouchSettings.cs`
+`Runtime/Settings/BugBeaconSettings.cs`
 
-플러그인 동작을 제어하는 ScriptableObject 설정 클래스입니다. Unity 에디터에서 `Project Settings` → `Bug-OneTouch` 패널을 통해 관리합니다.
+플러그인 동작을 제어하는 ScriptableObject 설정 클래스입니다. Unity 에디터에서 `Project Settings` → `BugBeacon` 패널을 통해 관리합니다.
 
 ### 생성
 
 ```csharp
-// 에디터 메뉴: Assets > Create > Bug-OneTouch > Settings
-[CreateAssetMenu(fileName = "BugOneTouchSettings", menuName = "Bug-OneTouch/Settings")]
+// 에디터 메뉴: Assets > Create > BugBeacon > Settings
+[CreateAssetMenu(fileName = "BugBeaconSettings", menuName = "BugBeacon/Settings")]
 ```
 
 ### 주요 프로퍼티
@@ -407,7 +407,7 @@ public int Count { get; }
 
 | 프로퍼티 | 타입 | 기본값 | 설명 |
 |----------|------|--------|------|
-| `defaultLabels` | `string[]` | `["bug-onetouch-unity", "unity"]` | 이슈 생성 시 자동으로 추가할 Jira 레이블 목록 |
+| `defaultLabels` | `string[]` | `["bugbeacon-unity", "unity"]` | 이슈 생성 시 자동으로 추가할 Jira 레이블 목록 |
 
 ---
 
@@ -438,21 +438,21 @@ public event Action<CaptureProgressEvent> OnProgress
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 public class CaptureProgressDisplay : MonoBehaviour
 {
     void Start()
     {
-        var orchestrator = BugOneTouch.Instance.Orchestrator;
+        var orchestrator = BugBeacon.Instance.Orchestrator;
         orchestrator.OnProgress += HandleProgress;
     }
 
     void OnDestroy()
     {
-        if (BugOneTouch.Instance != null)
+        if (BugBeacon.Instance != null)
         {
-            BugOneTouch.Instance.Orchestrator.OnProgress -= HandleProgress;
+            BugBeacon.Instance.Orchestrator.OnProgress -= HandleProgress;
         }
     }
 
@@ -515,7 +515,7 @@ public async Task<CaptureResult> StartAsync()
 public void BindHotkeyManager(HotkeyManager hotkeyManager)
 ```
 
-HotkeyManager를 등록하고 `OnCaptureTrigger` 이벤트를 구독합니다. 초기화 시 BugOneTouch 시스템이 자동으로 호출합니다.
+HotkeyManager를 등록하고 `OnCaptureTrigger` 이벤트를 구독합니다. 초기화 시 BugBeacon 시스템이 자동으로 호출합니다.
 
 ---
 
@@ -627,7 +627,7 @@ public class MaskingRule
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 var masker = new LogMasker();
 masker.AddRule(new LogMasker.MaskingRule
@@ -709,7 +709,7 @@ public static int LoadFromFile(LogMasker masker, string filePath)
 **사용 예:**
 
 ```csharp
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
 var masker = new LogMasker();
 string rulesPath = "/path/to/custom-masking-rules.json";

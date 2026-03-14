@@ -1,4 +1,4 @@
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 로그 수집기 인터페이스.

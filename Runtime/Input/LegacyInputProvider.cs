@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// Unity Legacy Input System 기반 핫키 제공자.

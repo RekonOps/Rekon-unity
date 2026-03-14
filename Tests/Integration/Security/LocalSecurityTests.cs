@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch.Tests.Integration
+namespace RekonOps.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.3 보안 테스트 - 로컬 보안.

@@ -1,8 +1,8 @@
 using System;
 using NUnit.Framework;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// FrameRingBuffer 단위 테스트.

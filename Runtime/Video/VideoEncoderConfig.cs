@@ -1,8 +1,8 @@
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 영상 인코딩에 필요한 설정 값을 담는 클래스.
-    /// BugOneTouchSettings에서 생성하거나 직접 생성할 수 있습니다.
+    /// BugBeaconSettings에서 생성하거나 직접 생성할 수 있습니다.
     /// </summary>
     public class VideoEncoderConfig
     {
@@ -31,9 +31,9 @@ namespace RekonOps.BugOneTouch
         public long TargetMaxSizeBytes { get; set; } = 0;
 
         /// <summary>
-        /// BugOneTouchSettings에서 VideoEncoderConfig를 생성합니다.
+        /// BugBeaconSettings에서 VideoEncoderConfig를 생성합니다.
         /// </summary>
-        public static VideoEncoderConfig FromSettings(BugOneTouchSettings settings)
+        public static VideoEncoderConfig FromSettings(BugBeaconSettings settings)
         {
             if (settings == null)
                 throw new System.ArgumentNullException(nameof(settings));

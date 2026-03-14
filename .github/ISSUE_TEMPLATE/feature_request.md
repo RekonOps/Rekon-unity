@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature or enhancement for Bug-OneTouch-unity
+about: Suggest a new feature or enhancement for BugBeacon-unity
 title: "[FEAT] "
 labels: enhancement
 assignees: ''

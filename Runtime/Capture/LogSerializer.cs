@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// LogEntry 배열을 텍스트로 직렬화하고 ZIP으로 압축하여 저장하는 클래스.
@@ -56,7 +56,7 @@ namespace RekonOps.BugOneTouch
             var sb = new StringBuilder(entries.Length * 200);
 
             // 헤더 정보
-            sb.AppendLine($"# Bug-OneTouch 로그 덤프");
+            sb.AppendLine($"# BugBeacon 로그 덤프");
             sb.AppendLine($"# 생성 시각: {DateTime.UtcNow:O}");
             sb.AppendLine($"# 항목 수: {entries.Length}");
             sb.AppendLine($"# 플랫폼: {Application.platform}");
@@ -119,11 +119,11 @@ namespace RekonOps.BugOneTouch
                     entryStream.Write(textBytes, 0, textBytes.Length);
                 });
 
-                Debug.Log($"[BugOneTouch] 로그 ZIP 저장 완료: {zipPath} ({entries.Length}개 항목)");
+                Debug.Log($"[BugBeacon] 로그 ZIP 저장 완료: {zipPath} ({entries.Length}개 항목)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 로그 ZIP 저장 실패 (경로: {zipPath}): {ex.Message}");
+                Debug.LogError($"[BugBeacon] 로그 ZIP 저장 실패 (경로: {zipPath}): {ex.Message}");
                 throw;
             }
         }

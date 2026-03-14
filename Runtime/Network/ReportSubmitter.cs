@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// create-report Edge Function 호출 + R2 업로드를 조율하는 리포트 제출기 (레거시).
@@ -157,7 +157,7 @@ namespace RekonOps.BugOneTouch
                 // report_files 배열 수동 파싱 (JsonUtility 배열 제한 우회)
                 var reportFiles = ParseReportFiles(responseJson);
 
-                Debug.Log($"[BugOneTouch] 리포트 생성 완료: {baseResponse.report_id}, 파일 {reportFiles.Count}개");
+                Debug.Log($"[BugBeacon] 리포트 생성 완료: {baseResponse.report_id}, 파일 {reportFiles.Count}개");
 
                 // 공개 URL 매핑 구성
                 var fileUrls = new Dictionary<string, string>();
@@ -202,7 +202,7 @@ namespace RekonOps.BugOneTouch
                             if (!r.Success) failCount++;
 
                         if (failCount > 0)
-                            Debug.LogWarning($"[BugOneTouch] {failCount}/{uploadResults.Length}개 파일 업로드 실패");
+                            Debug.LogWarning($"[BugBeacon] {failCount}/{uploadResults.Length}개 파일 업로드 실패");
                     }
                 }
 
@@ -234,12 +234,12 @@ namespace RekonOps.BugOneTouch
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("[BugOneTouch] 리포트 제출 취소됨");
+                Debug.Log("[BugBeacon] 리포트 제출 취소됨");
                 throw;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 리포트 제출 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 리포트 제출 실패: {ex.Message}");
                 return new SubmitResult
                 {
                     Success = false,
@@ -323,7 +323,7 @@ namespace RekonOps.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] report_files 파싱 실패 (빈 목록으로 진행): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] report_files 파싱 실패 (빈 목록으로 진행): {ex.Message}");
             }
 
             return result;
@@ -399,7 +399,7 @@ namespace RekonOps.BugOneTouch
                     if (attempt < MaxRetryCount)
                     {
                         float delay = RetryBaseDelaySeconds * Mathf.Pow(2f, attempt - 1);
-                        Debug.LogWarning($"[BugOneTouch] create-report 요청 실패 (시도 {attempt}/{MaxRetryCount}), {delay:F1}초 후 재시도: {ex.Message}");
+                        Debug.LogWarning($"[BugBeacon] create-report 요청 실패 (시도 {attempt}/{MaxRetryCount}), {delay:F1}초 후 재시도: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), ct);
                     }
                 }

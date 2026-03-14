@@ -4,7 +4,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// CaptureResult를 BundleManifest로 변환하는 생성기.
@@ -17,13 +17,13 @@ namespace RekonOps.BugOneTouch
         private const string PluginVersion = "0.1.0";
 
         /// <summary>Jira 연동 초기값 구성에 사용하는 설정 객체.</summary>
-        private readonly BugOneTouchSettings _settings;
+        private readonly BugBeaconSettings _settings;
 
         /// <summary>
         /// ManifestGenerator 생성자.
         /// </summary>
-        /// <param name="settings">BugOneTouchSettings. null 허용 (연동 정보 미설정 시 기본값 사용).</param>
-        public ManifestGenerator(BugOneTouchSettings settings = null)
+        /// <param name="settings">BugBeaconSettings. null 허용 (연동 정보 미설정 시 기본값 사용).</param>
+        public ManifestGenerator(BugBeaconSettings settings = null)
         {
             _settings = settings;
         }
@@ -189,7 +189,7 @@ namespace RekonOps.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 디렉토리 크기 계산 실패: {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 디렉토리 크기 계산 실패: {ex.Message}");
             }
             return total;
         }

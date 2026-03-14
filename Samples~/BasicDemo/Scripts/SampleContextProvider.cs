@@ -1,20 +1,20 @@
 // SampleContextProvider.cs
-// Bug-OneTouch BasicDemo 샘플
+// BugBeacon BasicDemo 샘플
 //
 // IContextProvider 인터페이스를 구현하여 동적 컨텍스트를 제공하는 예제입니다.
 // ContextProviderRegistry에 등록하면 버그 캡처 시 자동으로 GetContext()가 호출됩니다.
 //
-// BugOneTouchContext.Add() 와의 차이:
-//   - BugOneTouchContext: 정적 API, 직접 키-값 추가/제거
+// BugBeaconContext.Add() 와의 차이:
+//   - BugBeaconContext: 정적 API, 직접 키-값 추가/제거
 //   - IContextProvider: 캡처 시점에 GetContext()를 호출하여 데이터 수집
 //                       (게임 오브젝트 참조, 씬 상태 등을 캡처 시점에 수집할 때 유용)
 
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Samples
+namespace RekonOps.BugBeacon.Samples
 {
     /// <summary>
     /// IContextProvider 구현 예제.
@@ -29,14 +29,14 @@ namespace RekonOps.BugOneTouch.Samples
 
         private void OnEnable()
         {
-            // BugOneTouch 시스템이 초기화된 후에 등록해야 합니다.
-            // 실제 프로젝트에서는 BugOneTouch.Instance가 null인지 확인하세요.
+            // BugBeacon 시스템이 초기화된 후에 등록해야 합니다.
+            // 실제 프로젝트에서는 BugBeacon.Instance가 null인지 확인하세요.
             try
             {
-                // 참고: BugOneTouch.Instance.ContextRegistry에 등록하는 것이 정석이지만,
+                // 참고: BugBeacon.Instance.ContextRegistry에 등록하는 것이 정석이지만,
                 //       이 샘플에서는 직접 ContextProviderRegistry 인스턴스 생성 방법을 보여줍니다.
                 Debug.Log("[SampleContextProvider] IContextProvider 등록 준비 완료.");
-                Debug.Log("실제 프로젝트에서는 BugOneTouch.Instance.ContextRegistry.Register(this)를 호출하세요.");
+                Debug.Log("실제 프로젝트에서는 BugBeacon.Instance.ContextRegistry.Register(this)를 호출하세요.");
             }
             catch (Exception ex)
             {
@@ -47,7 +47,7 @@ namespace RekonOps.BugOneTouch.Samples
         private void OnDisable()
         {
             // 컴포넌트 비활성화 시 등록 해제
-            // BugOneTouch.Instance.ContextRegistry.Unregister(this);
+            // BugBeacon.Instance.ContextRegistry.Unregister(this);
             Debug.Log("[SampleContextProvider] IContextProvider 등록 해제.");
         }
 

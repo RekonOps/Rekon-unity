@@ -1,9 +1,9 @@
 {
-  "name": "BugOneTouch.Tests",
-  "rootNamespace": "RekonOps.BugOneTouch.Tests",
+  "name": "BugBeacon.IntegrationTests",
+  "rootNamespace": "RekonOps.BugBeacon.Tests.Integration",
   "references": [
-    "BugOneTouch.Runtime",
-    "BugOneTouch.Editor",
+    "BugBeacon.Runtime",
+    "BugBeacon.Editor",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

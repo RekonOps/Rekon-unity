@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 스크린샷 캡처 전략 인터페이스.

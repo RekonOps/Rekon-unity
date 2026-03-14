@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// 크래시 복구를 위해 로그·상태·영상을 주기적으로 디스크에 플러시하는 MonoBehaviour.
@@ -15,7 +15,7 @@ namespace RekonOps.BugOneTouch
     ///   - 상태 플러시:  매 stateFlushInterval초 (기본 10초)
     ///   - 영상 플러시:  매 videoFlushInterval초 (기본 30초)
     ///
-    /// 플러시 디렉토리: {persistentDataPath}/BugOneTouch/crash_recovery/active/
+    /// 플러시 디렉토리: {persistentDataPath}/BugBeacon/crash_recovery/active/
     ///
     /// 특징:
     ///   - DontDestroyOnLoad로 씬 전환에도 지속
@@ -44,7 +44,7 @@ namespace RekonOps.BugOneTouch
         // 내부 상태
         // ──────────────────────────────────────────────────────────────
 
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
         private LogRingBuffer _logBuffer;
         private LogSerializer _logSerializer;
         private IStateSnapshotCollector _stateCollector;
@@ -83,7 +83,7 @@ namespace RekonOps.BugOneTouch
 
         /// <summary>플러시 데이터 저장 루트 디렉토리 경로</summary>
         public static string CrashRecoveryDir =>
-            _crashRecoveryDir ??= Path.Combine(Application.persistentDataPath, "BugOneTouch", "crash_recovery");
+            _crashRecoveryDir ??= Path.Combine(Application.persistentDataPath, "BugBeacon", "crash_recovery");
 
         /// <summary>active/ 디렉토리 경로 (플러시 데이터 저장 위치)</summary>
         public static string ActiveDir =>
@@ -106,13 +106,13 @@ namespace RekonOps.BugOneTouch
         /// PeriodicFlushManager를 초기화합니다.
         /// Initialize() 호출 전에는 플러시가 시작되지 않습니다.
         /// </summary>
-        /// <param name="settings">Bug-OneTouch 설정</param>
+        /// <param name="settings">BugBeacon 설정</param>
         /// <param name="logBuffer">로그 링버퍼</param>
         /// <param name="logSerializer">로그 직렬화기</param>
         /// <param name="stateCollector">상태 스냅샷 수집기</param>
         /// <param name="videoWriter">영상 세그먼트 쓰기 (null 허용)</param>
         public void Initialize(
-            BugOneTouchSettings settings,
+            BugBeaconSettings settings,
             LogRingBuffer logBuffer,
             LogSerializer logSerializer,
             IStateSnapshotCollector stateCollector,
@@ -131,7 +131,7 @@ namespace RekonOps.BugOneTouch
 
             _initialized = true;
 
-            Debug.Log($"[BugOneTouch] PeriodicFlushManager 초기화 완료. 플러시 경로: {ActiveDir}");
+            Debug.Log($"[BugBeacon] PeriodicFlushManager 초기화 완료. 플러시 경로: {ActiveDir}");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ namespace RekonOps.BugOneTouch
         {
             if (!_initialized)
             {
-                Debug.LogWarning("[BugOneTouch] PeriodicFlushManager: Initialize() 호출 없이 Start()가 실행됐습니다.");
+                Debug.LogWarning("[BugBeacon] PeriodicFlushManager: Initialize() 호출 없이 Start()가 실행됐습니다.");
                 return;
             }
 
@@ -287,12 +287,12 @@ namespace RekonOps.BugOneTouch
                 await _logSerializer.SaveAsync(entries, destPath);
 
                 LastLogFlushTime = DateTime.UtcNow;
-                Debug.Log($"[BugOneTouch] 로그 플러시 완료: {entries.Length}개 항목 → {destPath}");
+                Debug.Log($"[BugBeacon] 로그 플러시 완료: {entries.Length}개 항목 → {destPath}");
             }
             catch (Exception ex)
             {
                 // 플러시 실패는 게임에 영향을 주지 않음
-                Debug.LogWarning($"[BugOneTouch] 로그 플러시 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 로그 플러시 실패 (무시): {ex.Message}");
             }
         }
 
@@ -315,12 +315,12 @@ namespace RekonOps.BugOneTouch
                 if (ok)
                 {
                     LastStateFlushTime = DateTime.UtcNow;
-                    Debug.Log($"[BugOneTouch] 상태 플러시 완료 → {destPath}");
+                    Debug.Log($"[BugBeacon] 상태 플러시 완료 → {destPath}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 상태 플러시 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 상태 플러시 실패 (무시): {ex.Message}");
             }
         }
 
@@ -337,11 +337,11 @@ namespace RekonOps.BugOneTouch
                 await _videoWriter.FlushSegmentAsync();
 
                 LastVideoFlushTime = DateTime.UtcNow;
-                Debug.Log("[BugOneTouch] 영상 플러시 완료");
+                Debug.Log("[BugBeacon] 영상 플러시 완료");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 영상 플러시 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 영상 플러시 실패 (무시): {ex.Message}");
             }
         }
 
@@ -360,7 +360,7 @@ namespace RekonOps.BugOneTouch
             _disposed = true;
             StopFlushCoroutines();
 
-            Debug.Log("[BugOneTouch] PeriodicFlushManager 정리 완료.");
+            Debug.Log("[BugBeacon] PeriodicFlushManager 정리 완료.");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -373,7 +373,7 @@ namespace RekonOps.BugOneTouch
         /// </summary>
         public static PeriodicFlushManager CreateInstance()
         {
-            var go = new GameObject("[BugOneTouch] PeriodicFlushManager");
+            var go = new GameObject("[BugBeacon] PeriodicFlushManager");
             return go.AddComponent<PeriodicFlushManager>();
         }
     }

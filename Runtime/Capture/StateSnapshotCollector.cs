@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace RekonOps.BugOneTouch
+namespace RekonOps.BugBeacon
 {
     /// <summary>
     /// SystemInfo, Application, SceneManager, Time, Screen, QualitySettings를 사용하여
@@ -73,7 +73,7 @@ namespace RekonOps.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 상태 스냅샷 수집 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 상태 스냅샷 수집 실패: {ex.Message}");
                 // 실패 시에도 빈 스냅샷 반환 (null 방지)
                 return Task.FromResult(new StateSnapshot
                 {

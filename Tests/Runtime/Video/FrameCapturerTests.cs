@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// FrameCapturer 단위 테스트.
@@ -17,12 +17,12 @@ namespace RekonOps.BugOneTouch.Tests
         private FrameCapturer _capturer;
         private FrameRingBuffer _ringBuffer;
         private VideoEncoderConfig _config;
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
 
         [SetUp]
         public void SetUp()
         {
-            _settings = ScriptableObject.CreateInstance<BugOneTouchSettings>();
+            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
             _settings.videoWidth = 320;
             _settings.videoHeight = 180;
             _settings.videoFps = 10;

@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugOneTouch;
+using RekonOps.BugBeacon;
 
-namespace RekonOps.BugOneTouch.Tests
+namespace RekonOps.BugBeacon.Tests
 {
     /// <summary>
     /// LogRingBuffer 단위 테스트.
@@ -169,7 +169,7 @@ namespace RekonOps.BugOneTouch.Tests
             buf.Clear(); // 기존 로그 초기화
 
             // Play Mode에서 Debug.Log 호출 → 콜백을 통해 버퍼에 추가됨
-            string testMsg = $"BugOneTouchTest_{System.Guid.NewGuid():N}";
+            string testMsg = $"BugBeaconTest_{System.Guid.NewGuid():N}";
             Debug.Log(testMsg);
 
             // 콜백이 동기적으로 처리됨 (Unity는 같은 프레임에 콜백 호출)

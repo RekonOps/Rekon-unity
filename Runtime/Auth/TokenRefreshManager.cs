@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// JWT 세션 토큰 및 Jira access_token의 자동 갱신을 관리합니다.

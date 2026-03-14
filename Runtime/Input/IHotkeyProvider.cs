@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 핫키 입력 감지 전략 인터페이스.

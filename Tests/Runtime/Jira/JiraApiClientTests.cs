@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// Jira API 클라이언트 단위 테스트.

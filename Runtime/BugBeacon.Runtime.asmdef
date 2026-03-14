@@ -1,6 +1,6 @@
 {
-  "name": "BugOneTouch.Runtime",
-  "rootNamespace": "GaoZombie.BugOneTouch",
+  "name": "BugBeacon.Runtime",
+  "rootNamespace": "GaoZombie.BugBeacon",
   "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],

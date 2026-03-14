@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 버그 리포트에 포함되는 시스템/애플리케이션 상태 스냅샷.

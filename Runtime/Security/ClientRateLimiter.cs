@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// HTTP 429(Too Many Requests) 응답을 감지하고 지수 백오프로 재시도하는 클라이언트 측 Rate Limiter.

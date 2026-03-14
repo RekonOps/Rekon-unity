@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// SubmissionQueue 단위 테스트.

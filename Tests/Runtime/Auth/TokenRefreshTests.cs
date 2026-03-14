@@ -1,8 +1,8 @@
 using System;
 using NUnit.Framework;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// 토큰 갱신 관련 단위 테스트.

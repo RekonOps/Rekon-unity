@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 캡처 진행 상황을 Play Mode 화면에 오버레이로 표시하는 컴포넌트.
@@ -107,7 +107,7 @@ namespace GaoZombie.BugOneTouch
             CaptureOverlay existing = FindObjectOfType<CaptureOverlay>();
             if (existing != null) return existing;
 
-            GameObject go = new GameObject("[BugOneTouch] CaptureOverlay");
+            GameObject go = new GameObject("[BugBeacon] CaptureOverlay");
             DontDestroyOnLoad(go);
             return go.AddComponent<CaptureOverlay>();
         }
@@ -131,7 +131,7 @@ namespace GaoZombie.BugOneTouch
             if (_orchestrator != null)
             {
                 _orchestrator.OnProgress += HandleProgress;
-                Debug.Log("[BugOneTouch] CaptureOverlay: 오케스트레이터 바인딩 완료");
+                Debug.Log("[BugBeacon] CaptureOverlay: 오케스트레이터 바인딩 완료");
             }
         }
 
@@ -143,7 +143,7 @@ namespace GaoZombie.BugOneTouch
         public void SetSilentMode(bool silent)
         {
             _silentMode = silent;
-            Debug.Log($"[BugOneTouch] CaptureOverlay: Silent 모드 {(silent ? "활성화" : "비활성화")}");
+            Debug.Log($"[BugBeacon] CaptureOverlay: Silent 모드 {(silent ? "활성화" : "비활성화")}");
         }
 
         /// <summary>

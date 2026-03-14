@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using NUnit.Framework;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// TokenEncryptor 단위 테스트.

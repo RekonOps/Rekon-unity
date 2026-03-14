@@ -1,9 +1,9 @@
 {
-  "name": "BugOneTouch.IntegrationTests",
-  "rootNamespace": "GaoZombie.BugOneTouch.Tests.Integration",
+  "name": "BugBeacon.IntegrationTests",
+  "rootNamespace": "GaoZombie.BugBeacon.Tests.Integration",
   "references": [
-    "BugOneTouch.Runtime",
-    "BugOneTouch.Editor",
+    "BugBeacon.Runtime",
+    "BugBeacon.Editor",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

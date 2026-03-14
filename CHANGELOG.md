@@ -74,8 +74,8 @@
 #### M1: UPM 패키지 구조
 - `package.json` (UPM 표준 메타데이터)
 - `Runtime/`, `Editor/`, `Tests/` 디렉토리 구조
-- Assembly Definition 설정 (`BugOneTouch.Runtime.asmdef` / `BugOneTouch.Editor.asmdef`)
-- 네임스페이스 `GaoZombie.BugOneTouch` 일관 적용
+- Assembly Definition 설정 (`BugBeacon.Runtime.asmdef` / `BugBeacon.Editor.asmdef`)
+- 네임스페이스 `GaoZombie.BugBeacon` 일관 적용
 
 #### M2: 로컬 번들 저장소
 - `BundleWriter` -- 버그 리포트 아티팩트를 ZIP 번들로 패키징
@@ -100,7 +100,7 @@
 - `JiraSubmissionService` -- 번들에서 Jira 이슈 전체 제출 플로우 조율
 
 #### M5: 에디터 UI
-- `BugOneTouchSettingsProvider` -- Project Settings 패널 통합
+- `BugBeaconSettingsProvider` -- Project Settings 패널 통합
 - `BugReportForm` -- 버그 리포트 작성 폼
 - `CaptureOverlay` -- 캡처 진행 상황 오버레이 UI
 - Bundle Manager 에디터 윈도우
@@ -129,6 +129,6 @@
 
 ---
 
-[Unreleased]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/Project-Bug-OneTouch/Bug-OneTouch-unity/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Project-BugBeacon/BugBeacon-unity/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Project-BugBeacon/BugBeacon-unity/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/Project-BugBeacon/BugBeacon-unity/releases/tag/v0.1.0

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 캡처 파이프라인 실행 결과를 담는 데이터 클래스.

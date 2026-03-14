@@ -1,8 +1,8 @@
-# Bug-OneTouch-unity PRD v2.0 — Unity 로컬-퍼스트 버그 리포팅 플러그인 (Jira Cloud 전용)
+# BugBeacon-unity PRD v2.0 — Unity 로컬-퍼스트 버그 리포팅 플러그인 (Jira Cloud 전용)
 
 - **문서 버전**: v2.2 (크래시 자동 감지 및 복구 플로우 반영)
 - **작성일**: 2026-02-27 (KST), **검수일**: 2026-02-28
-- **제품 코드명**: **Bug-OneTouch-unity** (가칭)
+- **제품 코드명**: **BugBeacon-unity** (가칭)
 - **대상 엔진**: **Unity (우선)**
 - **연동 대상**: **Jira Cloud (단독 지원)**
 - **핵심 원칙**: **로컬-퍼스트(Local-first) + 포털 없음(Portal-less) + 유저 명의 이슈 생성(User identity only)**
@@ -33,7 +33,7 @@ Unity에서 결함을 발견하면 **핫키 1번**으로
 - 환경/상태/로그/증거가 부족해 **재현이 안 되거나(= 재현 불가)**,
 - 담당자가 "원인 좁히기"까지 가기 위해 추가 커뮤니케이션이 반복되기 때문이다.
 
-웹 서비스 영역에서는 Jam.dev가 "증거(영상) + 컨텍스트 자동 수집 + 링크 공유 + 이슈 트래커 주입" 패턴으로 강한 제품-시장 적합성을 보여줬다. Bug-OneTouch-unity은 이 아이디어를 **게임 엔진(특히 Unity) 개발/테스트 워크플로우**에 맞게 재해석한다.
+웹 서비스 영역에서는 Jam.dev가 "증거(영상) + 컨텍스트 자동 수집 + 링크 공유 + 이슈 트래커 주입" 패턴으로 강한 제품-시장 적합성을 보여줬다. BugBeacon-unity은 이 아이디어를 **게임 엔진(특히 Unity) 개발/테스트 워크플로우**에 맞게 재해석한다.
 
 한국 게임 개발 현장의 실태를 보면, 대부분의 중소 스튜디오는 OBS 화면 녹화 + 로그 수집 스크립트 + Jira/Redmine 수동 등록 조합으로 버그를 리포팅하고 있다. 이는 비용은 낮지만 재현 일관성, 속도, 표준화가 떨어지는 구조다. QA 성숙도는 5단계 기준 평균 2~3단계 수준으로, "재현 자동화" 도구의 문제-해결 적합성이 높은 시장이다.
 
@@ -66,7 +66,7 @@ Unity에서 결함을 발견하면 **핫키 1번**으로
 | PC 게임 매출 비중 | 25.6% | KOCCA 게임백서 2024 |
 | 콘솔 게임 매출 비중 | 4.9% | KOCCA 게임백서 2024 |
 
-모바일 비중이 59.3%로 높아 Unity 친화적 시장 특성이 강하다. 한국은 글로벌 게임 시장에서 세계 4위라는 규모를 보유하면서도, 사업체의 90% 이상이 중소기업인 구조다. 이는 Bug-OneTouch-unity의 초기 타겟인 SMB 대상 제품-시장 적합성이 높음을 시사한다.
+모바일 비중이 59.3%로 높아 Unity 친화적 시장 특성이 강하다. 한국은 글로벌 게임 시장에서 세계 4위라는 규모를 보유하면서도, 사업체의 90% 이상이 중소기업인 구조다. 이는 BugBeacon-unity의 초기 타겟인 SMB 대상 제품-시장 적합성이 높음을 시사한다.
 
 #### Unity 사용률 교차 검증 (추정)
 
@@ -93,7 +93,7 @@ Unity에서 결함을 발견하면 **핫키 1번**으로
 
 #### KOCCA 인디게임 지원 생태계
 
-2025년 KOCCA 인디게임 지원: 76개 프로젝트, 219억원 투자 규모. Bug-OneTouch-unity Free 티어를 활용하여 KOCCA 지원 프로젝트 대상 레퍼런스 고객을 확보하는 채널로 활용 가능하다.
+2025년 KOCCA 인디게임 지원: 76개 프로젝트, 219억원 투자 규모. BugBeacon-unity Free 티어를 활용하여 KOCCA 지원 프로젝트 대상 레퍼런스 고객을 확보하는 채널로 활용 가능하다.
 
 ### 2.2 타겟 시장 규모 (TAM / SAM / SOM)
 
@@ -149,7 +149,7 @@ Codex 모델은 좌석 기반 계산으로 별도 추정치를 제시했다. 아
 
 #### 직접 경쟁자: 사실상 부재 (블루오션)
 
-5개 분석 모델 모두 **Unity 게임 개발에 특화된 로컬-퍼스트 버그 리포팅 플러그인 형태의 직접 경쟁자는 없음**을 확인했다. 이는 Bug-OneTouch-unity이 시장 선점 효과를 노릴 수 있는 블루오션 포지션임을 의미한다.
+5개 분석 모델 모두 **Unity 게임 개발에 특화된 로컬-퍼스트 버그 리포팅 플러그인 형태의 직접 경쟁자는 없음**을 확인했다. 이는 BugBeacon-unity이 시장 선점 효과를 노릴 수 있는 블루오션 포지션임을 의미한다.
 
 #### 간접 경쟁자 / 대안 도구 상세 분석
 
@@ -164,15 +164,15 @@ Codex 모델은 좌석 기반 계산으로 별도 추정치를 제시했다. 아
 
 #### 핵심 경쟁 구도
 
-**Bug-OneTouch-unity의 진짜 경쟁 상대는 "현상 유지(수작업)"다.** 대부분의 중소 개발사가 구글시트, OBS 녹화, 수동 스크린샷으로 버그를 리포팅하고 있어, 습관 변화 저항이 가장 큰 진입 장벽이다.
+**BugBeacon-unity의 진짜 경쟁 상대는 "현상 유지(수작업)"다.** 대부분의 중소 개발사가 구글시트, OBS 녹화, 수동 스크린샷으로 버그를 리포팅하고 있어, 습관 변화 저항이 가장 큰 진입 장벽이다.
 
 #### 데브시스터즈 사례의 시사점
 
-데브시스터즈가 구글시트 → 트렐로 → Jira 순으로 도구를 업그레이드한 패턴은, 한국 중소 게임사들도 **성장 단계에 따라 도구 업그레이드 의향이 있음**을 시사한다. Bug-OneTouch-unity은 이 업그레이드 사이클의 자연스러운 다음 단계로 포지셔닝 가능하다.
+데브시스터즈가 구글시트 → 트렐로 → Jira 순으로 도구를 업그레이드한 패턴은, 한국 중소 게임사들도 **성장 단계에 따라 도구 업그레이드 의향이 있음**을 시사한다. BugBeacon-unity은 이 업그레이드 사이클의 자연스러운 다음 단계로 포지셔닝 가능하다.
 
 ### 2.4 차별화 포인트
 
-Bug-OneTouch-unity의 핵심 차별화는 3박자 조합이다:
+BugBeacon-unity의 핵심 차별화는 3박자 조합이다:
 
 1. **Unity 특화**: 게임 엔진 런타임 플로우(핫키 → 게임 상태 스냅샷 → 로그)에 직접 통합
 2. **로컬-퍼스트**: 영상/로그 외부 서버 경유 최소화 → 보안 민감 한국 게임사에 유리
@@ -214,7 +214,7 @@ Backtrace(크래시 전용), Sentry(범용 모니터링), Jam.dev(웹 QA 전용)
 
 ### 4.2 타겟 세그먼트별 특성
 
-| 세그먼트 | 팀 규모 | 특성 | Bug-OneTouch-unity 적합성 |
+| 세그먼트 | 팀 규모 | 특성 | BugBeacon-unity 적합성 |
 |---------|--------|------|----------------|
 | 인디/소규모 | 1~5인 | 도구 예산 극소, Unity Personal 무료 | Free 티어로 진입 |
 | 중소 스튜디오 | 5~20인 | QA팀 1~3인, Jira 도입 의향 | Pro 티어 주력 타겟 |
@@ -253,7 +253,7 @@ Backtrace(크래시 전용), Sentry(범용 모니터링), Jam.dev(웹 QA 전용)
 
 ### 6.1 최초 설정 (1회)
 
-1. Unity 프로젝트에 Bug-OneTouch-unity 패키지 설치 (Unity Package Manager)
+1. Unity 프로젝트에 BugBeacon-unity 패키지 설치 (Unity Package Manager)
 2. **(옵션) Unity 계정 기반 로그인/활성화**
 3. "Connect Jira" 버튼 → 브라우저에서 Jira OAuth 동의
 4. Jira Site 선택(1개) → Jira Project 선택(수동, 1개) → Issue Type 선택
@@ -286,7 +286,7 @@ Backtrace(크래시 전용), Sentry(범용 모니터링), Jam.dev(웹 QA 전용)
 
 ### 6.5 플레이 모드 / 에디터 모드 동작 구분
 
-Bug-OneTouch-unity은 Unity의 두 가지 실행 컨텍스트에서 서로 다른 기능 집합을 활성화한다. Unity는 `#if UNITY_EDITOR` 전처리 지시자와 `Application.isEditor` 런타임 체크를 통해 에디터 전용 코드와 런타임 코드를 분리한다.
+BugBeacon-unity은 Unity의 두 가지 실행 컨텍스트에서 서로 다른 기능 집합을 활성화한다. Unity는 `#if UNITY_EDITOR` 전처리 지시자와 `Application.isEditor` 런타임 체크를 통해 에디터 전용 코드와 런타임 코드를 분리한다.
 
 #### 플레이 모드 (Play Mode / Standalone Build) — 핵심 캡처 기능 활성
 
@@ -309,7 +309,7 @@ Bug-OneTouch-unity은 Unity의 두 가지 실행 컨텍스트에서 서로 다�
 | 기능 | Unity API / 구현 방식 |
 |------|------|
 | Jira 연결 설정 | `EditorWindow` 기반 커스텀 설정 패널, `EditorPrefs` 또는 `ScriptableObject`로 설정 저장 |
-| 캡처 설정 | `ScriptableObject` 기반 설정 에셋(`BugOneTouchSettings.asset`) — 핫키, 링버퍼 크기, 해상도 설정 |
+| 캡처 설정 | `ScriptableObject` 기반 설정 에셋(`BugBeaconSettings.asset`) — 핫키, 링버퍼 크기, 해상도 설정 |
 | 번들 관리 | `EditorWindow` 기반 이전 캡처 번들 목록 조회, 재전송, 삭제 |
 | 플러그인 설정 | 로그 마스킹 규칙(`LogFilter ScriptableObject`), 보존 정책 설정 |
 
@@ -331,7 +331,7 @@ Bug-OneTouch-unity은 Unity의 두 가지 실행 컨텍스트에서 서로 다�
 
 ### 6.6 크래시 자동 감지 및 복구 플로우
 
-Bug-OneTouch-unity은 플레이 모드 중 크래시가 발생하더라도 버그 재현 데이터를 최대한 보존하고, 에디터 재실행 후 Jira에 즉시 등록할 수 있는 자동 복구 플로우를 제공한다.
+BugBeacon-unity은 플레이 모드 중 크래시가 발생하더라도 버그 재현 데이터를 최대한 보존하고, 에디터 재실행 후 Jira에 즉시 등록할 수 있는 자동 복구 플로우를 제공한다.
 
 #### 6.6.1 크래시 시 데이터 보존 전략 (3중 레이어)
 
@@ -345,7 +345,7 @@ Bug-OneTouch-unity은 플레이 모드 중 크래시가 발생하더라도 버�
 | 상태 스냅샷 | 10초 | `state_snapshot.json` 덮어쓰기 |
 | 영상 슬라이딩 윈도우 | 30초 | `replay_buffer` 세그먼트 교체 |
 
-- 저장 경로: `Application.persistentDataPath/BugOneTouch/crash_bundles/`
+- 저장 경로: `Application.persistentDataPath/BugBeacon/crash_bundles/`
 - 영상은 슬라이딩 윈도우 방식으로 최대 60초 분량을 유지하며, 30초 단위로 세그먼트를 교체한다.
 - 구현 시 `MemoryMappedFile`을 활용하여 OS 레벨 캐싱으로 크래시 시에도 데이터 보존율을 높인다. Unity 2022.3.22f1 미만에서는 macOS/Linux 호환성 문제로 일반 `FileStream` 폴백을 사용한다.
 
@@ -490,7 +490,7 @@ MVP 기본 수집(커스터마이징 없이 자동):
 
 확장 포인트(개발자 주입):
 
-- `BugOneTouchContext.Add(key, value)` 형태로 커스텀 K/V 추가
+- `BugBeaconContext.Add(key, value)` 형태로 커스텀 K/V 추가
 - `IContextProvider` 인터페이스로 프로젝트별 컨텍스트 프로바이더 등록
 
 저장 위치: `state/state.json`
@@ -505,7 +505,7 @@ MVP 기본 수집(커스터마이징 없이 자동):
   - 영상 슬라이딩 윈도우: 30초
 - 크래시 번들 최대 보관 수: **10개** (FIFO — 초과 시 가장 오래된 번들부터 삭제)
 - 보관 기간: **30일** (기본값, 설정 가능)
-- 크래시 번들은 `Application.persistentDataPath/BugOneTouch/crash_bundles/` 경로에 저장된다.
+- 크래시 번들은 `Application.persistentDataPath/BugBeacon/crash_bundles/` 경로에 저장된다.
 - 크래시 번들 구조 및 `manifest.json` 필드 상세는 섹션 6.6.4, 6.6.5 참조.
 
 ---
@@ -515,7 +515,7 @@ MVP 기본 수집(커스터마이징 없이 자동):
 #### 8.2.1 번들 구조 (예시)
 
 ```
-Bug-OneTouch-unity/
+BugBeacon-unity/
   Reports/
     2026-02-27_153012_AB12CD/
       manifest.json
@@ -575,7 +575,7 @@ Bug-OneTouch-unity/
 - Artifacts(스크린샷/로그/영상) 목록 및 크기
 
 필드:
-- labels(기본: `bug-onetouch-unity`, `unity`)
+- labels(기본: `bugbeacon-unity`, `unity`)
 - priority/severity 매핑(간단 매핑)
 - component(선택)
 
@@ -1055,11 +1055,11 @@ Pro → Studio 전환 트리거:
 
 ### 15.7 크래시 자동 감지 및 복구 (섹션 6.6, 8.1.5)
 
-19. 플레이 모드가 실행 중인 동안 설정된 주기(로그 5초, 상태 10초, 영상 30초 기본값)에 따라 링버퍼가 디스크에 플러시되며, 각 플러시 간격은 `BugOneTouchSettings`에서 변경 가능하다.
+19. 플레이 모드가 실행 중인 동안 설정된 주기(로그 5초, 상태 10초, 영상 30초 기본값)에 따라 링버퍼가 디스크에 플러시되며, 각 플러시 간격은 `BugBeaconSettings`에서 변경 가능하다.
 20. Unity 플레이 모드 중 Managed 예외(`LogType.Exception`)가 발생하면 `crash_{timestamp}.bot-unity` 번들이 자동 생성되고, `manifest.json`의 `crash_type`이 `"managed_exception"`, `registered`가 `false`로 설정된다.
 21. 플레이 모드 중 에디터가 비정상 종료(Native 크래시, 강제 종료 등)된 후 에디터를 재시작하면, `abnormal_exit.flag` 파일의 잔존 여부로 비정상 종료를 감지하고 `crash_bundles` 폴더의 미처리 번들을 복구 대상으로 마킹한다.
 22. `registered: false`인 크래시 번들이 1개 이상 존재하는 상태로 에디터를 시작하면, 에디터 시작 후 2초 이내에 크래시 번들 목록이 시간순(최신 먼저)으로 표시된다.
-23. [Jira에 등록] 버튼 클릭 시, 제목(`[Crash] {crash_type}: {crash_message 첫 50자}`), 설명(스택 트레이스 + 시스템 정보 포함), 첨부파일(번들 ZIP + 스크린샷), 우선순위(Critical), 레이블(`auto-crash-report`, `bug-onetouch-unity`)이 자동으로 채워진 Jira 등록 폼이 표시된다.
+23. [Jira에 등록] 버튼 클릭 시, 제목(`[Crash] {crash_type}: {crash_message 첫 50자}`), 설명(스택 트레이스 + 시스템 정보 포함), 첨부파일(번들 ZIP + 스크린샷), 우선순위(Critical), 레이블(`auto-crash-report`, `bugbeacon-unity`)이 자동으로 채워진 Jira 등록 폼이 표시된다.
 24. Jira 등록 완료 후, 해당 번들의 `manifest.json`에서 `registered` 필드가 `true`로 갱신되고 `jira_issue_key` 및 `registered_at` 필드가 기록된다.
 25. 크래시 번들 보관 수가 최대값(기본 10개)을 초과하면 FIFO 정책에 따라 가장 오래된 번들부터 자동 삭제된다. `registered: false` 상태인 번들은 삭제 전 사용자에게 경고를 표시한다.
 26. 크래시 번들의 `data_integrity` 필드는 번들 생성 시점에 각 파일(`crash_log`, `last_screenshot`, `replay_buffer`, `state_snapshot`, `system_info`)의 실제 존재 여부와 완전성을 반영하여 `"complete"` / `"partial"` / `"missing"` 중 하나로 설정되며, 이 값은 복구 UI의 보존 상태 배지에 정확히 표시된다.

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 30초 단위 슬라이딩 윈도우로 영상 세그먼트를 디스크에 플러시합니다.
@@ -151,11 +151,11 @@ namespace GaoZombie.BugOneTouch
                     TryDeleteDirectory(oldest);
                 }
 
-                Debug.Log($"[BugOneTouch] 세그먼트 플러시 완료: {segDir} ({frames.Length}프레임, 유지 중: {_segmentPaths.Count})");
+                Debug.Log($"[BugBeacon] 세그먼트 플러시 완료: {segDir} ({frames.Length}프레임, 유지 중: {_segmentPaths.Count})");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 세그먼트 플러시 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 세그먼트 플러시 실패: {ex.Message}");
             }
         }
 
@@ -168,7 +168,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 세그먼트 디렉토리 삭제 실패 ({path}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 세그먼트 디렉토리 삭제 실패 ({path}): {ex.Message}");
             }
         }
     }

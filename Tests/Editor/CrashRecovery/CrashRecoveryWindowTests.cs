@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugOneTouch;
-using GaoZombie.BugOneTouch.Editor;
+using GaoZombie.BugBeacon;
+using GaoZombie.BugBeacon.Editor;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// CrashRecoveryWindow, CrashBundleScanner, CrashJiraSubmitter 단위 테스트.

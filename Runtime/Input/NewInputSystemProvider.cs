@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// Unity New Input System 기반 핫키 제공자.

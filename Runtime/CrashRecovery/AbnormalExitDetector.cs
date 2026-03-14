@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 비정상 종료(크래시)를 감지하는 클래스.
@@ -13,7 +13,7 @@ namespace GaoZombie.BugOneTouch
     ///   - 크래시 후 다음 시작 시 flag 파일이 남아 있으면 비정상 종료로 간주
     ///
     /// 플래그 파일 경로:
-    ///   {persistentDataPath}/BugOneTouch/crash_recovery/abnormal_exit.flag
+    ///   {persistentDataPath}/BugBeacon/crash_recovery/abnormal_exit.flag
     ///
     /// 주의:
     ///   - RuntimeInitializeOnLoadMethod로 자동 초기화 (씬 로드 전)
@@ -46,12 +46,12 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>
         /// 플래그 파일 절대 경로.
-        /// {persistentDataPath}/BugOneTouch/crash_recovery/abnormal_exit.flag
+        /// {persistentDataPath}/BugBeacon/crash_recovery/abnormal_exit.flag
         /// </summary>
         public static string FlagFilePath =>
             _flagFilePath ??= Path.Combine(
                 Application.persistentDataPath,
-                "BugOneTouch",
+                "BugBeacon",
                 "crash_recovery",
                 FlagFileName);
 
@@ -79,14 +79,14 @@ namespace GaoZombie.BugOneTouch
 
                 if (previousCrash)
                 {
-                    Debug.LogWarning("[BugOneTouch] 이전 세션 비정상 종료 감지! 크래시 번들을 생성합니다.");
+                    Debug.LogWarning("[BugBeacon] 이전 세션 비정상 종료 감지! 크래시 번들을 생성합니다.");
                     // 크래시 번들 생성은 CrashBundleWriter에서 별도 처리
                     // 여기서는 감지 이벤트만 발행
                     OnAbnormalExitDetected?.Invoke();
                 }
                 else
                 {
-                    Debug.Log("[BugOneTouch] 이전 세션 정상 종료 확인.");
+                    Debug.Log("[BugBeacon] 이전 세션 정상 종료 확인.");
                 }
 
                 // 현재 세션의 flag 파일 생성 (Play 시작)
@@ -95,12 +95,12 @@ namespace GaoZombie.BugOneTouch
                 // 정상 종료 시 flag 삭제 등록
                 Application.quitting += OnApplicationQuitting;
 
-                Debug.Log($"[BugOneTouch] AbnormalExitDetector 초기화 완료. 플래그: {FlagFilePath}");
+                Debug.Log($"[BugBeacon] AbnormalExitDetector 초기화 완료. 플래그: {FlagFilePath}");
             }
             catch (Exception ex)
             {
                 // 초기화 실패가 게임 시작을 방해하면 안 됨
-                Debug.LogError($"[BugOneTouch] AbnormalExitDetector 초기화 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] AbnormalExitDetector 초기화 실패: {ex.Message}");
             }
         }
 
@@ -134,11 +134,11 @@ namespace GaoZombie.BugOneTouch
                 string content = DateTime.UtcNow.ToString("O");
                 File.WriteAllText(FlagFilePath, content, System.Text.Encoding.UTF8);
 
-                Debug.Log($"[BugOneTouch] 비정상 종료 플래그 생성: {FlagFilePath}");
+                Debug.Log($"[BugBeacon] 비정상 종료 플래그 생성: {FlagFilePath}");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 비정상 종료 플래그 생성 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 비정상 종료 플래그 생성 실패 (무시): {ex.Message}");
             }
         }
 
@@ -153,12 +153,12 @@ namespace GaoZombie.BugOneTouch
                 if (File.Exists(FlagFilePath))
                 {
                     File.Delete(FlagFilePath);
-                    Debug.Log("[BugOneTouch] 비정상 종료 플래그 삭제 완료 (정상 종료).");
+                    Debug.Log("[BugBeacon] 비정상 종료 플래그 삭제 완료 (정상 종료).");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 비정상 종료 플래그 삭제 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 비정상 종료 플래그 삭제 실패 (무시): {ex.Message}");
             }
         }
 

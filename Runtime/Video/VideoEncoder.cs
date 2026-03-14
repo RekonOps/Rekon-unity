@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 영상 인코더 MVP 구현.
@@ -45,7 +45,7 @@ namespace GaoZombie.BugOneTouch
 
             if (frames == null || frames.Length == 0)
             {
-                Debug.LogWarning("[BugOneTouch] VideoEncoder: 인코딩할 프레임이 없습니다.");
+                Debug.LogWarning("[BugBeacon] VideoEncoder: 인코딩할 프레임이 없습니다.");
                 return;
             }
 
@@ -57,11 +57,11 @@ namespace GaoZombie.BugOneTouch
                 // 메타데이터 및 프레임 저장을 백그라운드에서 수행
                 await Task.Run(() => SaveFrameSequence(frames, outputPath, config));
 
-                Debug.Log($"[BugOneTouch] 영상 인코딩 완료: {outputPath} ({frames.Length}프레임)");
+                Debug.Log($"[BugBeacon] 영상 인코딩 완료: {outputPath} ({frames.Length}프레임)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 영상 인코딩 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 영상 인코딩 실패: {ex.Message}");
                 throw;
             }
         }

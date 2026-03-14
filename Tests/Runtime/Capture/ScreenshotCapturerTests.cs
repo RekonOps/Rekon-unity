@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// ScreenshotCapturer 단위 테스트.
@@ -14,18 +14,18 @@ namespace GaoZombie.BugOneTouch.Tests
     [TestFixture]
     public class ScreenshotCapturerTests
     {
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
         private ScreenshotCapturer _capturer;
         private string _tempDir;
 
         [SetUp]
         public void SetUp()
         {
-            _settings = ScriptableObject.CreateInstance<BugOneTouchSettings>();
+            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
             _settings.screenshotDownscale = 1;
             _capturer = new ScreenshotCapturer(_settings);
 
-            _tempDir = Path.Combine(Path.GetTempPath(), "BugOneTouchTests_" + System.Guid.NewGuid().ToString("N"));
+            _tempDir = Path.Combine(Path.GetTempPath(), "BugBeaconTests_" + System.Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_tempDir);
         }
 

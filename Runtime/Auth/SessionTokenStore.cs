@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// JWT 세션 토큰을 AES-256 암호화하여 EditorPrefs(에디터) 또는 PlayerPrefs(빌드)에 저장합니다.
@@ -17,8 +17,8 @@ namespace GaoZombie.BugOneTouch
     {
         // ─── 상수 ─────────────────────────────────────────────────────────────────
 
-        private const string JiraPrefsKey = "GaoZombie.BugOneTouch.SessionToken";
-        private const string SupabasePrefsKey = "GaoZombie.BugOneTouch.SupabaseToken";
+        private const string JiraPrefsKey = "GaoZombie.BugBeacon.SessionToken";
+        private const string SupabasePrefsKey = "GaoZombie.BugBeacon.SupabaseToken";
         private const int Pbkdf2Iterations = 100_000;
         private const int AesKeySize = 32;       // 256 비트
         private const int AesIvSize = 16;        // 128 비트
@@ -43,7 +43,7 @@ namespace GaoZombie.BugOneTouch
         /// SessionTokenStore를 초기화합니다.
         /// </summary>
         /// <param name="packageName">패키지명 (키 파생에 사용됨)</param>
-        public SessionTokenStore(string packageName = "com.gaozombie.bug-onetouch")
+        public SessionTokenStore(string packageName = "com.gaozombie.bugbeacon")
         {
             _packageName = packageName;
         }

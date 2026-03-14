@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// R2 Signed URL을 사용하여 파일을 PUT 업로드하는 클래스.
@@ -85,7 +85,7 @@ namespace GaoZombie.BugOneTouch
                 try
                 {
                     await PutUploadAsync(signedUrl, fileData, contentType, fileName, ct);
-                    Debug.Log($"[BugOneTouch] R2 업로드 완료: {fileName} ({fileData.Length / 1024}KB)");
+                    Debug.Log($"[BugBeacon] R2 업로드 완료: {fileName} ({fileData.Length / 1024}KB)");
                     return new UploadResult { Success = true, FileId = fileId, FileName = fileName };
                 }
                 catch (OperationCanceledException) { throw; }
@@ -96,7 +96,7 @@ namespace GaoZombie.BugOneTouch
                     if (attempt <= MaxRetryCount)
                     {
                         float delay = RetryBaseDelaySeconds * Mathf.Pow(2f, attempt - 1);
-                        Debug.LogWarning($"[BugOneTouch] R2 업로드 실패 ({fileName}, 시도 {attempt}/{MaxRetryCount + 1}), {delay:F1}초 후 재시도: {ex.Message}");
+                        Debug.LogWarning($"[BugBeacon] R2 업로드 실패 ({fileName}, 시도 {attempt}/{MaxRetryCount + 1}), {delay:F1}초 후 재시도: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), ct);
                     }
                 }

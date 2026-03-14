@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch.Tests.Integration
+namespace GaoZombie.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.1 E2E 통합 테스트 - 오프라인→재시도 플로우.
@@ -33,8 +33,8 @@ namespace GaoZombie.BugOneTouch.Tests.Integration
             // 각 테스트마다 독립된 임시 디렉토리 사용
             _tempBundlesRoot = Path.Combine(
                 Path.GetTempPath(),
-                "BugOneTouch_Retry_" + Guid.NewGuid().ToString("N")[..8],
-                "BugOneTouch",
+                "BugBeacon_Retry_" + Guid.NewGuid().ToString("N")[..8],
+                "BugBeacon",
                 "bundles");
             Directory.CreateDirectory(_tempBundlesRoot);
             _testBundleId = null;

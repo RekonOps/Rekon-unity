@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// Camera.main을 이용해 설정된 FPS에 맞춰 프레임을 캡처하여 FrameRingBuffer에 저장합니다.
@@ -47,7 +47,7 @@ namespace GaoZombie.BugOneTouch
             _renderTexture = new RenderTexture(_config.Width, _config.Height, 24, RenderTextureFormat.ARGB32);
             _renderTexture.Create();
 
-            Debug.Log($"[BugOneTouch] FrameCapturer 초기화: {_config.Width}x{_config.Height}@{_config.Fps}fps, " +
+            Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_config.Width}x{_config.Height}@{_config.Fps}fps, " +
                       $"AsyncGPUReadback={_asyncGpuReadbackSupported}");
         }
 
@@ -58,7 +58,7 @@ namespace GaoZombie.BugOneTouch
         {
             if (_ringBuffer == null)
             {
-                Debug.LogError("[BugOneTouch] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
+                Debug.LogError("[BugBeacon] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
                 return;
             }
             _isCapturing = true;
@@ -107,7 +107,7 @@ namespace GaoZombie.BugOneTouch
             var camera = Camera.main;
             if (camera == null)
             {
-                Debug.LogWarning("[BugOneTouch] Camera.main이 없습니다. 프레임 캡처 건너뜀.");
+                Debug.LogWarning("[BugBeacon] Camera.main이 없습니다. 프레임 캡처 건너뜀.");
                 return;
             }
 
@@ -138,7 +138,7 @@ namespace GaoZombie.BugOneTouch
             {
                 if (request.hasError)
                 {
-                    Debug.LogWarning("[BugOneTouch] AsyncGPUReadback 실패. ReadPixels로 폴백 없음.");
+                    Debug.LogWarning("[BugBeacon] AsyncGPUReadback 실패. ReadPixels로 폴백 없음.");
                     return;
                 }
 

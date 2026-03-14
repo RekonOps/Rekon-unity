@@ -1,4 +1,4 @@
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 프레임 캡처 인터페이스.

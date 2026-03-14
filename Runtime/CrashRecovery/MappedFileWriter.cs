@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// FileStream 기반 원자적 파일 쓰기 유틸리티.
@@ -71,7 +71,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 파일 쓰기 실패 ({filePath}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 파일 쓰기 실패 ({filePath}): {ex.Message}");
                 TryCleanupTemp(tempPath);
                 return false;
             }

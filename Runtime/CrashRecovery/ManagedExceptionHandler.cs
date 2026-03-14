@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// C# Managed Exception을 감지하여 크래시 번들을 생성하는 클래스.
@@ -59,7 +59,7 @@ namespace GaoZombie.BugOneTouch
             // Unity 로그 콜백 등록 (메인 스레드 전용)
             Application.logMessageReceived += OnLogReceived;
 
-            Debug.Log("[BugOneTouch] ManagedExceptionHandler 초기화 완료. Exception 감지 시작.");
+            Debug.Log("[BugBeacon] ManagedExceptionHandler 초기화 완료. Exception 감지 시작.");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ namespace GaoZombie.BugOneTouch
             Application.logMessageReceived -= OnLogReceived;
             _disposed = true;
 
-            Debug.Log("[BugOneTouch] ManagedExceptionHandler 정리 완료.");
+            Debug.Log("[BugBeacon] ManagedExceptionHandler 정리 완료.");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -111,18 +111,18 @@ namespace GaoZombie.BugOneTouch
             // 쿨다운 중이면 무시
             if (IsOnCooldown)
             {
-                Debug.LogWarning($"[BugOneTouch] Exception 감지 (쿨다운 중, 무시): {condition}");
+                Debug.LogWarning($"[BugBeacon] Exception 감지 (쿨다운 중, 무시): {condition}");
                 return;
             }
 
             // 이미 번들 생성 중이면 무시
             if (_isBuildingBundle)
             {
-                Debug.LogWarning("[BugOneTouch] Exception 감지 (번들 생성 중, 무시)");
+                Debug.LogWarning("[BugBeacon] Exception 감지 (번들 생성 중, 무시)");
                 return;
             }
 
-            Debug.LogWarning($"[BugOneTouch] Managed Exception 감지! 크래시 번들을 생성합니다: {condition}");
+            Debug.LogWarning($"[BugBeacon] Managed Exception 감지! 크래시 번들을 생성합니다: {condition}");
 
             // 예외 타입 추출 (예: "NullReferenceException: Object reference not set...")
             string exceptionType = ExtractExceptionType(condition);
@@ -155,17 +155,17 @@ namespace GaoZombie.BugOneTouch
 
                 if (manifest != null)
                 {
-                    Debug.Log($"[BugOneTouch] 크래시 번들 생성 완료: {manifest.id}");
+                    Debug.Log($"[BugBeacon] 크래시 번들 생성 완료: {manifest.id}");
                     OnCrashBundleCreated?.Invoke(manifest);
                 }
                 else
                 {
-                    Debug.LogWarning("[BugOneTouch] 크래시 번들 생성 실패 (null 반환).");
+                    Debug.LogWarning("[BugBeacon] 크래시 번들 생성 실패 (null 반환).");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 크래시 번들 생성 중 예외: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 크래시 번들 생성 중 예외: {ex.Message}");
             }
             finally
             {

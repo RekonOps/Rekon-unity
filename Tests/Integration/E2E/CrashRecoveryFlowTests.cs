@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch.Tests.Integration
+namespace GaoZombie.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.1 E2E 통합 테스트 - 크래시 복구 전체 플로우.
@@ -38,11 +38,11 @@ namespace GaoZombie.BugOneTouch.Tests.Integration
             // 각 테스트마다 독립된 임시 디렉토리 구성
             string testRoot = Path.Combine(
                 Path.GetTempPath(),
-                "BugOneTouch_CrashRecovery_" + Guid.NewGuid().ToString("N")[..8]);
+                "BugBeacon_CrashRecovery_" + Guid.NewGuid().ToString("N")[..8]);
 
-            _tempCrashRecoveryDir = Path.Combine(testRoot, "BugOneTouch", "crash_recovery");
+            _tempCrashRecoveryDir = Path.Combine(testRoot, "BugBeacon", "crash_recovery");
             _tempActiveDir = Path.Combine(_tempCrashRecoveryDir, "active");
-            _tempCrashBundlesDir = Path.Combine(testRoot, "BugOneTouch", "crash_bundles");
+            _tempCrashBundlesDir = Path.Combine(testRoot, "BugBeacon", "crash_bundles");
             _tempFlagFilePath = Path.Combine(_tempCrashRecoveryDir, AbnormalExitDetector.FlagFileName);
 
             Directory.CreateDirectory(_tempCrashRecoveryDir);

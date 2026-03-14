@@ -9,7 +9,7 @@ using UnityEngine.Networking;
 using UnityEditor;
 #endif
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 라이선스 검증 클라이언트.
@@ -105,7 +105,7 @@ namespace GaoZombie.BugOneTouch
         private const float GracePeriodHours = 72f;
 
         /// <summary>캐시 저장 키</summary>
-        private const string CachePrefsKey = "GaoZombie.BugOneTouch.LicenseCache";
+        private const string CachePrefsKey = "GaoZombie.BugBeacon.LicenseCache";
 
         /// <summary>HTTP 요청 최대 재시도 횟수</summary>
         private const int MaxRetryCount = 3;
@@ -179,7 +179,7 @@ namespace GaoZombie.BugOneTouch
                     // 유효한 라이선스 → 캐시 저장 및 이벤트 발생
                     _cachedLicense = licenseInfo;
                     SaveCacheToPrefs(licenseInfo);
-                    Debug.Log($"[BugOneTouch] 라이선스 검증 성공: plan={licenseInfo.Plan}, " +
+                    Debug.Log($"[BugBeacon] 라이선스 검증 성공: plan={licenseInfo.Plan}, " +
                               $"workspace={licenseInfo.WorkspaceName}");
                     OnLicenseValidated?.Invoke(licenseInfo);
                 }
@@ -188,7 +188,7 @@ namespace GaoZombie.BugOneTouch
                     // 서버가 invalid를 반환
                     _cachedLicense = licenseInfo;
                     ClearCache();
-                    Debug.LogWarning("[BugOneTouch] 라이선스 무효: " +
+                    Debug.LogWarning("[BugBeacon] 라이선스 무효: " +
                                      $"reason={licenseInfo.Plan ?? "unknown"}");
                     OnLicenseInvalid?.Invoke(responseJson);
                 }
@@ -202,13 +202,13 @@ namespace GaoZombie.BugOneTouch
             catch (Exception ex) when (ex is NetworkException || ex is AggregateException)
             {
                 // 네트워크/서버 오류 → Grace Period 내 캐시 사용
-                Debug.LogWarning($"[BugOneTouch] 라이선스 검증 네트워크 오류: {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 라이선스 검증 네트워크 오류: {ex.Message}");
                 return HandleNetworkFailure(ex);
             }
             catch (Exception ex)
             {
                 // JSON 파싱 오류 등 비네트워크 오류 → 캐시 사용하지 않고 실패 반환
-                Debug.LogError($"[BugOneTouch] 라이선스 검증 처리 오류: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 라이선스 검증 처리 오류: {ex.Message}");
                 var invalidInfo = new LicenseInfo
                 {
                     Valid = false,
@@ -311,7 +311,7 @@ namespace GaoZombie.BugOneTouch
                     if (attempt < MaxRetryCount)
                     {
                         float delay = RetryBaseDelaySeconds * Mathf.Pow(2f, attempt - 1);
-                        Debug.LogWarning($"[BugOneTouch] 라이선스 검증 요청 실패 " +
+                        Debug.LogWarning($"[BugBeacon] 라이선스 검증 요청 실패 " +
                                          $"(시도 {attempt}/{MaxRetryCount}), " +
                                          $"{delay:F1}초 후 재시도. 에러: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
@@ -494,14 +494,14 @@ namespace GaoZombie.BugOneTouch
                 if (IsWithinGracePeriod(_cachedLicense.LastCheckedAt))
                 {
                     var elapsed = (DateTime.UtcNow - _cachedLicense.LastCheckedAt).TotalHours;
-                    Debug.LogWarning($"[BugOneTouch] 네트워크 실패 → Grace Period 캐시 사용 " +
+                    Debug.LogWarning($"[BugBeacon] 네트워크 실패 → Grace Period 캐시 사용 " +
                                      $"(경과: {elapsed:F1}시간 / {GracePeriodHours}시간)");
                     return _cachedLicense;
                 }
                 else
                 {
                     // Grace Period 초과 → 라이선스 무효 처리
-                    Debug.LogError("[BugOneTouch] Grace Period 초과 → 라이선스 무효 처리");
+                    Debug.LogError("[BugBeacon] Grace Period 초과 → 라이선스 무효 처리");
                     _cachedLicense.Valid = false;
                     ClearCache();
                     OnLicenseInvalid?.Invoke("Grace Period 초과로 라이선스가 무효 처리되었습니다.");
@@ -510,7 +510,7 @@ namespace GaoZombie.BugOneTouch
             }
 
             // 캐시 없음 → 무효 정보 반환
-            Debug.LogError("[BugOneTouch] 라이선스 검증 실패 (캐시 없음)");
+            Debug.LogError("[BugBeacon] 라이선스 검증 실패 (캐시 없음)");
             var invalidInfo = new LicenseInfo
             {
                 Valid = false,
@@ -556,11 +556,11 @@ namespace GaoZombie.BugOneTouch
                 var json = JsonUtility.ToJson(cache);
                 // SessionTokenStore의 암호화를 활용하여 위변조 방지
                 _tokenStore.Save(json, CachePrefsKey);
-                Debug.Log("[BugOneTouch] 라이선스 캐시 저장 완료 (암호화)");
+                Debug.Log("[BugBeacon] 라이선스 캐시 저장 완료 (암호화)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 라이선스 캐시 저장 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 라이선스 캐시 저장 실패: {ex.Message}");
             }
         }
 
@@ -612,12 +612,12 @@ namespace GaoZombie.BugOneTouch
                     }
                 }
 
-                Debug.Log("[BugOneTouch] 라이선스 캐시 로드 완료");
+                Debug.Log("[BugBeacon] 라이선스 캐시 로드 완료");
                 return info;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 라이선스 캐시 로드 실패: {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 라이선스 캐시 로드 실패: {ex.Message}");
                 return null;
             }
         }

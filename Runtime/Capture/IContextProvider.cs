@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 커스텀 K/V 컨텍스트 데이터를 제공하는 인터페이스.

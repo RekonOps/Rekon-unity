@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// LogMasker 및 MaskingRuleLoader 단위 테스트.

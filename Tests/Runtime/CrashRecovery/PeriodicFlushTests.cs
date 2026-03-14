@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// PeriodicFlushManager 및 MappedFileWriter 단위 테스트.

@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// HotkeyManager 단위 테스트.
@@ -50,7 +50,7 @@ namespace GaoZombie.BugOneTouch.Tests
 
         private GameObject _gameObject;
         private HotkeyManager _manager;
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
 
         [SetUp]
         public void SetUp()
@@ -58,7 +58,7 @@ namespace GaoZombie.BugOneTouch.Tests
             _gameObject = new GameObject("HotkeyManagerTest");
             _manager = _gameObject.AddComponent<HotkeyManager>();
 
-            _settings = ScriptableObject.CreateInstance<BugOneTouchSettings>();
+            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
             _settings.captureHotkey = KeyCode.F12;
             _manager.SetSettings(_settings);
         }

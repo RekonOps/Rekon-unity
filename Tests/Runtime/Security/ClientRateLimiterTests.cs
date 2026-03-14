@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// ClientRateLimiter 단위 테스트.

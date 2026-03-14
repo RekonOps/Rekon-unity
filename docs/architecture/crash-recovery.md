@@ -2,7 +2,7 @@
 
 ## 개요
 
-Bug-OneTouch Unity 플러그인의 크래시 복구 시스템은 게임이 비정상 종료(크래시, Managed Exception, 강제 종료)
+BugBeacon Unity 플러그인의 크래시 복구 시스템은 게임이 비정상 종료(크래시, Managed Exception, 강제 종료)
 될 경우 직전까지의 로그·상태·영상을 보존하고, 다음 실행 시 Jira 이슈로 자동 제출할 수 있도록
 지원합니다.
 
@@ -34,7 +34,7 @@ Bug-OneTouch Unity 플러그인의 크래시 복구 시스템은 게임이 비�
 ## 2. 디렉토리 구조
 
 ```
-{persistentDataPath}/BugOneTouch/
+{persistentDataPath}/BugBeacon/
 ├── crash_recovery/
 │   ├── active/                     # 레이어 1 주기적 플러시 데이터
 │   │   ├── logs_flush.zip          # 최신 로그 스냅샷
@@ -131,7 +131,7 @@ flag 파일 생성 (abnormal_exit.flag)
 
 ## 5. 구성 요소 목록
 
-### Runtime (GaoZombie.BugOneTouch)
+### Runtime (GaoZombie.BugBeacon)
 
 | 파일 | 역할 |
 |---|---|
@@ -142,7 +142,7 @@ flag 파일 생성 (abnormal_exit.flag)
 | `Runtime/CrashRecovery/ManagedExceptionHandler.cs` | 레이어 2 Managed Exception 감지 |
 | `Runtime/CrashRecovery/CrashBundleRetentionPolicy.cs` | 번들 보존 정책 (FIFO + 기간) |
 
-### Editor (GaoZombie.BugOneTouch.Editor)
+### Editor (GaoZombie.BugBeacon.Editor)
 
 | 파일 | 역할 |
 |---|---|

@@ -1,4 +1,4 @@
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 캡처 파이프라인 진행 상황을 나타내는 이벤트 데이터.

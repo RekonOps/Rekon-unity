@@ -5,14 +5,14 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 크래시 발생 시 active/ 디렉토리의 플러시 데이터를 수집하여
     /// crash_bundles/ 에 크래시 번들을 생성하는 클래스.
     ///
     /// 크래시 번들 구조:
-    ///   {persistentDataPath}/BugOneTouch/crash_bundles/{timestamp}/
+    ///   {persistentDataPath}/BugBeacon/crash_bundles/{timestamp}/
     ///   ├── manifest.json       (type: "crash", data_integrity 포함)
     ///   ├── logs_flush.zip      (active/에서 복사)
     ///   ├── state_flush.json    (active/에서 복사)
@@ -57,7 +57,7 @@ namespace GaoZombie.BugOneTouch
 
         /// <summary>크래시 번들 저장 루트 디렉토리 경로</summary>
         public static string CrashBundlesDir =>
-            _crashBundlesDir ??= Path.Combine(Application.persistentDataPath, "BugOneTouch", CrashBundlesDirName);
+            _crashBundlesDir ??= Path.Combine(Application.persistentDataPath, "BugBeacon", CrashBundlesDirName);
 
         // ──────────────────────────────────────────────────────────────
         // 생성자
@@ -113,13 +113,13 @@ namespace GaoZombie.BugOneTouch
                 // active/ 디렉토리 클린업
                 CleanupActiveDir(activeDir);
 
-                Debug.Log($"[BugOneTouch] 크래시 번들 생성 완료: {bundleDir} (무결성: {integrity.overall})");
+                Debug.Log($"[BugBeacon] 크래시 번들 생성 완료: {bundleDir} (무결성: {integrity.overall})");
 
                 return manifest;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 크래시 번들 생성 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 크래시 번들 생성 실패: {ex.Message}");
 
                 // 실패한 번들 디렉토리 정리
                 TryDeleteDirectory(bundleDir);
@@ -161,7 +161,7 @@ namespace GaoZombie.BugOneTouch
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugOneTouch] 크래시 번들 manifest 파싱 실패 ({dir}): {ex.Message}");
+                    Debug.LogWarning($"[BugBeacon] 크래시 번들 manifest 파싱 실패 ({dir}): {ex.Message}");
                 }
             }
 
@@ -222,7 +222,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 파일 복사 실패 ({src} → {dst}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 파일 복사 실패 ({src} → {dst}): {ex.Message}");
                 return false;
             }
         }
@@ -242,7 +242,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 디렉토리 복사 실패 ({src} → {dst}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 디렉토리 복사 실패 ({src} → {dst}): {ex.Message}");
                 return false;
             }
         }
@@ -385,11 +385,11 @@ namespace GaoZombie.BugOneTouch
                     TryDeleteDirectory(dir);
                 }
 
-                Debug.Log("[BugOneTouch] active/ 디렉토리 클린업 완료.");
+                Debug.Log("[BugBeacon] active/ 디렉토리 클린업 완료.");
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] active/ 클린업 실패 (무시): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] active/ 클린업 실패 (무시): {ex.Message}");
             }
         }
 
@@ -405,7 +405,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] 디렉토리 삭제 실패 ({path}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] 디렉토리 삭제 실패 ({path}): {ex.Message}");
             }
         }
     }

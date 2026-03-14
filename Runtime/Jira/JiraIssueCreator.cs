@@ -5,16 +5,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// Jira 이슈를 생성합니다.
     /// POST /rest/api/3/issue
     /// ADF(Atlassian Document Format)로 설명을 작성하고,
-    /// BugOneTouchSettings의 defaultLabels를 자동으로 추가합니다.
+    /// BugBeaconSettings의 defaultLabels를 자동으로 추가합니다.
     ///
     /// ⚠️ JAM.dev 패턴 적용 (ADR-047):
-    /// 이 클래스는 웹 대시보드(Bug-OneTouch-web)의 push-to-jira API에서만 호출됩니다.
+    /// 이 클래스는 웹 대시보드(BugBeacon-web)의 push-to-jira API에서만 호출됩니다.
     /// Unity 플러그인(런타임)에서는 직접 호출하지 마세요.
     /// Unity → Web Backend → Jira 순서로만 동작해야 합니다.
     /// </summary>
@@ -23,7 +23,7 @@ namespace GaoZombie.BugOneTouch
         // ─── 내부 상태 ─────────────────────────────────────────────────────────────
 
         private readonly JiraApiClient _apiClient;
-        private readonly BugOneTouchSettings _settings;
+        private readonly BugBeaconSettings _settings;
 
         // ─── 요청/응답 모델 ────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ namespace GaoZombie.BugOneTouch
             /// <summary>이슈 설명 (일반 텍스트, 내부에서 ADF로 변환)</summary>
             public string Description { get; set; }
 
-            /// <summary>추가 레이블 목록 (BugOneTouchSettings.defaultLabels가 자동 추가됨)</summary>
+            /// <summary>추가 레이블 목록 (BugBeaconSettings.defaultLabels가 자동 추가됨)</summary>
             public string[] AdditionalLabels { get; set; } = Array.Empty<string>();
 
             /// <summary>우선순위 이름 (예: "High", "Medium", "Low")</summary>
@@ -93,8 +93,8 @@ namespace GaoZombie.BugOneTouch
         /// JiraIssueCreator를 초기화합니다.
         /// </summary>
         /// <param name="apiClient">Jira API 클라이언트</param>
-        /// <param name="settings">Bug OneTouch 설정 (defaultLabels 참조)</param>
-        public JiraIssueCreator(JiraApiClient apiClient, BugOneTouchSettings settings)
+        /// <param name="settings">BugBeacon 설정 (defaultLabels 참조)</param>
+        public JiraIssueCreator(JiraApiClient apiClient, BugBeaconSettings settings)
         {
             _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));

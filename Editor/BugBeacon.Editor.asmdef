@@ -1,7 +1,7 @@
 {
-  "name": "BugOneTouch.Editor",
-  "rootNamespace": "GaoZombie.BugOneTouch.Editor",
-  "references": ["BugOneTouch.Runtime"],
+  "name": "BugBeacon.Editor",
+  "rootNamespace": "GaoZombie.BugBeacon.Editor",
+  "references": ["BugBeacon.Runtime"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

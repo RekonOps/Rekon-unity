@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// JSON 설정 파일에서 커스텀 마스킹 규칙을 로드하여 LogMasker에 주입하는 클래스.
@@ -211,7 +211,7 @@ namespace GaoZombie.BugOneTouch
                 "..",
                 "Library",
                 "PackageCache",
-                "com.gaozombie.bug-onetouch",
+                "com.gaozombie.bugbeacon",
                 "Settings",
                 "masking-rules.json"
             );
@@ -220,12 +220,12 @@ namespace GaoZombie.BugOneTouch
             if (File.Exists(packageCachePath))
                 return packageCachePath;
 
-            // 개발 환경(Packages/com.gaozombie.bug-onetouch) 경로
+            // 개발 환경(Packages/com.gaozombie.bugbeacon) 경로
             var devPackagePath = Path.Combine(
                 Application.dataPath,
                 "..",
                 "Packages",
-                "com.gaozombie.bug-onetouch",
+                "com.gaozombie.bugbeacon",
                 "Settings",
                 "masking-rules.json"
             );

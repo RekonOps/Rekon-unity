@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 로그 문자열 내 민감 정보(이메일, IP, 토큰 등)를 마스킹하는 유틸리티 클래스.

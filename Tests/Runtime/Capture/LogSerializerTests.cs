@@ -4,9 +4,9 @@ using System.IO.Compression;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// LogSerializer 단위 테스트.
@@ -106,7 +106,7 @@ namespace GaoZombie.BugOneTouch.Tests
 
             string result = _serializer.Serialize(entries);
 
-            StringAssert.Contains("Bug-OneTouch", result);
+            StringAssert.Contains("BugBeacon", result);
             StringAssert.Contains("항목 수: 1", result);
         }
 

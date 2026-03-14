@@ -6,10 +6,10 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEditor;
-using GaoZombie.BugOneTouch;
-using GaoZombie.BugOneTouch.Editor;
+using GaoZombie.BugBeacon;
+using GaoZombie.BugBeacon.Editor;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// BundleManagerWindow 에디터 모드 단위 테스트.
@@ -69,8 +69,8 @@ namespace GaoZombie.BugOneTouch.Tests
         {
             // 메뉴 경로 상수 검증
             Assert.AreEqual(
-                "Window/Bug-OneTouch",
-                BugOneTouchEditorInfo.MenuRoot,
+                "Window/BugBeacon",
+                BugBeaconEditorInfo.MenuRoot,
                 "메뉴 루트 경로가 일치해야 합니다.");
         }
 
@@ -222,8 +222,8 @@ namespace GaoZombie.BugOneTouch.Tests
         public void MenuPath_Settings_IsCorrect()
         {
             Assert.AreEqual(
-                "Window/Bug-OneTouch/Settings",
-                BugOneTouchEditorInfo.MenuRoot + "/Settings",
+                "Window/BugBeacon/Settings",
+                BugBeaconEditorInfo.MenuRoot + "/Settings",
                 "Settings 메뉴 경로가 올바라야 합니다.");
         }
 
@@ -231,8 +231,8 @@ namespace GaoZombie.BugOneTouch.Tests
         public void MenuPath_Bundles_IsCorrect()
         {
             Assert.AreEqual(
-                "Window/Bug-OneTouch/Bundles",
-                BugOneTouchEditorInfo.MenuRoot + "/Bundles",
+                "Window/BugBeacon/Bundles",
+                BugBeaconEditorInfo.MenuRoot + "/Bundles",
                 "Bundles 메뉴 경로가 올바라야 합니다.");
         }
 

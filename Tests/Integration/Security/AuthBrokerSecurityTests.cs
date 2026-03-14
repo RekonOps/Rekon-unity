@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch.Tests.Integration
+namespace GaoZombie.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.3 보안 테스트 - Auth Broker 보안.

@@ -3,7 +3,7 @@ using System;
 using System.Diagnostics;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// FFmpeg 설치 상태를 감지하는 유틸리티 클래스.
@@ -40,7 +40,7 @@ namespace GaoZombie.BugOneTouch
                 }
 
                 _isInstalled = false;
-                UnityEngine.Debug.LogWarning("[BugOneTouch] FFmpeg가 설치되어 있지 않습니다.");
+                UnityEngine.Debug.LogWarning("[BugBeacon] FFmpeg가 설치되어 있지 않습니다.");
                 return _isInstalled.Value;
             }
         }
@@ -82,7 +82,7 @@ namespace GaoZombie.BugOneTouch
                         _versionInfo = firstLine.Trim();
                         _ffmpegPath = executablePath;
                         _isInstalled = true;
-                        UnityEngine.Debug.Log($"[BugOneTouch] FFmpeg 감지됨: {_versionInfo} (경로: {executablePath})");
+                        UnityEngine.Debug.Log($"[BugBeacon] FFmpeg 감지됨: {_versionInfo} (경로: {executablePath})");
                         return true;
                     }
                 }
@@ -91,7 +91,7 @@ namespace GaoZombie.BugOneTouch
             catch (System.IO.FileNotFoundException) { /* 파일 없음 */ }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[BugOneTouch] FFmpeg 감지 중 오류 ({executablePath}): {ex.GetType().Name}");
+                UnityEngine.Debug.LogWarning($"[BugBeacon] FFmpeg 감지 중 오류 ({executablePath}): {ex.GetType().Name}");
             }
             return false;
         }
@@ -161,7 +161,7 @@ namespace GaoZombie.BugOneTouch
     }
 }
 #else
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 모바일 등 미지원 플랫폼에서의 FFmpeg 스텁 구현.

@@ -4,7 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch.Editor
+namespace GaoZombie.BugBeacon.Editor
 {
     /// <summary>
     /// 크래시 번들 목록을 표시하고 Jira 제출을 지원하는 EditorWindow.
@@ -16,7 +16,7 @@ namespace GaoZombie.BugOneTouch.Editor
     ///   - 상태: unregistered / registered
     ///   - Jira 제출 버튼
     ///
-    /// 메뉴: Window/Bug-OneTouch/Crash Recovery
+    /// 메뉴: Window/BugBeacon/Crash Recovery
     /// </summary>
     public class CrashRecoveryWindow : EditorWindow
     {
@@ -25,7 +25,7 @@ namespace GaoZombie.BugOneTouch.Editor
         // ──────────────────────────────────────────────────────────────
 
         private const string WindowTitle = "크래시 복구";
-        private const string MenuPath = BugOneTouchEditorInfo.MenuRoot + "/Crash Recovery";
+        private const string MenuPath = BugBeaconEditorInfo.MenuRoot + "/Crash Recovery";
 
         // UI 색상
         private static readonly Color ColorOk = new Color(0.2f, 0.8f, 0.2f);
@@ -495,7 +495,7 @@ namespace GaoZombie.BugOneTouch.Editor
         /// </summary>
         private static void OpenJiraIssue(string issueKey)
         {
-            var settings = BugOneTouchSettingsProvider.Settings;
+            var settings = BugBeaconSettingsProvider.Settings;
             if (settings != null && !string.IsNullOrEmpty(settings.jiraSiteUrl))
             {
                 string url = $"{settings.jiraSiteUrl}/browse/{issueKey}";
@@ -503,7 +503,7 @@ namespace GaoZombie.BugOneTouch.Editor
             }
             else
             {
-                Debug.LogWarning($"[BugOneTouch] Jira 사이트 URL이 설정되지 않았습니다. Settings에서 구성하세요. 이슈 키: {issueKey}");
+                Debug.LogWarning($"[BugBeacon] Jira 사이트 URL이 설정되지 않았습니다. Settings에서 구성하세요. 이슈 키: {issueKey}");
             }
         }
 

@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// AbnormalExitDetector 단위 테스트.

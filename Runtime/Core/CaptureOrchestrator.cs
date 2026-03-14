@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 캡처 파이프라인 전체를 조율하는 오케스트레이터.
@@ -30,7 +30,7 @@ namespace GaoZombie.BugOneTouch
         private readonly FrameRingBuffer _frameBuffer;
         private readonly IVideoEncoder _videoEncoder;
         private readonly VideoEncoderConfig _videoConfig;
-        private readonly BugOneTouchSettings _settings;
+        private readonly BugBeaconSettings _settings;
 
         private HotkeyManager _hotkeyManager;
         private bool _disposed;
@@ -53,7 +53,7 @@ namespace GaoZombie.BugOneTouch
             FrameRingBuffer frameBuffer,
             IVideoEncoder videoEncoder,
             VideoEncoderConfig videoConfig,
-            BugOneTouchSettings settings)
+            BugBeaconSettings settings)
         {
             _screenshotCapturer = screenshotCapturer ?? throw new ArgumentNullException(nameof(screenshotCapturer));
             _logCollector = logCollector ?? throw new ArgumentNullException(nameof(logCollector));
@@ -87,7 +87,7 @@ namespace GaoZombie.BugOneTouch
         {
             if (_isCapturing)
             {
-                Debug.LogWarning("[BugOneTouch] 이미 캡처가 진행 중입니다.");
+                Debug.LogWarning("[BugBeacon] 이미 캡처가 진행 중입니다.");
                 return null;
             }
 
@@ -118,12 +118,12 @@ namespace GaoZombie.BugOneTouch
             }
             catch (OperationCanceledException)
             {
-                Debug.LogWarning($"[BugOneTouch] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
+                Debug.LogWarning($"[BugBeacon] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
                 ReportProgress("complete", 1.0f, "타임아웃");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 캡처 중 예기치 않은 오류: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 캡처 중 예기치 않은 오류: {ex.Message}");
             }
             finally
             {
@@ -176,7 +176,7 @@ namespace GaoZombie.BugOneTouch
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 스크린샷 캡처 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 스크린샷 캡처 실패: {ex.Message}");
                 ReportProgress("screenshot", 0.25f, ex.Message);
             }
         }
@@ -197,7 +197,7 @@ namespace GaoZombie.BugOneTouch
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 로그 수집 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 로그 수집 실패: {ex.Message}");
                 ReportProgress("logs", 0.50f, ex.Message);
             }
         }
@@ -223,7 +223,7 @@ namespace GaoZombie.BugOneTouch
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 상태 수집 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 상태 수집 실패: {ex.Message}");
                 ReportProgress("state", 0.75f, ex.Message);
             }
         }
@@ -281,7 +281,7 @@ namespace GaoZombie.BugOneTouch
 
                             int nextCrf = crfSteps[attempt];
                             Debug.LogWarning(
-                                $"[BugOneTouch] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                $"[BugBeacon] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
                                 $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
                                 $"CRF {nextCrf}으로 재인코딩합니다. (시도 {attempt + 1}/2)");
 
@@ -335,7 +335,7 @@ namespace GaoZombie.BugOneTouch
                             if (finalSize > activeConfig.TargetMaxSizeBytes)
                             {
                                 Debug.LogWarning(
-                                    $"[BugOneTouch] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                    $"[BugBeacon] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
                                     $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
                                     "Jira 업로드 시 거부될 수 있습니다.");
                             }
@@ -350,7 +350,7 @@ namespace GaoZombie.BugOneTouch
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 영상 수집 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 영상 수집 실패: {ex.Message}");
                 ReportProgress("video", 1.0f, ex.Message);
             }
         }
@@ -359,7 +359,7 @@ namespace GaoZombie.BugOneTouch
         {
             string tempBase = Path.Combine(
                 Application.temporaryCachePath,
-                "BugOneTouch",
+                "BugBeacon",
                 timestamp.ToString("yyyyMMdd_HHmmss_fff"));
 
             Directory.CreateDirectory(tempBase);
@@ -375,7 +375,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] OnProgress 핸들러 오류: {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] OnProgress 핸들러 오류: {ex.Message}");
             }
         }
     }

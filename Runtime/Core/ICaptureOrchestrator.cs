@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 캡처 파이프라인 오케스트레이터 인터페이스.

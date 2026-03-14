@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 로컬 디스크에 저장된 번들 목록을 관리하는 저장소 클래스.
@@ -103,7 +103,7 @@ namespace GaoZombie.BugOneTouch
                 manifest.state = newState;
                 WriteManifestAtomic(manifest, manifestPath);
 
-                Debug.Log($"[BugOneTouch] 번들 상태 변경: {bundleId} → {newState}");
+                Debug.Log($"[BugBeacon] 번들 상태 변경: {bundleId} → {newState}");
             });
         }
 
@@ -135,7 +135,7 @@ namespace GaoZombie.BugOneTouch
 
                 WriteManifestAtomic(manifest, manifestPath);
 
-                Debug.Log($"[BugOneTouch] 번들 제출 완료: {bundleId} → Jira={jiraIssueKey}");
+                Debug.Log($"[BugBeacon] 번들 제출 완료: {bundleId} → Jira={jiraIssueKey}");
             });
         }
 
@@ -163,7 +163,7 @@ namespace GaoZombie.BugOneTouch
                 manifest.retry_count++;
                 WriteManifestAtomic(manifest, manifestPath);
 
-                Debug.Log($"[BugOneTouch] 번들 재시도 횟수 증가: {bundleId} → {manifest.retry_count}회");
+                Debug.Log($"[BugBeacon] 번들 재시도 횟수 증가: {bundleId} → {manifest.retry_count}회");
                 return manifest.retry_count;
             });
         }
@@ -188,12 +188,12 @@ namespace GaoZombie.BugOneTouch
 
                 if (!Directory.Exists(bundleDir))
                 {
-                    Debug.LogWarning($"[BugOneTouch] 삭제할 번들 디렉토리가 없습니다: {bundleId}");
+                    Debug.LogWarning($"[BugBeacon] 삭제할 번들 디렉토리가 없습니다: {bundleId}");
                     return;
                 }
 
                 Directory.Delete(bundleDir, recursive: true);
-                Debug.Log($"[BugOneTouch] 번들 삭제 완료: {bundleId}");
+                Debug.Log($"[BugBeacon] 번들 삭제 완료: {bundleId}");
             });
         }
 
@@ -271,7 +271,7 @@ namespace GaoZombie.BugOneTouch
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] manifest.json 파싱 실패 ({manifestPath}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] manifest.json 파싱 실패 ({manifestPath}): {ex.Message}");
                 return null;
             }
         }

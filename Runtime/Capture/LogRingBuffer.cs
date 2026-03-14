@@ -1,13 +1,13 @@
 using System;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// Application.logMessageReceived 이벤트를 구독하여 로그를 순환 배열에 저장하는 링버퍼.
     ///
     /// 구조:
-    ///   - 고정 크기 배열 (capacity = BugOneTouchSettings.logBufferSize)
+    ///   - 고정 크기 배열 (capacity = BugBeaconSettings.logBufferSize)
     ///   - _head: 다음 쓸 위치 (쓰기 후 증가)
     ///   - _count: 현재 저장된 항목 수 (capacity를 넘으면 capacity 유지)
     ///

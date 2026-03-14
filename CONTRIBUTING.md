@@ -1,4 +1,4 @@
-# Contributing to Bug-OneTouch-unity
+# Contributing to BugBeacon-unity
 
 Thank you for your interest in contributing! This document outlines the process for reporting issues, proposing features, and submitting pull requests.
 
@@ -28,11 +28,11 @@ Please be respectful and professional in all interactions. We are committed to m
 1. **Fork** the repository on GitHub.
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/<your-username>/Bug-OneTouch-unity.git
+   git clone https://github.com/<your-username>/BugBeacon-unity.git
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/GaoZombie/Bug-OneTouch-unity.git
+   git remote add upstream https://github.com/GaoZombie/BugBeacon-unity.git
    ```
 4. Open the project in **Unity 2022.3 LTS** or later.
 
@@ -54,7 +54,7 @@ All pull requests should target the **`develop`** branch, unless it is a hotfix.
 
 ## How to Contribute
 
-1. Check existing [Issues](https://github.com/GaoZombie/Bug-OneTouch-unity/issues) to avoid duplicates.
+1. Check existing [Issues](https://github.com/GaoZombie/BugBeacon-unity/issues) to avoid duplicates.
 2. Create a new branch from `develop`:
    ```bash
    git checkout develop
@@ -132,4 +132,4 @@ Use the [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.md). P
 
 ---
 
-Thank you for helping make Bug-OneTouch-unity better!
+Thank you for helping make BugBeacon-unity better!

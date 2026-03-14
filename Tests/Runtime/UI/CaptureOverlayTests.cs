@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// CaptureOverlay Play Mode 단위 테스트.
@@ -74,8 +74,8 @@ namespace GaoZombie.BugOneTouch.Tests
         {
             _overlay = CaptureOverlay.EnsureInstance();
 
-            Assert.AreEqual("[BugOneTouch] CaptureOverlay", _overlay.gameObject.name,
-                "게임 오브젝트 이름이 '[BugOneTouch] CaptureOverlay'여야 합니다.");
+            Assert.AreEqual("[BugBeacon] CaptureOverlay", _overlay.gameObject.name,
+                "게임 오브젝트 이름이 '[BugBeacon] CaptureOverlay'여야 합니다.");
         }
 
         // ──────────────────────────────────────────────────────────────

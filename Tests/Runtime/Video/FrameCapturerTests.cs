@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugOneTouch;
+using GaoZombie.BugBeacon;
 
-namespace GaoZombie.BugOneTouch.Tests
+namespace GaoZombie.BugBeacon.Tests
 {
     /// <summary>
     /// FrameCapturer 단위 테스트.
@@ -17,12 +17,12 @@ namespace GaoZombie.BugOneTouch.Tests
         private FrameCapturer _capturer;
         private FrameRingBuffer _ringBuffer;
         private VideoEncoderConfig _config;
-        private BugOneTouchSettings _settings;
+        private BugBeaconSettings _settings;
 
         [SetUp]
         public void SetUp()
         {
-            _settings = ScriptableObject.CreateInstance<BugOneTouchSettings>();
+            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
             _settings.videoWidth = 320;
             _settings.videoHeight = 180;
             _settings.videoFps = 10;

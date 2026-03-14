@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch.Tests.Integration
+namespace GaoZombie.BugBeacon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.1 E2E 통합 테스트 - 핫키→번들→Jira 전체 플로우.
@@ -30,7 +30,7 @@ namespace GaoZombie.BugOneTouch.Tests.Integration
         public void SetUp()
         {
             // 각 테스트마다 독립된 임시 디렉토리 사용
-            _tempDir = Path.Combine(Path.GetTempPath(), "BugOneTouch_E2E_" + Guid.NewGuid().ToString("N")[..8]);
+            _tempDir = Path.Combine(Path.GetTempPath(), "BugBeacon_E2E_" + Guid.NewGuid().ToString("N")[..8]);
             Directory.CreateDirectory(_tempDir);
         }
 
@@ -78,7 +78,7 @@ namespace GaoZombie.BugOneTouch.Tests.Integration
 
             // Act - Mock을 통한 Jira 제출 시뮬레이션
             await mockBundleStateUpdater.UpdateSubmittingAsync("bundle-test-001");
-            var result = await mockJiraFacade.SubmitAsync("bundle-test-001", "TEST", "[BugOneTouch] E2E 테스트 이슈");
+            var result = await mockJiraFacade.SubmitAsync("bundle-test-001", "TEST", "[BugBeacon] E2E 테스트 이슈");
             await mockBundleStateUpdater.UpdateSubmittedAsync("bundle-test-001", result.IssueKey, result.IssueUrl);
 
             // Assert
@@ -154,7 +154,7 @@ namespace GaoZombie.BugOneTouch.Tests.Integration
             string errorMessage = null;
             try
             {
-                var result = await mockJiraFacade.SubmitAsync("bundle-fail-001", "TEST", "[BugOneTouch] 이슈 생성 실패 테스트");
+                var result = await mockJiraFacade.SubmitAsync("bundle-fail-001", "TEST", "[BugBeacon] 이슈 생성 실패 테스트");
             }
             catch (Exception ex)
             {

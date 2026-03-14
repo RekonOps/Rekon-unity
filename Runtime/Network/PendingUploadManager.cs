@@ -4,13 +4,13 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 오프라인/미로그인 시 전송 실패한 번들을 pending 큐에 등록하는 매니저.
     ///
     /// pending 큐 관리:
-    ///   - {persistentDataPath}/BugOneTouch/pending/ 폴더 사용
+    ///   - {persistentDataPath}/BugBeacon/pending/ 폴더 사용
     ///   - 각 항목은 {bundleId}.pending.json 파일
     ///   - 번들 자체는 BundleWriter가 이미 로컬에 저장
     ///
@@ -45,7 +45,7 @@ namespace GaoZombie.BugOneTouch
         public PendingUploadManager()
         {
             EnsurePendingDirectory();
-            Debug.Log("[BugOneTouch] PendingUploadManager 초기화 완료");
+            Debug.Log("[BugBeacon] PendingUploadManager 초기화 완료");
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ namespace GaoZombie.BugOneTouch
         {
             if (manifest == null)
             {
-                Debug.LogWarning("[BugOneTouch] PendingUpload: null 매니페스트를 enqueue 시도");
+                Debug.LogWarning("[BugBeacon] PendingUpload: null 매니페스트를 enqueue 시도");
                 return;
             }
 
@@ -83,11 +83,11 @@ namespace GaoZombie.BugOneTouch
                     File.Move(tempPath, pendingPath);
                 });
 
-                Debug.Log($"[BugOneTouch] PendingUpload: 큐에 등록 완료 (bundleId={manifest.id})");
+                Debug.Log($"[BugBeacon] PendingUpload: 큐에 등록 완료 (bundleId={manifest.id})");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] PendingUpload: 큐 등록 실패 ({manifest.id}): {ex.Message}");
+                Debug.LogError($"[BugBeacon] PendingUpload: 큐 등록 실패 ({manifest.id}): {ex.Message}");
             }
         }
 
@@ -118,7 +118,7 @@ namespace GaoZombie.BugOneTouch
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugOneTouch] PendingUpload: pending 파일 파싱 실패 ({filePath}): {ex.Message}");
+                    Debug.LogWarning($"[BugBeacon] PendingUpload: pending 파일 파싱 실패 ({filePath}): {ex.Message}");
                 }
             }
 
@@ -151,12 +151,12 @@ namespace GaoZombie.BugOneTouch
                 if (File.Exists(pendingPath))
                 {
                     File.Delete(pendingPath);
-                    Debug.Log($"[BugOneTouch] PendingUpload: pending 파일 제거 (bundleId={bundleId})");
+                    Debug.Log($"[BugBeacon] PendingUpload: pending 파일 제거 (bundleId={bundleId})");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugOneTouch] PendingUpload: pending 파일 삭제 실패 ({bundleId}): {ex.Message}");
+                Debug.LogWarning($"[BugBeacon] PendingUpload: pending 파일 삭제 실패 ({bundleId}): {ex.Message}");
             }
         }
 
@@ -167,7 +167,7 @@ namespace GaoZombie.BugOneTouch
         /// </summary>
         public static string GetPendingDirectory()
         {
-            return Path.Combine(Application.persistentDataPath, "BugOneTouch", PendingFolderName);
+            return Path.Combine(Application.persistentDataPath, "BugBeacon", PendingFolderName);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace GaoZombie.BugOneTouch
             if (!Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
-                Debug.Log($"[BugOneTouch] PendingUpload: pending 디렉토리 생성: {dir}");
+                Debug.Log($"[BugBeacon] PendingUpload: pending 디렉토리 생성: {dir}");
             }
         }
     }

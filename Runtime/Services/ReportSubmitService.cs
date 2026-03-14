@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// 버그 리포트 제출 서비스.
@@ -31,7 +31,7 @@ namespace GaoZombie.BugOneTouch
 
         private readonly R2UploadService _uploadService;
 
-        /// <summary>Web API 프록시 기본 URL (BugOneTouchSettings.WEB_DASHBOARD_URL)</summary>
+        /// <summary>Web API 프록시 기본 URL (BugBeaconSettings.WEB_DASHBOARD_URL)</summary>
         private readonly string _webApiBaseUrl;
 
         // ─── JSON 응답 모델 ─────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ namespace GaoZombie.BugOneTouch
             _uploadService = uploadService ?? throw new ArgumentNullException(nameof(uploadService));
 
             // Web 프록시 기본 URL — 상수에서 직접 읽어 Supabase 설정 의존성 제거
-            _webApiBaseUrl = BugOneTouchSettings.WEB_DASHBOARD_URL.TrimEnd('/');
+            _webApiBaseUrl = BugBeaconSettings.WEB_DASHBOARD_URL.TrimEnd('/');
         }
 
         // ─── 공개 메서드 ─────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ namespace GaoZombie.BugOneTouch
                     return FailResult("create-report 응답에 파일 정보가 없습니다.");
 
                 string reportId = createResponse.report_id;
-                Debug.Log($"[BugOneTouch] 리포트 생성 완료: {reportId} (파일 {createResponse.report_files.Length}개)");
+                Debug.Log($"[BugBeacon] 리포트 생성 완료: {reportId} (파일 {createResponse.report_files.Length}개)");
 
                 ReportProgress(progress, SubmitPhase.CreatingReport, PhaseCreateEnd, "리포트 생성 완료");
 
@@ -179,14 +179,14 @@ namespace GaoZombie.BugOneTouch
 
                     if (!uploadResult.Success)
                     {
-                        Debug.LogError($"[BugOneTouch] 파일 업로드 실패: {fileInfo.FileName} - {uploadResult.ErrorMessage}");
+                        Debug.LogError($"[BugBeacon] 파일 업로드 실패: {fileInfo.FileName} - {uploadResult.ErrorMessage}");
                         return FailResult($"파일 업로드 실패 ({fileInfo.FileName}): {uploadResult.ErrorMessage}", reportId);
                     }
 
                     uploadedFileIds.Add(serverFile.file_id);
                     completedFiles++;
 
-                    Debug.Log($"[BugOneTouch] 파일 업로드 완료: {fileInfo.FileName} ({completedFiles}/{totalFiles})");
+                    Debug.Log($"[BugBeacon] 파일 업로드 완료: {fileInfo.FileName} ({completedFiles}/{totalFiles})");
                 }
 
                 ReportProgress(progress, SubmitPhase.UploadingFiles, PhaseUploadEnd, "파일 업로드 완료");
@@ -201,7 +201,7 @@ namespace GaoZombie.BugOneTouch
                     return FailResult("confirm-upload 응답이 null입니다.", reportId);
 
                 if (!string.IsNullOrEmpty(confirmResponse.warning))
-                    Debug.LogWarning($"[BugOneTouch] confirm-upload 경고: {confirmResponse.warning}");
+                    Debug.LogWarning($"[BugBeacon] confirm-upload 경고: {confirmResponse.warning}");
 
                 // 확인 결과 검증
                 int confirmedCount = 0;
@@ -212,11 +212,11 @@ namespace GaoZombie.BugOneTouch
                         if (result.status == "confirmed" || result.status == "r2_skipped")
                             confirmedCount++;
                         else
-                            Debug.LogWarning($"[BugOneTouch] 파일 확인 실패: {result.file_id} -> {result.status}");
+                            Debug.LogWarning($"[BugBeacon] 파일 확인 실패: {result.file_id} -> {result.status}");
                     }
                 }
 
-                Debug.Log($"[BugOneTouch] 업로드 확인 완료: {confirmedCount}/{uploadedFileIds.Count}개 파일 확인됨");
+                Debug.Log($"[BugBeacon] 업로드 확인 완료: {confirmedCount}/{uploadedFileIds.Count}개 파일 확인됨");
 
                 ReportProgress(progress, SubmitPhase.Completed, PhaseConfirmEnd, "리포트 제출 완료");
 
@@ -229,13 +229,13 @@ namespace GaoZombie.BugOneTouch
             }
             catch (OperationCanceledException)
             {
-                Debug.Log("[BugOneTouch] 리포트 제출이 취소되었습니다.");
+                Debug.Log("[BugBeacon] 리포트 제출이 취소되었습니다.");
                 ReportProgress(progress, SubmitPhase.Failed, 0f, "제출 취소됨");
                 throw;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugOneTouch] 리포트 제출 실패: {ex.Message}");
+                Debug.LogError($"[BugBeacon] 리포트 제출 실패: {ex.Message}");
                 ReportProgress(progress, SubmitPhase.Failed, 0f, $"제출 실패: {ex.Message}");
                 return FailResult($"리포트 제출 실패: {ex.Message}");
             }
@@ -280,7 +280,7 @@ namespace GaoZombie.BugOneTouch
             var createResponse = JsonUtility.FromJson<CreateReportResponse>(responseJson);
             if (createResponse == null || string.IsNullOrEmpty(createResponse.report_id))
             {
-                Debug.LogError($"[BugOneTouch] 리포트 생성 응답 파싱 실패. 응답: {responseJson}");
+                Debug.LogError($"[BugBeacon] 리포트 생성 응답 파싱 실패. 응답: {responseJson}");
                 throw new System.Exception("리포트 생성 응답이 올바르지 않습니다 (report_id 누락 또는 파싱 실패)");
             }
 
@@ -356,7 +356,7 @@ namespace GaoZombie.BugOneTouch
                     if (attempt < MaxRetries)
                     {
                         float delay = RetryBaseDelaySec * Mathf.Pow(2f, attempt - 1);
-                        Debug.LogWarning($"[BugOneTouch] API 요청 실패 (시도 {attempt}/{MaxRetries}), " +
+                        Debug.LogWarning($"[BugBeacon] API 요청 실패 (시도 {attempt}/{MaxRetries}), " +
                                          $"{delay:F1}초 후 재시도: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), ct);
                     }
@@ -558,7 +558,7 @@ namespace GaoZombie.BugOneTouch
         /// <summary>실패 결과를 생성합니다.</summary>
         private static SubmitResult FailResult(string errorMessage, string reportId = null)
         {
-            Debug.LogError($"[BugOneTouch] {errorMessage}");
+            Debug.LogError($"[BugBeacon] {errorMessage}");
             return new SubmitResult
             {
                 Success = false,

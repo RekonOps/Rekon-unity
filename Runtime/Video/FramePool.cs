@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 
-namespace GaoZombie.BugOneTouch
+namespace GaoZombie.BugBeacon
 {
     /// <summary>
     /// NativeArray&lt;byte&gt; 풀 관리자.

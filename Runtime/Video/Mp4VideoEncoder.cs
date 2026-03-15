@@ -326,8 +326,8 @@ namespace RekonOps.BugBeacon
                 "h264_nvenc"        => $"-vcodec h264_nvenc -pix_fmt yuv420p -preset p4 -rc vbr -cq {config.Crf}",
                 // AMD AMF: CQP 고정 품질 모드
                 "h264_amf"          => $"-vcodec h264_amf -pix_fmt yuv420p -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
-                // Apple VideoToolbox: 실시간 모드 + q 파라미터 (0~100, 높을수록 고화질)
-                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -pix_fmt yuv420p -realtime 1 -q {MapCrfToVideoToolboxQ(config.Crf)}",
+                // Apple VideoToolbox: 비트레이트 기반 품질 제어 (FFmpeg 8.x 호환)
+                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -pix_fmt yuv420p -b:v {config.BitrateMbps}M",
                 // Intel Quick Sync: global_quality로 품질 제어
                 "h264_qsv"          => $"-vcodec h264_qsv -pix_fmt yuv420p -preset veryfast -global_quality {config.Crf}",
                 // CPU fallback (libx264): 기존 동작과 동일

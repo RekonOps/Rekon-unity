@@ -345,7 +345,7 @@ namespace GaoZombie.BugBeacon.Tests.Integration
         {
             if (delayMs > 0)
                 await Task.Delay(delayMs, token);
-            result.LogsPath = "mock_logs.zip";
+            result.LogsPath = "mock_logs.txt";
         }
 
         private async Task SimulateStateAsync(int delayMs, CaptureResult result, CancellationToken token)

@@ -188,7 +188,7 @@ namespace GaoZombie.BugBeacon.Tests
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public async Task LogSerializer_SaveAsync_CreatesZipFile()
+        public async Task LogSerializer_SaveAsync_CreatesTxtFile()
         {
             var serializer = new LogSerializer();
             var entries = new LogEntry[]
@@ -198,23 +198,23 @@ namespace GaoZombie.BugBeacon.Tests
                 new LogEntry(3.0, LogType.Error, "테스트 오류", "at Test.Method()"),
             };
 
-            string zipPath = Path.Combine(_tempDir, "logs_flush.zip");
-            await serializer.SaveAsync(entries, zipPath);
+            string txtPath = Path.Combine(_tempDir, "logs_flush.txt");
+            await serializer.SaveAsync(entries, txtPath);
 
-            Assert.IsTrue(File.Exists(zipPath), "ZIP 파일이 생성되어야 합니다.");
-            Assert.Greater(new FileInfo(zipPath).Length, 0, "ZIP 파일이 비어 있으면 안 됩니다.");
+            Assert.IsTrue(File.Exists(txtPath), "TXT 파일이 생성되어야 합니다.");
+            Assert.Greater(new FileInfo(txtPath).Length, 0, "TXT 파일이 비어 있으면 안 됩니다.");
         }
 
         [Test]
-        public async Task LogSerializer_SaveAsync_EmptyEntries_CreatesZip()
+        public async Task LogSerializer_SaveAsync_EmptyEntries_CreatesTxt()
         {
             var serializer = new LogSerializer();
-            string zipPath = Path.Combine(_tempDir, "empty_logs.zip");
+            string txtPath = Path.Combine(_tempDir, "empty_logs.txt");
 
             // 빈 배열도 정상 처리되어야 함
-            await serializer.SaveAsync(Array.Empty<LogEntry>(), zipPath);
+            await serializer.SaveAsync(Array.Empty<LogEntry>(), txtPath);
 
-            Assert.IsTrue(File.Exists(zipPath), "빈 로그도 ZIP 파일을 생성해야 합니다.");
+            Assert.IsTrue(File.Exists(txtPath), "빈 로그도 TXT 파일을 생성해야 합니다.");
         }
 
         // ──────────────────────────────────────────────────────────────

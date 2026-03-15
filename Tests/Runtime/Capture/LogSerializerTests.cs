@@ -1,6 +1,5 @@
 using System.Collections;
 using System.IO;
-using System.IO.Compression;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -115,55 +114,35 @@ namespace GaoZombie.BugBeacon.Tests
         // ──────────────────────────────────────────────────────────────
 
         [UnityTest]
-        public IEnumerator SaveAsync_ValidEntries_CreatesZipFile()
+        public IEnumerator SaveAsync_ValidEntries_CreatesTxtFile()
         {
             var entries = new[]
             {
-                new LogEntry(1.0, LogType.Log, "ZIP 테스트 메시지", ""),
+                new LogEntry(1.0, LogType.Log, "TXT 테스트 메시지", ""),
             };
-            string zipPath = Path.Combine(_tempDir, "logs.zip");
+            string txtPath = Path.Combine(_tempDir, "logs.txt");
 
-            var task = _serializer.SaveAsync(entries, zipPath);
+            var task = _serializer.SaveAsync(entries, txtPath);
             yield return new WaitUntil(() => task.IsCompleted);
 
             Assert.IsFalse(task.IsFaulted, $"저장 실패: {task.Exception?.Message}");
-            Assert.IsTrue(File.Exists(zipPath), "ZIP 파일이 생성되어야 합니다.");
+            Assert.IsTrue(File.Exists(txtPath), "TXT 파일이 생성되어야 합니다.");
         }
 
         [UnityTest]
-        public IEnumerator SaveAsync_ValidEntries_ZipContainsLogsTxt()
-        {
-            var entries = new[]
-            {
-                new LogEntry(1.0, LogType.Log, "ZIP 내부 확인 테스트", ""),
-            };
-            string zipPath = Path.Combine(_tempDir, "logs.zip");
-
-            var task = _serializer.SaveAsync(entries, zipPath);
-            yield return new WaitUntil(() => task.IsCompleted);
-
-            // ZIP 파일 내부에 logs.txt가 있는지 확인
-            using var fs = new FileStream(zipPath, FileMode.Open, FileAccess.Read);
-            using var archive = new ZipArchive(fs, ZipArchiveMode.Read);
-
-            Assert.AreEqual(1, archive.Entries.Count, "ZIP에 항목이 1개여야 합니다.");
-            Assert.AreEqual("logs.txt", archive.Entries[0].FullName, "파일명이 logs.txt여야 합니다.");
-        }
-
-        [UnityTest]
-        public IEnumerator SaveAsync_ValidEntries_ZipContentContainsMessage()
+        public IEnumerator SaveAsync_ValidEntries_TxtContentContainsMessage()
         {
             var entries = new[]
             {
                 new LogEntry(1.0, LogType.Error, "검색할 메시지 ABC123", "스택트레이스 내용"),
             };
-            string zipPath = Path.Combine(_tempDir, "logs.zip");
+            string txtPath = Path.Combine(_tempDir, "logs.txt");
 
-            var saveTask = _serializer.SaveAsync(entries, zipPath);
+            var saveTask = _serializer.SaveAsync(entries, txtPath);
             yield return new WaitUntil(() => saveTask.IsCompleted);
 
-            // ZIP 내용 읽기
-            var loadTask = _serializer.LoadAsync(zipPath);
+            // 텍스트 파일 내용 읽기
+            var loadTask = _serializer.LoadAsync(txtPath);
             yield return new WaitUntil(() => loadTask.IsCompleted);
 
             string content = loadTask.Result;
@@ -172,15 +151,15 @@ namespace GaoZombie.BugBeacon.Tests
         }
 
         [UnityTest]
-        public IEnumerator SaveAsync_NullEntries_CreatesZipWithEmptyContent()
+        public IEnumerator SaveAsync_NullEntries_CreatesTxtWithEmptyContent()
         {
-            string zipPath = Path.Combine(_tempDir, "empty_logs.zip");
+            string txtPath = Path.Combine(_tempDir, "empty_logs.txt");
 
-            var task = _serializer.SaveAsync(null, zipPath);
+            var task = _serializer.SaveAsync(null, txtPath);
             yield return new WaitUntil(() => task.IsCompleted);
 
             Assert.IsFalse(task.IsFaulted);
-            Assert.IsTrue(File.Exists(zipPath));
+            Assert.IsTrue(File.Exists(txtPath));
         }
 
         [Test]
@@ -195,7 +174,7 @@ namespace GaoZombie.BugBeacon.Tests
         public IEnumerator SaveAsync_CreatesDirectoryIfNotExists()
         {
             var entries = new[] { new LogEntry(1.0, LogType.Log, "디렉토리 생성 테스트", "") };
-            string nestedPath = Path.Combine(_tempDir, "nested", "deep", "logs.zip");
+            string nestedPath = Path.Combine(_tempDir, "nested", "deep", "logs.txt");
 
             var task = _serializer.SaveAsync(entries, nestedPath);
             yield return new WaitUntil(() => task.IsCompleted);

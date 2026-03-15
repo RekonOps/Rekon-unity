@@ -70,32 +70,35 @@ namespace RekonOps.BugBeacon
 
                 if (settings.videoEnabled)
                 {
-                    int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
-                    frameRingBuffer = new FrameRingBuffer(frameCapacity);
-
-                    // FFmpeg 설치 여부에 따라 인코더 선택
 #if UNITY_STANDALONE || UNITY_EDITOR
                     // 최초 호출 시 최대 3초 소요 (FFmpeg 프로세스 실행 및 응답 대기)
                     // 이후 호출은 캐시된 결과를 즉시 반환합니다.
-                    if (FfmpegHelper.IsInstalled())
+                    bool ffmpegAvailable = FfmpegHelper.IsInstalled();
+#else
+                    bool ffmpegAvailable = false;
+#endif
+
+                    if (!ffmpegAvailable)
                     {
-                        videoEncoder = new Mp4VideoEncoder();
-                        Debug.Log("[BugBeacon] MP4 인코더 활성화 (FFmpeg 감지됨)");
+                        Debug.LogWarning("[BugBeacon] FFmpeg 미설치로 영상 녹화가 비활성화됩니다. " +
+                                         "스크린샷과 로그 캡처는 정상 동작합니다.");
+                        // frameRingBuffer, videoEncoder, videoConfig, frameCapturer 모두 null 유지
                     }
                     else
-#endif
                     {
-                        videoEncoder = new VideoEncoder();
-                        Debug.Log("[BugBeacon] raw 프레임 인코더 사용");
+                        // FFmpeg 확인 후 MP4 인코더 초기화
+                        int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
+                        frameRingBuffer = new FrameRingBuffer(frameCapacity);
+                        videoEncoder = new Mp4VideoEncoder();
+                        videoConfig = VideoEncoderConfig.FromSettings(settings);
+
+                        // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
+                        frameCapturer = root.AddComponent<FrameCapturer>();
+                        frameCapturer.Initialize(frameRingBuffer, videoConfig);
+                        frameCapturer.StartCapturing();
+
+                        Debug.Log($"[BugBeacon] 영상 녹화 활성화: {videoConfig}");
                     }
-                    videoConfig = VideoEncoderConfig.FromSettings(settings);
-
-                    // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
-                    frameCapturer = root.AddComponent<FrameCapturer>();
-                    frameCapturer.Initialize(frameRingBuffer, videoConfig);
-                    frameCapturer.StartCapturing();
-
-                    Debug.Log($"[BugBeacon] 영상 녹화 활성화: {videoConfig}");
                 }
 
                 // ── 5. CaptureOrchestrator 생성 ───────────────────────────────────
@@ -123,6 +126,17 @@ namespace RekonOps.BugBeacon
                 // CaptureOverlay: Silent 모드 활성화 (SilentSubmitManager가 사용되므로)
                 overlay.SetSilentMode(true);
 
+                // BugBeacon 오버레이 Canvas를 FrameCapturer에 전달 (영상에 UI가 찍히지 않도록)
+                // CaptureOverlay 초기화 이후에 호출해야 Canvas가 존재함
+                if (frameCapturer != null)
+                {
+                    var overlayCanvas = overlay.GetComponent<Canvas>();
+                    if (overlayCanvas != null)
+                    {
+                        frameCapturer.SetBugBeaconCanvas(overlayCanvas);
+                    }
+                }
+
                 // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
                 var manifestGenerator = new ManifestGenerator();
                 var bundleWriter = new BundleWriter(manifestGenerator);
@@ -148,6 +162,8 @@ namespace RekonOps.BugBeacon
                 var tokenStore = new SessionTokenStore();
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
+                // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩
+                orchestrator.BindSilentSubmitManager(silentSubmitManager);
 
                 // ── 10. PendingUploadManager 초기화 ──────────────────────────────────
                 var pendingUploadManager = new PendingUploadManager();

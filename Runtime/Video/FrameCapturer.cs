@@ -1,40 +1,42 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace RekonOps.BugBeacon
 {
     /// <summary>
-    /// Camera.main을 이용해 설정된 FPS에 맞춰 프레임을 캡처하여 FrameRingBuffer에 저장합니다.
+    /// ScreenCapture.CaptureScreenshotIntoRenderTexture()를 사용하여
+    /// 게임 화면을 캡처하고 FrameRingBuffer에 저장합니다.
     ///
     /// 캡처 전략:
-    ///   1. AsyncGPUReadback.Request() 지원 시 비동기 GPU 읽기 사용 (성능 우선)
+    ///   WaitForEndOfFrame 이후 ScreenCapture API로 현재 화면을 RenderTexture에 복사.
+    ///   camera.Render() 추가 렌더링이 없어 스터터링이 발생하지 않습니다.
+    ///
+    /// GPU 읽기:
+    ///   1. AsyncGPUReadback.Request() 지원 시 비동기 GPU 읽기 (성능 우선)
     ///   2. 미지원 시 ReadPixels 폴백 (동기, 메인 스레드 블로킹)
     ///
-    /// camera.Render()를 사용하여 설정된 해상도(기본 1280x720)로 직접 렌더링합니다.
-    /// 이 방식은 게임 윈도우 크기와 무관하게 일정한 해상도로 캡처됩니다.
-    ///
-    /// FPS 스로틀링:
-    ///   Time.unscaledTime 기반으로 프레임 간격을 계산하여 목표 FPS를 유지합니다.
+    /// BugBeacon Canvas 처리:
+    ///   ScreenCapture는 UI를 포함하므로, 캡처 직전 BugBeacon Canvas를 비활성화하고
+    ///   캡처 직후 재활성화하여 BugBeacon UI가 영상에 찍히지 않도록 합니다.
     /// </summary>
     public class FrameCapturer : MonoBehaviour, IFrameCapturer
     {
         private FrameRingBuffer _ringBuffer;
         private VideoEncoderConfig _config;
         private RenderTexture _renderTexture;
+        private Texture2D _fallbackTexture; // ReadPixels 폴백 시 재사용할 텍스처 (매 프레임 new/Destroy 방지)
         private bool _isCapturing;
         private float _lastCaptureTime;
         private float _captureInterval;
         private bool _asyncGpuReadbackSupported;
+        private Coroutine _captureCoroutine;
+        private Canvas _bugBeaconCanvas;
+        private readonly WaitForEndOfFrame _waitForEndOfFrame = new WaitForEndOfFrame();
 
-        /// <summary>현재 캡처가 진행 중인지 여부</summary>
         public bool IsCapturing => _isCapturing;
 
-        /// <summary>
-        /// FrameCapturer를 초기화합니다.
-        /// </summary>
-        /// <param name="ringBuffer">프레임을 저장할 링버퍼</param>
-        /// <param name="config">캡처 설정 (해상도, FPS 등)</param>
         public void Initialize(FrameRingBuffer ringBuffer, VideoEncoderConfig config)
         {
             _ringBuffer = ringBuffer ?? throw new ArgumentNullException(nameof(ringBuffer));
@@ -43,17 +45,24 @@ namespace RekonOps.BugBeacon
             _captureInterval = 1f / Mathf.Max(1, _config.Fps);
             _asyncGpuReadbackSupported = SystemInfo.supportsAsyncGPUReadback;
 
-            // RenderTexture 생성
-            _renderTexture = new RenderTexture(_config.Width, _config.Height, 24, RenderTextureFormat.ARGB32);
+            _renderTexture = new RenderTexture(_config.Width, _config.Height, 0, RenderTextureFormat.ARGB32);
             _renderTexture.Create();
+
+            // AsyncGPUReadback 미지원 플랫폼을 위한 폴백 텍스처를 1회 생성하여 재사용
+            _fallbackTexture = new Texture2D(_config.Width, _config.Height, TextureFormat.RGBA32, false);
 
             Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_config.Width}x{_config.Height}@{_config.Fps}fps, " +
                       $"AsyncGPUReadback={_asyncGpuReadbackSupported}");
         }
 
         /// <summary>
-        /// 프레임 캡처를 시작합니다.
+        /// BugBeacon 자체 UI Canvas를 등록합니다. 영상 캡처 시 Canvas를 임시 비활성화합니다.
         /// </summary>
+        public void SetBugBeaconCanvas(Canvas canvas)
+        {
+            _bugBeaconCanvas = canvas;
+        }
+
         public void StartCapturing()
         {
             if (_ringBuffer == null)
@@ -61,21 +70,31 @@ namespace RekonOps.BugBeacon
                 Debug.LogError("[BugBeacon] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
                 return;
             }
+            if (_isCapturing) return;
+
             _isCapturing = true;
             _lastCaptureTime = Time.unscaledTime;
+            _captureCoroutine = StartCoroutine(CaptureLoopCoroutine());
         }
 
-        /// <summary>
-        /// 프레임 캡처를 중지합니다.
-        /// </summary>
         public void StopCapturing()
         {
             _isCapturing = false;
+            if (_captureCoroutine != null)
+            {
+                StopCoroutine(_captureCoroutine);
+                _captureCoroutine = null;
+            }
         }
 
         private void OnDestroy()
         {
             _isCapturing = false;
+            if (_captureCoroutine != null)
+            {
+                StopCoroutine(_captureCoroutine);
+                _captureCoroutine = null;
+            }
 
             if (_renderTexture != null)
             {
@@ -83,107 +102,89 @@ namespace RekonOps.BugBeacon
                 Destroy(_renderTexture);
                 _renderTexture = null;
             }
-        }
 
-        private void Update()
-        {
-            if (!_isCapturing)
-                return;
-
-            float now = Time.unscaledTime;
-            if (now - _lastCaptureTime < _captureInterval)
-                return;
-
-            _lastCaptureTime = now;
-            CaptureFrame(now);
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // 캡처 로직
-        // ──────────────────────────────────────────────────────────────
-
-        private void CaptureFrame(float timestamp)
-        {
-            var camera = Camera.main;
-            if (camera == null)
+            if (_fallbackTexture != null)
             {
-                Debug.LogWarning("[BugBeacon] Camera.main이 없습니다. 프레임 캡처 건너뜀.");
-                return;
-            }
-
-            if (_asyncGpuReadbackSupported)
-            {
-                CaptureWithAsyncReadback(camera, timestamp);
-            }
-            else
-            {
-                CaptureWithReadPixels(camera, timestamp);
+                Destroy(_fallbackTexture);
+                _fallbackTexture = null;
             }
         }
 
-        /// <summary>
-        /// AsyncGPUReadback을 사용한 비동기 캡처.
-        /// GPU → CPU 전송이 비동기로 처리되어 메인 스레드 블로킹이 없습니다.
-        /// </summary>
-        private void CaptureWithAsyncReadback(Camera camera, float timestamp)
+        private IEnumerator CaptureLoopCoroutine()
         {
-            var prevTarget = camera.targetTexture;
-            camera.targetTexture = _renderTexture;
-            camera.Render();
-            camera.targetTexture = prevTarget;
-
-            double captureTimestamp = (double)timestamp;
-
-            AsyncGPUReadback.Request(_renderTexture, 0, TextureFormat.RGBA32, request =>
+            while (_isCapturing)
             {
-                if (request.hasError)
+                yield return _waitForEndOfFrame;
+
+                // FPS 스로틀링: unscaledTime 기반
+                float now = Time.unscaledTime;
+                if (now - _lastCaptureTime < _captureInterval)
+                    continue;
+
+                _lastCaptureTime = now;
+
+                // BugBeacon Canvas 임시 비활성화 (UI가 영상에 찍히지 않도록)
+                bool canvasWasActive = false;
+                if (_bugBeaconCanvas != null && _bugBeaconCanvas.gameObject.activeSelf)
                 {
-                    Debug.LogWarning("[BugBeacon] AsyncGPUReadback 실패. ReadPixels로 폴백 없음.");
-                    return;
+                    canvasWasActive = true;
+                    _bugBeaconCanvas.gameObject.SetActive(false);
                 }
 
-                // 에디터 도메인 리로드 등으로 _config/_ringBuffer가 해제된 경우 방어
+                // 현재 화면을 RenderTexture에 캡처 (렌더링 완료 후, 추가 렌더링 없음)
+                ScreenCapture.CaptureScreenshotIntoRenderTexture(_renderTexture);
+
+                // Canvas 재활성화
+                if (canvasWasActive && _bugBeaconCanvas != null)
+                {
+                    _bugBeaconCanvas.gameObject.SetActive(true);
+                }
+
+                if (_asyncGpuReadbackSupported)
+                {
+                    EnqueueAsyncReadback((double)now);
+                }
+                else
+                {
+                    CaptureWithReadPixelsFallback((double)now);
+                }
+            }
+        }
+
+        private void EnqueueAsyncReadback(double timestamp)
+        {
+            AsyncGPUReadback.Request(_renderTexture, 0, TextureFormat.RGBA32, request =>
+            {
+                if (request.hasError) return;
                 if (_config == null || _ringBuffer == null) return;
 
                 var data = request.GetData<byte>();
                 byte[] bytes = new byte[data.Length];
                 data.CopyTo(bytes);
 
-                var frame = new FrameData(bytes, _config.Width, _config.Height, captureTimestamp);
-                _ringBuffer.Add(frame);
+                _ringBuffer.Add(new FrameData(bytes, _config.Width, _config.Height, timestamp));
             });
         }
 
-        /// <summary>
-        /// ReadPixels를 사용한 동기 폴백 캡처.
-        /// 메인 스레드를 잠시 블로킹합니다.
-        /// </summary>
-        private void CaptureWithReadPixels(Camera camera, float timestamp)
+        private void CaptureWithReadPixelsFallback(double timestamp)
         {
-            var prevTarget = camera.targetTexture;
-            camera.targetTexture = _renderTexture;
-            camera.Render();
-
             var prev = RenderTexture.active;
             RenderTexture.active = _renderTexture;
-
             try
             {
-                var texture = new Texture2D(_config.Width, _config.Height, TextureFormat.RGBA32, false);
-                texture.ReadPixels(new Rect(0, 0, _config.Width, _config.Height), 0, 0, false);
-                texture.Apply();
-
-                byte[] bytes = texture.GetRawTextureData();
-
-                var frame = new FrameData(bytes, _config.Width, _config.Height, timestamp);
-                _ringBuffer?.Add(frame);
-
-                Destroy(texture);
+                // _fallbackTexture를 재사용하여 매 프레임 new/Destroy로 인한 GC 부담 방지
+                _fallbackTexture.ReadPixels(new Rect(0, 0, _config.Width, _config.Height), 0, 0, false);
+                _fallbackTexture.Apply();
+                // GetRawTextureData()는 내부 버퍼 참조를 반환하므로 반드시 복사해야 함
+                // _fallbackTexture 재사용 시 이전 프레임 데이터가 덮어씌워지는 것을 방지
+                byte[] raw = _fallbackTexture.GetRawTextureData();
+                byte[] bytes = new byte[raw.Length];
+                Buffer.BlockCopy(raw, 0, bytes, 0, raw.Length);
+                _ringBuffer?.Add(new FrameData(bytes, _config.Width, _config.Height, timestamp));
             }
             finally
             {
                 RenderTexture.active = prev;
-                camera.targetTexture = prevTarget;
             }
         }
     }

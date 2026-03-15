@@ -420,7 +420,7 @@ namespace GaoZombie.BugBeacon
 
             // reportId URI 인코딩
             string encodedReportId = Uri.EscapeDataString(reportId);
-            string fullUrl = $"{baseUri.AbsoluteUri.TrimEnd('/')}/reports/{encodedReportId}";
+            string fullUrl = $"{baseUri.AbsoluteUri.TrimEnd('/')}/workspace/{encodedReportId}";
 
             // 최종 URL 재검증
             if (!IsValidHttpsUrl(fullUrl))

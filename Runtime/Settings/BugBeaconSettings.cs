@@ -150,8 +150,12 @@ namespace GaoZombie.BugBeacon
         public string userId = "";
 
         // ─── 웹 대시보드 연동 ────────────────────────────────────────────────
-        /// <summary>웹 대시보드 기본 URL</summary>
+        /// <summary>웹 대시보드 기본 URL (BUGBEACON_DEV 심볼로 dev/prod 전환)</summary>
+#if BUGBEACON_DEV
+        public const string WEB_DASHBOARD_URL = "https://bugbeacon.vercel.app";
+#else
         public const string WEB_DASHBOARD_URL = "https://app.bugbeacon.com";
+#endif
 
         [Header("웹 연동")]
         [Tooltip("웹 대시보드와 연동 여부")]
@@ -181,28 +185,6 @@ namespace GaoZombie.BugBeacon
         [Header("Auth Broker")]
         [Tooltip("Auth Broker base URL")]
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
-
-        [Header("Jira (Runtime)")]
-        // 아래 Jira 필드들은 웹 대시보드 연동 방식으로 전환됨.
-        // Jira 설정은 웹 대시보드(https://app.bugbeacon.com) > 워크스페이스 설정에서 관리합니다.
-        [Tooltip("Jira 사이트 기본 URL — 웹 대시보드에서 관리됨")]
-        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
-        [UnityEngine.HideInInspector]
-        public string jiraSiteUrl = "";
-
-        [Tooltip("Jira 프로젝트 키 — 웹 대시보드에서 관리됨")]
-        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
-        [UnityEngine.HideInInspector]
-        public string jiraProjectKey = "";
-
-        [Tooltip("기본 Jira 라벨 — 웹 대시보드에서 관리됨")]
-        [System.Obsolete("Jira 연동은 웹 대시보드에서 관리됩니다. 이 필드는 더 이상 사용되지 않습니다.")]
-        [UnityEngine.HideInInspector]
-        public string[] defaultLabels = new string[0];
-
-        // 첨부파일 크기 제한 캐시 (Jira 서버에서 조회한 값)
-        /// <summary>Jira 서버에서 조회한 첨부파일 최대 크기(바이트). 0이면 미조회 상태.</summary>
-        [HideInInspector] public long cachedAttachmentSizeLimitBytes = 0;
 
         /// <summary>
         /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.

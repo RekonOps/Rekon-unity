@@ -250,21 +250,8 @@ namespace GaoZombie.BugBeacon
                         ? Path.Combine(dir, "video")
                         : Path.Combine(dir, $"video{ext}");
 
-                    // 첨부파일 크기 제한을 config에 반영
+                    // 첨부파일 크기 제한은 웹 대시보드에서 관리됨 (ADR-047)
                     var activeConfig = _videoConfig;
-                    if (_settings.cachedAttachmentSizeLimitBytes > 0)
-                    {
-                        // 클론하여 원본 config를 수정하지 않음
-                        activeConfig = new VideoEncoderConfig
-                        {
-                            Width             = _videoConfig.Width,
-                            Height            = _videoConfig.Height,
-                            Fps               = _videoConfig.Fps,
-                            BitrateMbps       = _videoConfig.BitrateMbps,
-                            Crf               = _videoConfig.Crf,
-                            TargetMaxSizeBytes = _settings.cachedAttachmentSizeLimitBytes,
-                        };
-                    }
 
                     await _videoEncoder.EncodeAsync(frames, videoPath, activeConfig, token);
 

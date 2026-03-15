@@ -403,12 +403,6 @@ public int Count { get; }
 |----------|------|--------|------|
 | `authBrokerUrl` | `string` | `""` | Auth Broker 서버 기본 URL |
 
-#### Jira 설정
-
-| 프로퍼티 | 타입 | 기본값 | 설명 |
-|----------|------|--------|------|
-| `defaultLabels` | `string[]` | `["bugbeacon-unity", "unity"]` | 이슈 생성 시 자동으로 추가할 Jira 레이블 목록 |
-
 ---
 
 ## CaptureOrchestrator

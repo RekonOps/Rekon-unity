@@ -162,7 +162,7 @@ https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3
 - `issuetype.name`: 이슈 유형 (기본: "Bug")
 - `summary`: 요약 (제목)
 - `description`: ADF 형식 본문
-- `labels`: BugBeaconSettings.defaultLabels 자동 추가
+- `labels`: AdditionalLabels(요청 시 지정)와 기본 레이블 병합하여 자동 추가
 - `priority.name`: 우선순위
 
 ---

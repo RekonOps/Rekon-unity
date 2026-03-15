@@ -128,8 +128,10 @@ namespace GaoZombie.BugBeacon
                 Directory.CreateDirectory(outputDir);
             }
 
-            // 2. FFmpeg 인수 구성 (인코더별 최적 인수 사용)
-            string ffmpegArgs = BuildFfmpegArguments(config, outputPath, encoderName);
+            // 2. FFmpeg 인수 구성 (프레임의 실제 해상도 사용, 화면 크기에 따라 동적)
+            int frameWidth = frames[0].Width;
+            int frameHeight = frames[0].Height;
+            string ffmpegArgs = BuildFfmpegArguments(frameWidth, frameHeight, config, outputPath, encoderName);
             string ffmpegPath = FfmpegHelper.GetPath();
 
             var startInfo = new ProcessStartInfo
@@ -312,28 +314,28 @@ namespace GaoZombie.BugBeacon
         /// 인코더별 최적 인수를 포함한 FFmpeg 명령줄 인수를 구성합니다.
         /// encoderName이 null이면 libx264 CPU 인코더를 사용합니다.
         /// </summary>
-        private static string BuildFfmpegArguments(VideoEncoderConfig config, string outputPath, string encoderName)
+        private static string BuildFfmpegArguments(int width, int height, VideoEncoderConfig config, string outputPath, string encoderName)
         {
             // 경로에 포함된 따옴표 문자 제거 후 인용 처리
             string safeOutputPath = outputPath.Replace("\"", "");
 
-            // 인코더별 최적 인수 선택
+            // 인코더별 최적 인수 선택 (모든 인코더에 -pix_fmt yuv420p 통일)
             string encoderArgs = encoderName switch
             {
                 // NVIDIA NVENC: 가변 비트레이트 + CQ 품질 제어
-                "h264_nvenc"        => $"-vcodec h264_nvenc -preset p4 -rc vbr -cq {config.Crf}",
+                "h264_nvenc"        => $"-vcodec h264_nvenc -pix_fmt yuv420p -preset p4 -rc vbr -cq {config.Crf}",
                 // AMD AMF: CQP 고정 품질 모드
-                "h264_amf"          => $"-vcodec h264_amf -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
+                "h264_amf"          => $"-vcodec h264_amf -pix_fmt yuv420p -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
                 // Apple VideoToolbox: 실시간 모드 + q 파라미터 (0~100, 높을수록 고화질)
-                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -realtime 1 -q {MapCrfToVideoToolboxQ(config.Crf)}",
+                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -pix_fmt yuv420p -realtime 1 -q {MapCrfToVideoToolboxQ(config.Crf)}",
                 // Intel Quick Sync: global_quality로 품질 제어
-                "h264_qsv"          => $"-vcodec h264_qsv -preset veryfast -global_quality {config.Crf}",
+                "h264_qsv"          => $"-vcodec h264_qsv -pix_fmt yuv420p -preset veryfast -global_quality {config.Crf}",
                 // CPU fallback (libx264): 기존 동작과 동일
                 _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
             };
 
             // ScreenCapture API는 백버퍼를 정방향으로 캡처하므로 vflip 불필요
-            return $"-y -f rawvideo -pix_fmt rgba -video_size {config.Width}x{config.Height} " +
+            return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";

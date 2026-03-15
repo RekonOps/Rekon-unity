@@ -33,6 +33,8 @@ namespace GaoZombie.BugBeacon
         private float _captureInterval;
         private bool _asyncGpuReadbackSupported;
         private Coroutine _captureCoroutine;
+        private int _currentWidth;
+        private int _currentHeight;
         private readonly WaitForEndOfFrame _waitForEndOfFrame = new WaitForEndOfFrame();
 
         public bool IsCapturing => _isCapturing;
@@ -45,13 +47,13 @@ namespace GaoZombie.BugBeacon
             _captureInterval = 1f / Mathf.Max(1, _config.Fps);
             _asyncGpuReadbackSupported = SystemInfo.supportsAsyncGPUReadback;
 
-            _renderTexture = new RenderTexture(_config.Width, _config.Height, 0, RenderTextureFormat.ARGB32);
-            _renderTexture.Create();
+            // RT는 현재 화면 크기로 생성 (ScreenCapture가 화면 전체를 채우도록)
+            // 화면 크기가 변경되면 CaptureLoopCoroutine에서 자동 재생성
+            _currentWidth = Screen.width;
+            _currentHeight = Screen.height;
+            CreateRenderResources(_currentWidth, _currentHeight);
 
-            // AsyncGPUReadback 미지원 플랫폼을 위한 폴백 텍스처를 1회 생성하여 재사용
-            _fallbackTexture = new Texture2D(_config.Width, _config.Height, TextureFormat.RGBA32, false);
-
-            Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_config.Width}x{_config.Height}@{_config.Fps}fps, " +
+            Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_currentWidth}x{_currentHeight}@{_config.Fps}fps, " +
                       $"AsyncGPUReadback={_asyncGpuReadbackSupported}");
         }
 
@@ -79,6 +81,29 @@ namespace GaoZombie.BugBeacon
             }
         }
 
+        private void CreateRenderResources(int width, int height)
+        {
+            ReleaseRenderResources();
+            _renderTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
+            _renderTexture.Create();
+            _fallbackTexture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        }
+
+        private void ReleaseRenderResources()
+        {
+            if (_renderTexture != null)
+            {
+                _renderTexture.Release();
+                Destroy(_renderTexture);
+                _renderTexture = null;
+            }
+            if (_fallbackTexture != null)
+            {
+                Destroy(_fallbackTexture);
+                _fallbackTexture = null;
+            }
+        }
+
         private void OnDestroy()
         {
             _isCapturing = false;
@@ -87,19 +112,7 @@ namespace GaoZombie.BugBeacon
                 StopCoroutine(_captureCoroutine);
                 _captureCoroutine = null;
             }
-
-            if (_renderTexture != null)
-            {
-                _renderTexture.Release();
-                Destroy(_renderTexture);
-                _renderTexture = null;
-            }
-
-            if (_fallbackTexture != null)
-            {
-                Destroy(_fallbackTexture);
-                _fallbackTexture = null;
-            }
+            ReleaseRenderResources();
         }
 
         private IEnumerator CaptureLoopCoroutine()
@@ -114,6 +127,17 @@ namespace GaoZombie.BugBeacon
                     continue;
 
                 _lastCaptureTime = now;
+
+                // 화면 크기가 변경되면 RT/Texture 재생성 (에디터에서 Game Window 리사이즈 대응)
+                int sw = Screen.width;
+                int sh = Screen.height;
+                if (sw != _currentWidth || sh != _currentHeight)
+                {
+                    _currentWidth = sw;
+                    _currentHeight = sh;
+                    CreateRenderResources(sw, sh);
+                    Debug.Log($"[BugBeacon] 화면 크기 변경 감지: {sw}x{sh}, RT 재생성");
+                }
 
                 // 현재 화면을 RenderTexture에 캡처 (렌더링 완료 후, 추가 렌더링 없음)
                 // WaitForEndOfFrame 이후이므로 UI를 포함한 최종 화면이 그대로 캡처됨
@@ -141,7 +165,7 @@ namespace GaoZombie.BugBeacon
                 byte[] bytes = new byte[data.Length];
                 data.CopyTo(bytes);
 
-                _ringBuffer.Add(new FrameData(bytes, _config.Width, _config.Height, timestamp));
+                _ringBuffer.Add(new FrameData(bytes, _currentWidth, _currentHeight, timestamp));
             });
         }
 
@@ -152,14 +176,14 @@ namespace GaoZombie.BugBeacon
             try
             {
                 // _fallbackTexture를 재사용하여 매 프레임 new/Destroy로 인한 GC 부담 방지
-                _fallbackTexture.ReadPixels(new Rect(0, 0, _config.Width, _config.Height), 0, 0, false);
+                _fallbackTexture.ReadPixels(new Rect(0, 0, _currentWidth, _currentHeight), 0, 0, false);
                 _fallbackTexture.Apply();
                 // GetRawTextureData()는 내부 버퍼 참조를 반환하므로 반드시 복사해야 함
                 // _fallbackTexture 재사용 시 이전 프레임 데이터가 덮어씌워지는 것을 방지
                 byte[] raw = _fallbackTexture.GetRawTextureData();
                 byte[] bytes = new byte[raw.Length];
                 Buffer.BlockCopy(raw, 0, bytes, 0, raw.Length);
-                _ringBuffer?.Add(new FrameData(bytes, _config.Width, _config.Height, timestamp));
+                _ringBuffer?.Add(new FrameData(bytes, _currentWidth, _currentHeight, timestamp));
             }
             finally
             {

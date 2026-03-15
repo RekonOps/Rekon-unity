@@ -214,6 +214,10 @@ namespace GaoZombie.BugBeacon
                         return string.Empty;
                     }
 
+                    // WaitForExit(timeout) 후 비동기 OutputDataReceived 이벤트가 아직 처리 중일 수 있음
+                    // 인수 없는 WaitForExit() 호출로 남은 비동기 출력을 모두 플러시
+                    process.WaitForExit();
+
                     return outputBuilder.ToString();
                 }
             }

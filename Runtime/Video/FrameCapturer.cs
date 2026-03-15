@@ -17,9 +17,10 @@ namespace GaoZombie.BugBeacon
     ///   1. AsyncGPUReadback.Request() 지원 시 비동기 GPU 읽기 (성능 우선)
     ///   2. 미지원 시 ReadPixels 폴백 (동기, 메인 스레드 블로킹)
     ///
-    /// BugBeacon Canvas 처리:
-    ///   ScreenCapture는 UI를 포함하므로, 캡처 직전 BugBeacon Canvas를 비활성화하고
-    ///   캡처 직후 재활성화하여 BugBeacon UI가 영상에 찍히지 않도록 합니다.
+    /// UI 포함:
+    ///   ScreenCapture는 UI를 포함한 최종 화면을 캡처합니다.
+    ///   WaitForEndOfFrame 시점에서 이미 렌더링이 완료된 백버퍼를 복사하므로
+    ///   별도의 Canvas 조작 없이 게임 화면 + UI가 그대로 녹화됩니다.
     /// </summary>
     public class FrameCapturer : MonoBehaviour, IFrameCapturer
     {
@@ -32,7 +33,6 @@ namespace GaoZombie.BugBeacon
         private float _captureInterval;
         private bool _asyncGpuReadbackSupported;
         private Coroutine _captureCoroutine;
-        private Canvas _bugBeaconCanvas;
         private readonly WaitForEndOfFrame _waitForEndOfFrame = new WaitForEndOfFrame();
 
         public bool IsCapturing => _isCapturing;
@@ -53,14 +53,6 @@ namespace GaoZombie.BugBeacon
 
             Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_config.Width}x{_config.Height}@{_config.Fps}fps, " +
                       $"AsyncGPUReadback={_asyncGpuReadbackSupported}");
-        }
-
-        /// <summary>
-        /// BugBeacon 자체 UI Canvas를 등록합니다. 영상 캡처 시 Canvas를 임시 비활성화합니다.
-        /// </summary>
-        public void SetBugBeaconCanvas(Canvas canvas)
-        {
-            _bugBeaconCanvas = canvas;
         }
 
         public void StartCapturing()
@@ -123,22 +115,9 @@ namespace GaoZombie.BugBeacon
 
                 _lastCaptureTime = now;
 
-                // BugBeacon Canvas 임시 비활성화 (UI가 영상에 찍히지 않도록)
-                bool canvasWasActive = false;
-                if (_bugBeaconCanvas != null && _bugBeaconCanvas.gameObject.activeSelf)
-                {
-                    canvasWasActive = true;
-                    _bugBeaconCanvas.gameObject.SetActive(false);
-                }
-
                 // 현재 화면을 RenderTexture에 캡처 (렌더링 완료 후, 추가 렌더링 없음)
+                // WaitForEndOfFrame 이후이므로 UI를 포함한 최종 화면이 그대로 캡처됨
                 ScreenCapture.CaptureScreenshotIntoRenderTexture(_renderTexture);
-
-                // Canvas 재활성화
-                if (canvasWasActive && _bugBeaconCanvas != null)
-                {
-                    _bugBeaconCanvas.gameObject.SetActive(true);
-                }
 
                 if (_asyncGpuReadbackSupported)
                 {

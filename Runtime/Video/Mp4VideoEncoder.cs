@@ -332,10 +332,10 @@ namespace RekonOps.BugBeacon
                 _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
             };
 
-            // -vf vflip: Unity 텍스처는 하단 원점(Y-up)이라 상하 반전 보정 필요
+            // ScreenCapture API는 백버퍼를 정방향으로 캡처하므로 vflip 불필요
             return $"-y -f rawvideo -pix_fmt rgba -video_size {config.Width}x{config.Height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-vf vflip {encoderArgs} " +
+                   $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }
 

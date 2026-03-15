@@ -126,17 +126,6 @@ namespace RekonOps.BugBeacon
                 // CaptureOverlay: Silent 모드 활성화 (SilentSubmitManager가 사용되므로)
                 overlay.SetSilentMode(true);
 
-                // BugBeacon 오버레이 Canvas를 FrameCapturer에 전달 (영상에 UI가 찍히지 않도록)
-                // CaptureOverlay 초기화 이후에 호출해야 Canvas가 존재함
-                if (frameCapturer != null)
-                {
-                    var overlayCanvas = overlay.GetComponent<Canvas>();
-                    if (overlayCanvas != null)
-                    {
-                        frameCapturer.SetBugBeaconCanvas(overlayCanvas);
-                    }
-                }
-
                 // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
                 var manifestGenerator = new ManifestGenerator();
                 var bundleWriter = new BundleWriter(manifestGenerator);

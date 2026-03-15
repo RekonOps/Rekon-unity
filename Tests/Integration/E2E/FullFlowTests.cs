@@ -101,14 +101,14 @@ namespace RekonOps.BugBeacon.Tests.Integration
             {
                 Timestamp = DateTime.UtcNow,
                 ScreenshotPath = Path.Combine(_tempDir, "screenshot.png"),
-                LogsPath = Path.Combine(_tempDir, "logs.zip"),
+                LogsPath = Path.Combine(_tempDir, "logs.txt"),
                 StatePath = Path.Combine(_tempDir, "state.json"),
                 VideoPath = null // 영상 없음 = 영상 캡처 실패 시뮬레이션
             };
 
             // 가짜 파일 생성
             File.WriteAllText(captureResult.ScreenshotPath, "PNG_STUB");
-            File.WriteAllText(captureResult.LogsPath, "ZIP_STUB");
+            File.WriteAllText(captureResult.LogsPath, "TXT_STUB");
             File.WriteAllText(captureResult.StatePath, "{\"state\":\"test\"}");
 
             var manifestGenerator = new ManifestGenerator();
@@ -226,11 +226,11 @@ namespace RekonOps.BugBeacon.Tests.Integration
         {
             // 가짜 파일 생성
             string screenshotPath = Path.Combine(_tempDir, "screenshot.png");
-            string logsPath = Path.Combine(_tempDir, "logs.zip");
+            string logsPath = Path.Combine(_tempDir, "logs.txt");
             string statePath = Path.Combine(_tempDir, "state.json");
 
             File.WriteAllText(screenshotPath, "PNG_STUB_CONTENT");
-            File.WriteAllText(logsPath, "ZIP_STUB_CONTENT");
+            File.WriteAllText(logsPath, "TXT_STUB_CONTENT");
             File.WriteAllText(statePath, "{\"scene\":\"TestScene\",\"fps\":60}");
 
             return new CaptureResult

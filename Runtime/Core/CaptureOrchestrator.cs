@@ -188,7 +188,7 @@ namespace RekonOps.BugBeacon
                 token.ThrowIfCancellationRequested();
 
                 LogEntry[] entries = _logCollector.GetEntries();
-                string path = Path.Combine(dir, "logs.zip");
+                string path = Path.Combine(dir, "logs.txt");
                 await _logSerializer.SaveAsync(entries, path);
                 result.LogsPath = path;
 

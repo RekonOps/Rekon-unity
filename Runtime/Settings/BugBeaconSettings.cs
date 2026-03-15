@@ -150,8 +150,15 @@ namespace RekonOps.BugBeacon
         public string userId = "";
 
         // ─── 웹 대시보드 연동 ────────────────────────────────────────────────
-        /// <summary>웹 대시보드 기본 URL (BUGBEACON_DEV 심볼로 dev/prod 전환)</summary>
-#if BUGBEACON_DEV
+        /// <summary>웹 대시보드 기본 URL (Scripting Define Symbol로 전환)</summary>
+        /// <remarks>
+        /// BUGBEACON_LOCAL: http://localhost:3000 (로컬 개발)
+        /// BUGBEACON_DEV: https://bugbeacon.vercel.app (Vercel dev 배포)
+        /// 없음: https://app.bugbeacon.com (prod)
+        /// </remarks>
+#if BUGBEACON_LOCAL
+        public const string WEB_DASHBOARD_URL = "http://localhost:3000";
+#elif BUGBEACON_DEV
         public const string WEB_DASHBOARD_URL = "https://bugbeacon.vercel.app";
 #else
         public const string WEB_DASHBOARD_URL = "https://app.bugbeacon.com";

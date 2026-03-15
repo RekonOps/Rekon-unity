@@ -134,7 +134,7 @@ namespace RekonOps.BugBeacon.Tests
                 "스크린샷이 번들 디렉토리에 복사되어야 합니다.");
 
             // 로그 확인
-            Assert.IsTrue(File.Exists(Path.Combine(bundleDir, "logs.zip")),
+            Assert.IsTrue(File.Exists(Path.Combine(bundleDir, "logs.txt")),
                 "로그 파일이 번들 디렉토리에 복사되어야 합니다.");
 
             // 상태 확인

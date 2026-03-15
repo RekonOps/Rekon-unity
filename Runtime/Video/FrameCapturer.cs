@@ -142,12 +142,15 @@ namespace RekonOps.BugBeacon
                     return;
                 }
 
+                // 에디터 도메인 리로드 등으로 _config/_ringBuffer가 해제된 경우 방어
+                if (_config == null || _ringBuffer == null) return;
+
                 var data = request.GetData<byte>();
                 byte[] bytes = new byte[data.Length];
                 data.CopyTo(bytes);
 
                 var frame = new FrameData(bytes, _config.Width, _config.Height, captureTimestamp);
-                _ringBuffer?.Add(frame);
+                _ringBuffer.Add(frame);
             });
         }
 

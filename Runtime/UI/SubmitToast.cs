@@ -411,10 +411,13 @@ namespace RekonOps.BugBeacon
                 return "";
             }
 
-            // https 스킴 강제 확인
-            if (!string.Equals(baseUri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+            // 스킴 검증: https 필수 (로컬 개발 시 http://localhost 허용)
+            bool isHttps = string.Equals(baseUri.Scheme, "https", StringComparison.OrdinalIgnoreCase);
+            bool isLocalDev = string.Equals(baseUri.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+                              && (baseUri.Host == "localhost" || baseUri.Host == "127.0.0.1");
+            if (!isHttps && !isLocalDev)
             {
-                Debug.LogWarning($"[BugBeacon] SubmitToast: https가 아닌 스킴 거부 ({baseUri.Scheme})");
+                Debug.LogWarning($"[BugBeacon] SubmitToast: 허용되지 않는 스킴 거부 ({baseUri.Scheme}://{baseUri.Host})");
                 return "";
             }
 
@@ -437,9 +440,15 @@ namespace RekonOps.BugBeacon
         /// </summary>
         private static bool IsValidHttpsUrl(string url)
         {
-            return !string.IsNullOrEmpty(url) &&
-                   Uri.TryCreate(url, UriKind.Absolute, out Uri uri) &&
-                   string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(url) || !Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+                return false;
+            // https 허용 + 로컬 개발(http://localhost, http://127.0.0.1) 허용
+            if (string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+                && (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
+                return true;
+            return false;
         }
 
         /// <summary>

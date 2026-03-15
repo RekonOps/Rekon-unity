@@ -45,9 +45,7 @@ namespace RekonOps.BugBeacon
                 Fps = settings.videoFps,
                 BitrateMbps = settings.videoBitrateMbps,
                 Crf = 23,
-                TargetMaxSizeBytes = settings.cachedAttachmentSizeLimitBytes > 0
-                    ? settings.cachedAttachmentSizeLimitBytes
-                    : 0,
+                TargetMaxSizeBytes = 0,
             };
         }
 

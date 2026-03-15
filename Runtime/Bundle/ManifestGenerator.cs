@@ -16,16 +16,11 @@ namespace RekonOps.BugBeacon
         // 플러그인 버전 상수 (package.json과 동기화)
         private const string PluginVersion = "0.1.0";
 
-        /// <summary>Jira 연동 초기값 구성에 사용하는 설정 객체.</summary>
-        private readonly BugBeaconSettings _settings;
-
         /// <summary>
         /// ManifestGenerator 생성자.
         /// </summary>
-        /// <param name="settings">BugBeaconSettings. null 허용 (연동 정보 미설정 시 기본값 사용).</param>
-        public ManifestGenerator(BugBeaconSettings settings = null)
+        public ManifestGenerator()
         {
-            _settings = settings;
         }
 
         /// <summary>
@@ -84,10 +79,10 @@ namespace RekonOps.BugBeacon
                 {
                     jira = new JiraIntegrationInfo
                     {
-                        // jiraProjectKey가 설정된 경우 connected = true로 초기화
-                        connected  = !string.IsNullOrEmpty(_settings?.jiraProjectKey),
-                        cloudId    = "",  // jiraSiteUrl에서 cloudId를 별도 파싱하지 않으므로 빈 문자열
-                        projectKey = _settings?.jiraProjectKey ?? "",
+                        // Jira 연동은 웹 대시보드에서 관리됩니다 (ADR-047)
+                        connected  = false,
+                        cloudId    = "",
+                        projectKey = "",
                         issueKey   = "", // 제출 성공 후 갱신됨
                     }
                 },

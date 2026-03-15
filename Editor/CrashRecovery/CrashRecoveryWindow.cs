@@ -491,20 +491,12 @@ namespace RekonOps.BugBeacon.Editor
 
         /// <summary>
         /// Jira 이슈를 기본 브라우저에서 엽니다.
-        /// Settings의 jiraSiteUrl을 사용하여 URL을 구성합니다.
+        /// Jira 사이트 URL은 웹 대시보드에서 관리되므로 이슈 키만 표시합니다 (ADR-047).
         /// </summary>
         private static void OpenJiraIssue(string issueKey)
         {
-            var settings = BugBeaconSettingsProvider.Settings;
-            if (settings != null && !string.IsNullOrEmpty(settings.jiraSiteUrl))
-            {
-                string url = $"{settings.jiraSiteUrl}/browse/{issueKey}";
-                Application.OpenURL(url);
-            }
-            else
-            {
-                Debug.LogWarning($"[BugBeacon] Jira 사이트 URL이 설정되지 않았습니다. Settings에서 구성하세요. 이슈 키: {issueKey}");
-            }
+            Debug.LogWarning($"[BugBeacon] Jira 직접 연동은 더 이상 지원되지 않습니다. 웹 대시보드에서 이슈를 확인하세요. 이슈 키: {issueKey}");
+            Application.OpenURL(BugBeaconSettings.WEB_DASHBOARD_URL);
         }
 
         // ──────────────────────────────────────────────────────────────

@@ -124,7 +124,7 @@ namespace RekonOps.BugBeacon
                 overlay.SetSilentMode(true);
 
                 // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
-                var manifestGenerator = new ManifestGenerator(settings);
+                var manifestGenerator = new ManifestGenerator();
                 var bundleWriter = new BundleWriter(manifestGenerator);
 
                 // ReportSubmitService: 웹 대시보드 연동 시에만 생성

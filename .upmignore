@@ -1,0 +1,17 @@
+# UPM 패키지 배포 시 제외할 파일/폴더
+supabase/
+supabase.meta
+scripts/
+scripts.meta
+docs/context/
+docs/context.meta
+docs/deployment/
+docs/deployment.meta
+*.iml
+*.iml.meta
+CLAUDE.md
+CLAUDE.md.meta
+.claude/
+.claude.meta
+.github/
+.github.meta

@@ -60,14 +60,66 @@ namespace GaoZombie.BugBeacon
 
             UnityEngine.Debug.Log($"[BugBeacon] MP4 인코딩 시작: {outputPath} ({frames.Length}프레임, {config})");
 
-            await Task.Run(() => RunFfmpegEncoding(frames, outputPath, config, cancellationToken), cancellationToken);
+            await Task.Run(() =>
+            {
+                // GPU 인코더를 먼저 시도하고, 실패 시 CPU(libx264) fallback
+                string gpuEncoder = FfmpegHelper.GetGpuEncoder();
+                bool success = false;
+
+                if (!string.IsNullOrEmpty(gpuEncoder))
+                {
+                    UnityEngine.Debug.Log($"[BugBeacon] GPU 인코더 시도: {gpuEncoder}");
+                    success = TryRunFfmpeg(frames, outputPath, config, gpuEncoder, cancellationToken);
+
+                    if (!success)
+                    {
+                        UnityEngine.Debug.LogWarning($"[BugBeacon] GPU 인코더 실패 ({gpuEncoder}). CPU 인코더(libx264)로 재시도합니다.");
+                        // 손상된 중간 파일 정리
+                        if (System.IO.File.Exists(outputPath))
+                        {
+                            try { System.IO.File.Delete(outputPath); } catch { /* 무시 */ }
+                        }
+                    }
+                }
+
+                if (!success)
+                {
+                    // CPU fallback (libx264) — encoderName null이면 libx264 사용
+                    UnityEngine.Debug.Log("[BugBeacon] CPU 인코더(libx264)로 인코딩합니다.");
+                    RunFfmpegEncoding(frames, outputPath, config, cancellationToken, null);
+                }
+            }, cancellationToken);
         }
 
         // ──────────────────────────────────────────────────────────────
         // 내부 구현
         // ──────────────────────────────────────────────────────────────
 
-        private void RunFfmpegEncoding(FrameData[] frames, string outputPath, VideoEncoderConfig config, CancellationToken cancellationToken)
+        /// <summary>
+        /// GPU 인코더로 인코딩을 시도합니다.
+        /// 성공(exit code 0, 파일 생성)이면 true, 실패 시 false 반환.
+        /// </summary>
+        private bool TryRunFfmpeg(FrameData[] frames, string outputPath, VideoEncoderConfig config, string encoderName, CancellationToken cancellationToken)
+        {
+            try
+            {
+                RunFfmpegEncoding(frames, outputPath, config, cancellationToken, encoderName);
+                // RunFfmpegEncoding 내부에서 hasError 시 파일을 삭제하므로, 파일 존재 여부로 성공 판단
+                return File.Exists(outputPath);
+            }
+            catch (OperationCanceledException)
+            {
+                // 취소는 상위로 전파
+                throw;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[BugBeacon] TryRunFfmpeg({encoderName}) 예외: {ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void RunFfmpegEncoding(FrameData[] frames, string outputPath, VideoEncoderConfig config, CancellationToken cancellationToken, string encoderName = null)
         {
             // 1. 출력 디렉토리 확인/생성
             string outputDir = Path.GetDirectoryName(outputPath);
@@ -76,18 +128,8 @@ namespace GaoZombie.BugBeacon
                 Directory.CreateDirectory(outputDir);
             }
 
-            // 2. FFmpeg 인수 구성
-            //    - -y: 출력 파일 덮어쓰기
-            //    - -f rawvideo: 입력 포맷 지정
-            //    - -pix_fmt rgba: 입력 픽셀 포맷 (Unity RGBA32)
-            //    - -video_size WxH: 프레임 해상도
-            //    - -framerate N: 입력 프레임레이트
-            //    - -i pipe:0: stdin에서 읽기
-            //    - -vcodec libx264: H.264 인코더 사용
-            //    - -pix_fmt yuv420p: 광범위한 플레이어 호환성을 위한 출력 픽셀 포맷
-            //    - -preset ultrafast: 인코딩 속도 우선 (캡처 도구이므로 실시간성 중요)
-            //    - -crf 23: 화질 설정 (0=무손실, 51=최저화질, 기본값 23)
-            string ffmpegArgs = BuildFfmpegArguments(config, outputPath);
+            // 2. FFmpeg 인수 구성 (인코더별 최적 인수 사용)
+            string ffmpegArgs = BuildFfmpegArguments(config, outputPath, encoderName);
             string ffmpegPath = FfmpegHelper.GetPath();
 
             var startInfo = new ProcessStartInfo
@@ -266,16 +308,44 @@ namespace GaoZombie.BugBeacon
             }
         }
 
-        private static string BuildFfmpegArguments(VideoEncoderConfig config, string outputPath)
+        /// <summary>
+        /// 인코더별 최적 인수를 포함한 FFmpeg 명령줄 인수를 구성합니다.
+        /// encoderName이 null이면 libx264 CPU 인코더를 사용합니다.
+        /// </summary>
+        private static string BuildFfmpegArguments(VideoEncoderConfig config, string outputPath, string encoderName)
         {
             // 경로에 포함된 따옴표 문자 제거 후 인용 처리
             string safeOutputPath = outputPath.Replace("\"", "");
 
+            // 인코더별 최적 인수 선택
+            string encoderArgs = encoderName switch
+            {
+                // NVIDIA NVENC: 가변 비트레이트 + CQ 품질 제어
+                "h264_nvenc"        => $"-vcodec h264_nvenc -preset p4 -rc vbr -cq {config.Crf}",
+                // AMD AMF: CQP 고정 품질 모드
+                "h264_amf"          => $"-vcodec h264_amf -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
+                // Apple VideoToolbox: 실시간 모드 + q 파라미터 (0~100, 높을수록 고화질)
+                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -realtime 1 -q {MapCrfToVideoToolboxQ(config.Crf)}",
+                // Intel Quick Sync: global_quality로 품질 제어
+                "h264_qsv"          => $"-vcodec h264_qsv -preset veryfast -global_quality {config.Crf}",
+                // CPU fallback (libx264): 기존 동작과 동일
+                _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
+            };
+
             // -vf vflip: Unity 텍스처는 하단 원점(Y-up)이라 상하 반전 보정 필요
             return $"-y -f rawvideo -pix_fmt rgba -video_size {config.Width}x{config.Height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-vf vflip -vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf} " +
+                   $"-vf vflip {encoderArgs} " +
                    $"\"{safeOutputPath}\"";
+        }
+
+        /// <summary>
+        /// libx264의 CRF 값(0~51)을 VideoToolbox의 q 값(1~100)으로 변환합니다.
+        /// CRF가 낮을수록 고화질 → q가 높을수록 고화질.
+        /// </summary>
+        private static int MapCrfToVideoToolboxQ(int crf)
+        {
+            return Mathf.Clamp(100 - Mathf.RoundToInt(crf * (99f / 51f)), 1, 100);
         }
     }
 }

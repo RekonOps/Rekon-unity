@@ -20,6 +20,7 @@ namespace GaoZombie.BugBeacon
     ///
     /// 스레드: Task.Run을 사용하여 파일 I/O를 백그라운드 스레드에서 처리합니다.
     /// </summary>
+    [System.Obsolete("FFmpeg 없는 환경에서는 영상 캡처 자체가 비활성화됩니다. 이 클래스는 하위 호환을 위해 유지됩니다.")]
     public class VideoEncoder : IVideoEncoder
     {
         /// <summary>출력 파일 확장자. 디렉토리 출력이므로 빈 문자열.</summary>

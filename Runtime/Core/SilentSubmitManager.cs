@@ -40,7 +40,13 @@ namespace GaoZombie.BugBeacon
         private PendingUploadManager _pendingUploadManager;
         private ICaptureOrchestrator _orchestrator;
         private bool _disposed;
-        private bool _isSubmitting;
+        // 원자적 플래그: 0 = 대기, 1 = 제출 중
+        private int _isSubmittingFlag;
+
+        // ─── 프로퍼티 ─────────────────────────────────────────────────────────
+
+        /// <summary>현재 제출이 진행 중인지 여부 (원자적 읽기)</summary>
+        public bool IsSubmitting => Interlocked.CompareExchange(ref _isSubmittingFlag, 0, 0) == 1;
 
         // ─── 이벤트 ──────────────────────────────────────────────────────────
 
@@ -115,13 +121,12 @@ namespace GaoZombie.BugBeacon
                 return;
             }
 
-            if (_isSubmitting)
+            // 원자적 CAS: 0(대기) → 1(제출 중) 으로 교체. 이미 1이면 중복 진입 차단
+            if (Interlocked.CompareExchange(ref _isSubmittingFlag, 1, 0) != 0)
             {
                 Debug.LogWarning("[BugBeacon] SilentSubmit: 이미 제출이 진행 중입니다.");
                 return;
             }
-
-            _isSubmitting = true;
 
             try
             {
@@ -167,7 +172,8 @@ namespace GaoZombie.BugBeacon
             }
             finally
             {
-                _isSubmitting = false;
+                // 원자적으로 플래그 해제: 1(제출 중) → 0(대기)
+                Interlocked.Exchange(ref _isSubmittingFlag, 0);
             }
         }
 

@@ -517,6 +517,13 @@ namespace GaoZombie.BugBeacon.Editor
             {
                 string versionInfo = FfmpegHelper.GetVersionInfo();
                 EditorGUILayout.LabelField("상태", $"✓ 설치됨 ({versionInfo})");
+
+                // GPU 인코더 감지 결과 표시
+                string gpuEncoder = FfmpegHelper.GetGpuEncoder();
+                if (!string.IsNullOrEmpty(gpuEncoder))
+                    EditorGUILayout.LabelField("GPU 인코더", $"✓ {gpuEncoder}");
+                else
+                    EditorGUILayout.LabelField("GPU 인코더", "없음 (libx264 CPU 사용)");
             }
             else
             {
@@ -525,9 +532,10 @@ namespace GaoZombie.BugBeacon.Editor
                 EditorGUILayout.Space(4f);
 
                 EditorGUILayout.HelpBox(
-                    "FFmpeg가 없어도 플러그인은 정상 동작합니다.\n" +
-                    "단, 영상 녹화가 MP4 대신 raw 프레임으로 저장됩니다.",
-                    MessageType.Info);
+                    "FFmpeg가 설치되어 있지 않습니다.\n" +
+                    "영상 캡처가 비활성화됩니다. 스크린샷과 로그는 정상 동작합니다.\n\n" +
+                    "영상 캡처를 사용하려면 아래 방법으로 FFmpeg를 설치하세요.",
+                    MessageType.Warning);
 
                 EditorGUILayout.Space(4f);
 

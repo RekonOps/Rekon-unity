@@ -33,8 +33,10 @@ namespace GaoZombie.BugBeacon
         private readonly BugBeaconSettings _settings;
 
         private HotkeyManager _hotkeyManager;
+        private SilentSubmitManager _silentSubmitManager;
         private bool _disposed;
-        private bool _isCapturing;
+        // 원자적 플래그: 0 = 대기, 1 = 캡처 중
+        private int _isCapturingFlag;
 
         /// <summary>캡처 진행 상황 이벤트</summary>
         public event Action<CaptureProgressEvent> OnProgress;
@@ -66,6 +68,16 @@ namespace GaoZombie.BugBeacon
         }
 
         /// <summary>
+        /// SilentSubmitManager를 바인딩합니다.
+        /// 캡처 시작 전 제출 진행 여부를 확인하는 데 사용됩니다.
+        /// </summary>
+        public void BindSilentSubmitManager(SilentSubmitManager manager)
+        {
+            _silentSubmitManager = manager;
+            Debug.Log("[BugBeacon] CaptureOrchestrator: SilentSubmitManager 바인딩 완료");
+        }
+
+        /// <summary>
         /// HotkeyManager를 등록하고 OnCaptureTrigger 이벤트를 구독합니다.
         /// </summary>
         public void BindHotkeyManager(HotkeyManager hotkeyManager)
@@ -85,13 +97,21 @@ namespace GaoZombie.BugBeacon
         /// </summary>
         public async Task<CaptureResult> StartAsync()
         {
-            if (_isCapturing)
+            // 원자적 CAS: 0(대기) → 1(캡처 중) 으로 교체. 이미 1이면 중복 진입 차단
+            if (Interlocked.CompareExchange(ref _isCapturingFlag, 1, 0) != 0)
             {
                 Debug.LogWarning("[BugBeacon] 이미 캡처가 진행 중입니다.");
                 return null;
             }
 
-            _isCapturing = true;
+            // 제출 진행 중이면 새 캡처 차단
+            if (_silentSubmitManager != null && _silentSubmitManager.IsSubmitting)
+            {
+                Debug.LogWarning("[BugBeacon] 제출이 진행 중입니다. 캡처를 시작할 수 없습니다.");
+                // 획득한 캡처 플래그 반환
+                Interlocked.Exchange(ref _isCapturingFlag, 0);
+                return null;
+            }
 
             // 인코더별 권장 타임아웃 적용 (인코딩 방식에 따라 소요 시간이 다름)
             float effectiveTimeout = (_videoEncoder != null)
@@ -127,7 +147,8 @@ namespace GaoZombie.BugBeacon
             }
             finally
             {
-                _isCapturing = false;
+                // 원자적으로 플래그 해제: 1(캡처 중) → 0(대기)
+                Interlocked.Exchange(ref _isCapturingFlag, 0);
             }
 
             return result;

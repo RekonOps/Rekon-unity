@@ -78,6 +78,10 @@ namespace RekonOps.BugBeacon
         {
             public string error;
             public string code;
+            /// <summary>사용량 초과 시 제한 유형: "daily" | "monthly"</summary>
+            public string reason;
+            /// <summary>업그레이드 안내 URL</summary>
+            public string upgradeUrl;
         }
 
         // ─── 생성자 ─────────────────────────────────────────────────────────────
@@ -227,6 +231,20 @@ namespace RekonOps.BugBeacon
                     ErrorMessage = null
                 };
             }
+            catch (UsageLimitExceededException ex)
+            {
+                // 429 사용량 초과 전용 처리 — pending 큐 등록 없이 사용자에게 안내
+                Debug.LogWarning($"[BugBeacon] 사용량 한도 초과: reason={ex.LimitReason}, upgradeUrl={ex.UpgradeUrl}");
+                ReportProgress(progress, SubmitPhase.Failed, 0f, "사용량 한도 초과");
+                return new SubmitResult
+                {
+                    Success = false,
+                    IsUsageLimitExceeded = true,
+                    UsageLimitReason = ex.LimitReason,
+                    UpgradeUrl = ex.UpgradeUrl,
+                    ErrorMessage = ex.Message
+                };
+            }
             catch (OperationCanceledException)
             {
                 Debug.Log("[BugBeacon] 리포트 제출이 취소되었습니다.");
@@ -338,6 +356,11 @@ namespace RekonOps.BugBeacon
                 try
                 {
                     return await SendRequestAsync(method, url, jsonBody, accessToken, ct);
+                }
+                catch (UsageLimitExceededException)
+                {
+                    // 429 사용량 초과는 재시도하지 않음
+                    throw;
                 }
                 catch (AuthBrokerException ex) when (ex.StatusCode >= 400 && ex.StatusCode < 500)
                 {
@@ -457,11 +480,20 @@ namespace RekonOps.BugBeacon
 
                         // 에러 응답 본문에서 상세 메시지 추출 시도
                         string detailMessage = errorMessage;
+                        string usageLimitReason = null;
+                        string upgradeUrl = null;
                         try
                         {
                             var errorObj = JsonUtility.FromJson<ErrorResponse>(responseText);
                             if (!string.IsNullOrEmpty(errorObj?.error))
                                 detailMessage = errorObj.error;
+
+                            // 429 사용량 초과 전용 필드 추출
+                            if (statusCode == 429 && errorObj?.code == "usage_limit_exceeded")
+                            {
+                                usageLimitReason = errorObj.reason;   // "daily" | "monthly"
+                                upgradeUrl = errorObj.upgradeUrl;
+                            }
                         }
                         catch { /* JSON 파싱 실패 시 기본 에러 메시지 사용 */ }
 
@@ -469,6 +501,14 @@ namespace RekonOps.BugBeacon
                         {
                             tcs.TrySetException(new NetworkException(
                                 $"네트워크 오류: {detailMessage}"));
+                        }
+                        else if (statusCode == 429 && usageLimitReason != null)
+                        {
+                            // 사용량 초과 전용 예외: reason + upgradeUrl 포함
+                            tcs.TrySetException(new UsageLimitExceededException(
+                                usageLimitReason,
+                                upgradeUrl,
+                                $"HTTP 429: {detailMessage}"));
                         }
                         else
                         {
@@ -657,5 +697,34 @@ namespace RekonOps.BugBeacon
 
         /// <summary>오류 메시지 (성공 시 null)</summary>
         public string ErrorMessage { get; set; }
+
+        /// <summary>429 사용량 초과 에러 여부</summary>
+        public bool IsUsageLimitExceeded { get; set; }
+
+        /// <summary>사용량 초과 유형: "daily" | "monthly" (IsUsageLimitExceeded가 true일 때만 유효)</summary>
+        public string UsageLimitReason { get; set; }
+
+        /// <summary>업그레이드 안내 URL (IsUsageLimitExceeded가 true일 때만 유효)</summary>
+        public string UpgradeUrl { get; set; }
+    }
+
+    /// <summary>
+    /// 429 사용량 초과 예외.
+    /// create-report API에서 { code: "usage_limit_exceeded", reason: "daily"|"monthly" } 응답 시 발생합니다.
+    /// </summary>
+    public class UsageLimitExceededException : Exception
+    {
+        /// <summary>초과 유형: "daily" 또는 "monthly"</summary>
+        public string LimitReason { get; }
+
+        /// <summary>업그레이드 안내 URL</summary>
+        public string UpgradeUrl { get; }
+
+        public UsageLimitExceededException(string limitReason, string upgradeUrl, string message)
+            : base(message)
+        {
+            LimitReason = limitReason ?? "";
+            UpgradeUrl = upgradeUrl ?? "";
+        }
     }
 }

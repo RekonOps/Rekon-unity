@@ -366,6 +366,17 @@ namespace RekonOps.BugBeacon
                     Debug.Log($"[BugBeacon] SilentSubmit: 웹 전송 성공! ReportId={result.ReportId}");
                     OnSubmitCompleted?.Invoke(true, result.ReportId);
                 }
+                else if (result.IsUsageLimitExceeded)
+                {
+                    // 429 사용량 초과: pending 큐 등록 없이 사용자 안내만 수행
+                    manifest.state = BundleState.Failed;
+                    Debug.LogWarning($"[BugBeacon] SilentSubmit: 사용량 한도 초과 " +
+                                     $"(reason={result.UsageLimitReason}, upgradeUrl={result.UpgradeUrl})");
+
+                    // 이벤트 페이로드: "USAGE_LIMIT:<reason>:<upgradeUrl>"
+                    string payload = $"USAGE_LIMIT:{result.UsageLimitReason}:{result.UpgradeUrl ?? ""}";
+                    OnSubmitCompleted?.Invoke(false, payload);
+                }
                 else
                 {
                     manifest.state = BundleState.Failed;

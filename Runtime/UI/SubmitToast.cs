@@ -57,6 +57,8 @@ namespace RekonOps.BugBeacon
             Success,
             LocalSave,
             Failure,
+            /// <summary>429 사용량 초과</summary>
+            UsageLimit,
         }
 
         private ToastState _state = ToastState.Hidden;
@@ -65,6 +67,8 @@ namespace RekonOps.BugBeacon
         private float _currentAlpha;
         private string _message = "";
         private string _reportUrl = "";
+        /// <summary>429 토스트 전용: 업그레이드 페이지 URL</summary>
+        private string _upgradeUrl = "";
 
         // ─── GUI 스타일 캐시 ──────────────────────────────────────────────────────
 
@@ -226,21 +230,43 @@ namespace RekonOps.BugBeacon
                     _toastType = ToastType.LocalSave;
                     _message = "오프라인 저장됨 (로그인 후 자동 업로드)";
                     _reportUrl = "";
+                    _upgradeUrl = "";
                 }
                 else
                 {
                     _toastType = ToastType.Success;
                     _message = "리포트가 저장되었습니다";
+                    _upgradeUrl = "";
 
                     // 웹 대시보드 URL 구성 (보안 검증 포함, 상수 URL 사용)
                     _reportUrl = BuildSecureReportUrl(BugBeaconSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
                 }
+            }
+            else if (reportIdOrMessage != null && reportIdOrMessage.StartsWith("USAGE_LIMIT:"))
+            {
+                // 429 사용량 초과 전용 처리
+                // 페이로드 형식: "USAGE_LIMIT:<reason>:<upgradeUrl>"
+                var parts = reportIdOrMessage.Split(new[] { ':' }, 3);
+                string reason = parts.Length > 1 ? parts[1] : "";
+                string rawUpgradeUrl = parts.Length > 2 ? parts[2] : "";
+
+                _toastType = ToastType.UsageLimit;
+                _reportUrl = "";
+
+                if (reason == "daily")
+                    _message = "일일 리포트 한도(5개)에 도달했습니다.\n내일 다시 시도하거나 업그레이드하세요.";
+                else
+                    _message = "월간 리포트 한도(30개)에 도달했습니다.\n업그레이드하세요.";
+
+                // 업그레이드 URL 구성: upgradeUrl이 "/pricing" 같은 상대 경로면 baseUrl과 합침
+                _upgradeUrl = BuildUpgradeUrl(BugBeaconSettings.WEB_DASHBOARD_URL, rawUpgradeUrl);
             }
             else
             {
                 _toastType = ToastType.Failure;
                 _message = "웹 저장 실패하여 로컬에 저장";
                 _reportUrl = "";
+                _upgradeUrl = "";
             }
 
             // 페이드 인 시작
@@ -269,10 +295,11 @@ namespace RekonOps.BugBeacon
             // 배경색 결정
             Color bgColor = _toastType switch
             {
-                ToastType.Success   => new Color(0.1f, 0.5f, 0.15f, 0.9f * _currentAlpha),
-                ToastType.LocalSave => new Color(0.6f, 0.5f, 0.0f, 0.9f * _currentAlpha),
-                ToastType.Failure   => new Color(0.6f, 0.12f, 0.1f, 0.9f * _currentAlpha),
-                _                   => new Color(0f, 0f, 0f, 0.75f * _currentAlpha),
+                ToastType.Success    => new Color(0.1f, 0.5f, 0.15f, 0.9f * _currentAlpha),
+                ToastType.LocalSave  => new Color(0.6f, 0.5f, 0.0f, 0.9f * _currentAlpha),
+                ToastType.Failure    => new Color(0.6f, 0.12f, 0.1f, 0.9f * _currentAlpha),
+                ToastType.UsageLimit => new Color(0.55f, 0.27f, 0.0f, 0.9f * _currentAlpha),
+                _                    => new Color(0f, 0f, 0f, 0.75f * _currentAlpha),
             };
 
             // 배경 박스
@@ -320,6 +347,31 @@ namespace RekonOps.BugBeacon
                     else
                     {
                         Debug.LogWarning("[BugBeacon] SubmitToast: 유효하지 않은 URL이므로 열지 않음");
+                    }
+                    Hide();
+                }
+
+                Rect closeBtnRect = new Rect(innerX + btnWidth + 8f, buttonY, btnWidth, buttonHeight);
+                if (GUI.Button(closeBtnRect, "닫기", _buttonStyle))
+                {
+                    Hide();
+                }
+            }
+            else if (_toastType == ToastType.UsageLimit)
+            {
+                // 429 사용량 초과: [업그레이드] + [닫기] 버튼
+                float btnWidth = (innerW - 8f) / 2f;
+
+                Rect upgradeBtnRect = new Rect(innerX, buttonY, btnWidth, buttonHeight);
+                if (GUI.Button(upgradeBtnRect, "업그레이드", _buttonStyle))
+                {
+                    if (!string.IsNullOrEmpty(_upgradeUrl) && IsValidHttpsUrl(_upgradeUrl))
+                    {
+                        Application.OpenURL(_upgradeUrl);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[BugBeacon] SubmitToast: 업그레이드 URL이 유효하지 않아 열지 않음");
                     }
                     Hide();
                 }
@@ -433,6 +485,33 @@ namespace RekonOps.BugBeacon
             }
 
             return fullUrl;
+        }
+
+        /// <summary>
+        /// 업그레이드 URL을 구성합니다.
+        /// rawUpgradeUrl이 절대 경로이면 그대로 사용하고,
+        /// "/pricing" 같은 상대 경로이면 baseUrl과 결합합니다.
+        /// </summary>
+        private static string BuildUpgradeUrl(string baseUrl, string rawUpgradeUrl)
+        {
+            if (string.IsNullOrEmpty(rawUpgradeUrl))
+            {
+                // upgradeUrl이 없으면 baseUrl/pricing 으로 폴백
+                if (string.IsNullOrEmpty(baseUrl)) return "";
+                if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri fallbackBase)) return "";
+                return $"{fallbackBase.AbsoluteUri.TrimEnd('/')}/pricing";
+            }
+
+            // 절대 URL인지 확인
+            if (Uri.TryCreate(rawUpgradeUrl, UriKind.Absolute, out Uri absoluteUri))
+                return absoluteUri.AbsoluteUri;
+
+            // 상대 경로: baseUrl과 결합
+            if (string.IsNullOrEmpty(baseUrl)) return "";
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri baseUri)) return "";
+
+            string relative = rawUpgradeUrl.StartsWith("/") ? rawUpgradeUrl : $"/{rawUpgradeUrl}";
+            return $"{baseUri.AbsoluteUri.TrimEnd('/')}{relative}";
         }
 
         /// <summary>

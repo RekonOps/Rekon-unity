@@ -147,7 +147,7 @@ namespace RekonOps.BugBeacon
                 var usageCheck = await CheckUsageLimitAsync();
                 if (usageCheck != null && !usageCheck.Allowed)
                 {
-                    string limitLabel = usageCheck.Reason == "daily" ? "일일 한도 도달" : "월간 한도 도달";
+                    string limitLabel = "월간 한도 도달";
                     Debug.LogWarning($"[BugBeacon] 사용량 한도 초과: {usageCheck.Reason}");
                     ReportProgress("usage_limit", 0f, limitLabel);
                     // 획득한 캡처 플래그 반환
@@ -543,12 +543,12 @@ namespace RekonOps.BugBeacon
                 if (usage == null)
                     return null;
 
-                if (usage.daily_exceeded || usage.monthly_exceeded)
+                if (usage.monthly_exceeded)
                 {
                     return new UsageCheckResult
                     {
                         Allowed = false,
-                        Reason = usage.daily_exceeded ? "daily" : "monthly"
+                        Reason = "monthly"
                     };
                 }
 
@@ -572,7 +572,7 @@ namespace RekonOps.BugBeacon
             /// <summary>캡처 허용 여부. false이면 Reason을 참조하세요.</summary>
             public bool Allowed;
 
-            /// <summary>한도 초과 유형: "daily" | "monthly"</summary>
+            /// <summary>한도 초과 유형: "monthly"</summary>
             public string Reason;
         }
 
@@ -581,12 +581,8 @@ namespace RekonOps.BugBeacon
         private class UsageInfoResponse
         {
             public string plan;
-            public int daily_count;
             public int monthly_count;
-            public int daily_limit;
             public int monthly_limit;
-            /// <summary>일일 한도 초과 여부</summary>
-            public bool daily_exceeded;
             /// <summary>월간 한도 초과 여부</summary>
             public bool monthly_exceeded;
         }

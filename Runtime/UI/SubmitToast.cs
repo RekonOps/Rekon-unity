@@ -245,9 +245,11 @@ namespace RekonOps.BugBeacon
             else if (reportIdOrMessage != null && reportIdOrMessage.StartsWith("USAGE_LIMIT:"))
             {
                 // 429 사용량 초과 전용 처리
-                // 페이로드 형식: "USAGE_LIMIT:<reason>:<upgradeUrl>"
-                var parts = reportIdOrMessage.Split(new[] { ':' }, 3);
-                string rawUpgradeUrl = parts.Length > 2 ? parts[2] : "";
+                // 페이로드 형식: "USAGE_LIMIT:<reason>:<monthly_limit>:<upgradeUrl>"
+                var parts = reportIdOrMessage.Split(new[] { ':' }, 4);
+                string limitStr      = parts.Length > 2 ? parts[2] : "";
+                string rawUpgradeUrl = parts.Length > 3 ? parts[3] : "";
+                int limit = int.TryParse(limitStr, out int l) ? l : 10;
 
                 _toastType = ToastType.UsageLimit;
                 _reportUrl = "";
@@ -257,7 +259,7 @@ namespace RekonOps.BugBeacon
                     var utcNow = System.DateTime.UtcNow;
                     var nextMonth = new System.DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, System.DateTimeKind.Utc).AddMonths(1);
                     int daysLeft = (int)System.Math.Ceiling((nextMonth - utcNow).TotalDays);
-                    _message = $"월간 리포트 한도(10개)에 도달했습니다.\n초기화까지 {daysLeft}일 남았습니다.";
+                    _message = $"월간 리포트 한도({limit}개)에 도달했습니다.\n초기화까지 {daysLeft}일 남았습니다.";
                 }
 
                 // 업그레이드 URL 구성: upgradeUrl이 "/pricing" 같은 상대 경로면 baseUrl과 합침

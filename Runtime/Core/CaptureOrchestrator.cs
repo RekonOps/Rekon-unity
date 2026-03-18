@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace RekonOps.BugBeacon
 {
@@ -31,6 +32,13 @@ namespace RekonOps.BugBeacon
         private readonly IVideoEncoder _videoEncoder;
         private readonly VideoEncoderConfig _videoConfig;
         private readonly BugBeaconSettings _settings;
+        // 생성자 주입 토큰 스토어 (null 허용)
+        private readonly SessionTokenStore _tokenStore;
+        // 런타임 바인딩 토큰 스토어 — BindTokenStore() 호출 시 설정되며, _tokenStore보다 우선합니다.
+        private SessionTokenStore _runtimeTokenStore;
+
+        // 실제 사용할 토큰 스토어: 런타임 바인딩 우선, 없으면 생성자 주입 사용
+        private SessionTokenStore ActiveTokenStore => _runtimeTokenStore ?? _tokenStore;
 
         private HotkeyManager _hotkeyManager;
         private SilentSubmitManager _silentSubmitManager;
@@ -47,6 +55,7 @@ namespace RekonOps.BugBeacon
         /// <summary>
         /// CaptureOrchestrator를 초기화합니다.
         /// </summary>
+        /// <param name="tokenStore">세션 토큰 저장소. null 허용 — null이면 사용량 사전 체크를 건너뜁니다.</param>
         public CaptureOrchestrator(
             IScreenshotCapturer screenshotCapturer,
             ILogCollector logCollector,
@@ -55,7 +64,8 @@ namespace RekonOps.BugBeacon
             FrameRingBuffer frameBuffer,
             IVideoEncoder videoEncoder,
             VideoEncoderConfig videoConfig,
-            BugBeaconSettings settings)
+            BugBeaconSettings settings,
+            SessionTokenStore tokenStore = null)
         {
             _screenshotCapturer = screenshotCapturer ?? throw new ArgumentNullException(nameof(screenshotCapturer));
             _logCollector = logCollector ?? throw new ArgumentNullException(nameof(logCollector));
@@ -65,6 +75,20 @@ namespace RekonOps.BugBeacon
             _videoEncoder = videoEncoder; // null 허용
             _videoConfig = videoConfig; // null 허용
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _tokenStore = tokenStore; // null 허용 (미연동 시 사전 체크 건너뜀)
+        }
+
+        /// <summary>
+        /// SessionTokenStore를 런타임에 바인딩합니다.
+        /// 부트스트랩에서 tokenStore 생성 후 오케스트레이터에 주입할 때 사용합니다.
+        /// 이미 생성자에서 주입된 경우에도 교체할 수 있습니다.
+        /// </summary>
+        public void BindTokenStore(SessionTokenStore tokenStore)
+        {
+            // _tokenStore는 readonly가 아니므로 필드를 직접 교체하는 대신
+            // 별도의 런타임 오버라이드 필드를 사용합니다.
+            _runtimeTokenStore = tokenStore;
+            Debug.Log("[BugBeacon] CaptureOrchestrator: SessionTokenStore 바인딩 완료");
         }
 
         /// <summary>
@@ -111,6 +135,25 @@ namespace RekonOps.BugBeacon
                 // 획득한 캡처 플래그 반환
                 Interlocked.Exchange(ref _isCapturingFlag, 0);
                 return null;
+            }
+
+            // 사용량 사전 체크: 웹 대시보드 연동 상태이고 유효한 토큰이 있을 때만 수행
+            bool usagePreCheckEnabled = _settings.isLinked
+                && ActiveTokenStore != null
+                && ActiveTokenStore.HasValidSupabaseToken();
+
+            if (usagePreCheckEnabled)
+            {
+                var usageCheck = await CheckUsageLimitAsync();
+                if (usageCheck != null && !usageCheck.Allowed)
+                {
+                    string limitLabel = usageCheck.Reason == "daily" ? "일일 한도 도달" : "월간 한도 도달";
+                    Debug.LogWarning($"[BugBeacon] 사용량 한도 초과: {usageCheck.Reason}");
+                    ReportProgress("usage_limit", 0f, limitLabel);
+                    // 획득한 캡처 플래그 반환
+                    Interlocked.Exchange(ref _isCapturingFlag, 0);
+                    return null;
+                }
             }
 
             // 인코더별 권장 타임아웃 적용 (인코딩 방식에 따라 소요 시간이 다름)
@@ -385,6 +428,167 @@ namespace RekonOps.BugBeacon
             {
                 Debug.LogWarning($"[BugBeacon] OnProgress 핸들러 오류: {ex.Message}");
             }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 사용량 사전 체크
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 캡처 전 사용량 한도를 사전 체크합니다.
+        /// 웹 대시보드 /api/usage 엔드포인트를 3초 타임아웃으로 호출합니다.
+        ///
+        /// 반환값:
+        ///   - null: API 실패 / 타임아웃 → fail-open (캡처 허용)
+        ///   - { Allowed = true }: 여유 있음 → 캡처 허용
+        ///   - { Allowed = false, Reason = "daily"|"monthly" }: 한도 초과 → 캡처 차단
+        /// </summary>
+        private async Task<UsageCheckResult> CheckUsageLimitAsync()
+        {
+            try
+            {
+                string accessToken = _tokenStore.LoadSupabase();
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    // 토큰 없음 → fail-open
+                    Debug.Log("[BugBeacon] 사용량 사전 체크: 토큰 없음. 캡처를 계속 진행합니다.");
+                    return null;
+                }
+
+                // URL: {WEB_DASHBOARD_URL}/api/usage?workspace_id={workspaceId}
+                string workspaceId = _settings.tenantId;
+                string baseUrl = BugBeaconSettings.WEB_DASHBOARD_URL.TrimEnd('/');
+                string url = $"{baseUrl}/api/usage?workspace_id={Uri.EscapeDataString(workspaceId)}";
+
+                var tcs = new TaskCompletionSource<string>();
+                var syncContext = System.Threading.SynchronizationContext.Current;
+
+                void RunOnMainThread(Action action)
+                {
+                    if (syncContext != null)
+                        syncContext.Post(_ => action(), null);
+                    else
+                        action();
+                }
+
+                RunOnMainThread(async () =>
+                {
+                    UnityWebRequest request = null;
+                    bool isDisposed = false;
+
+                    try
+                    {
+                        request = UnityWebRequest.Get(url);
+                        request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
+                        // 3초 타임아웃 (빠른 실패 — 네트워크 단절 대응)
+                        request.timeout = 3;
+
+                        var operation = request.SendWebRequest();
+                        while (!operation.isDone)
+                            await Task.Yield();
+
+                        if (request.result == UnityWebRequest.Result.Success)
+                        {
+                            tcs.TrySetResult(request.downloadHandler.text);
+                        }
+                        else
+                        {
+                            // fail-open: 네트워크 오류, 4xx, 5xx 모두 null로 처리
+                            Debug.Log($"[BugBeacon] 사용량 사전 체크 응답 오류 " +
+                                      $"(fail-open, HTTP {request.responseCode}): {request.error}");
+                            tcs.TrySetResult(null);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.Log($"[BugBeacon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
+                        tcs.TrySetResult(null);
+                    }
+                    finally
+                    {
+                        isDisposed = true;
+                        request?.Dispose();
+                    }
+                });
+
+                // 3초 + 여유 1초 대기 (UnityWebRequest.timeout이 이미 3초이므로 4초 초과 시 강제 fail-open)
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(4));
+                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+
+                if (completedTask == timeoutTask || !tcs.Task.IsCompleted)
+                {
+                    Debug.Log("[BugBeacon] 사용량 사전 체크 타임아웃 (fail-open). 캡처를 계속 진행합니다.");
+                    return null;
+                }
+
+                string responseJson = tcs.Task.Result;
+                if (string.IsNullOrEmpty(responseJson))
+                {
+                    // fail-open
+                    return null;
+                }
+
+                // JSON 파싱
+                UsageInfoResponse usage;
+                try
+                {
+                    usage = JsonUtility.FromJson<UsageInfoResponse>(responseJson);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log($"[BugBeacon] 사용량 사전 체크 JSON 파싱 실패 (fail-open): {ex.Message}");
+                    return null;
+                }
+
+                if (usage == null)
+                    return null;
+
+                if (usage.daily_exceeded || usage.monthly_exceeded)
+                {
+                    return new UsageCheckResult
+                    {
+                        Allowed = false,
+                        Reason = usage.daily_exceeded ? "daily" : "monthly"
+                    };
+                }
+
+                return new UsageCheckResult { Allowed = true };
+            }
+            catch (Exception ex)
+            {
+                // fail-open: 예외 시 캡처 허용
+                Debug.Log($"[BugBeacon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
+                return null;
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 사용량 체크 전용 내부 데이터 클래스
+        // ──────────────────────────────────────────────────────────────
+
+        /// <summary>사용량 사전 체크 결과</summary>
+        private class UsageCheckResult
+        {
+            /// <summary>캡처 허용 여부. false이면 Reason을 참조하세요.</summary>
+            public bool Allowed;
+
+            /// <summary>한도 초과 유형: "daily" | "monthly"</summary>
+            public string Reason;
+        }
+
+        /// <summary>/api/usage 응답 모델</summary>
+        [Serializable]
+        private class UsageInfoResponse
+        {
+            public string plan;
+            public int daily_count;
+            public int monthly_count;
+            public int daily_limit;
+            public int monthly_limit;
+            /// <summary>일일 한도 초과 여부</summary>
+            public bool daily_exceeded;
+            /// <summary>월간 한도 초과 여부</summary>
+            public bool monthly_exceeded;
         }
     }
 }

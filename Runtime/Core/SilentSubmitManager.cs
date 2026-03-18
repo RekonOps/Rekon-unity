@@ -373,8 +373,8 @@ namespace GaoZombie.BugBeacon
                     Debug.LogWarning($"[BugBeacon] SilentSubmit: 사용량 한도 초과 " +
                                      $"(reason={result.UsageLimitReason}, upgradeUrl={result.UpgradeUrl})");
 
-                    // 이벤트 페이로드: "USAGE_LIMIT:<reason>:<upgradeUrl>"
-                    string payload = $"USAGE_LIMIT:{result.UsageLimitReason}:{result.UpgradeUrl ?? ""}";
+                    // 이벤트 페이로드: "USAGE_LIMIT:<reason>:<monthly_limit>:<upgradeUrl>"
+                    string payload = $"USAGE_LIMIT:{result.UsageLimitReason}:{result.MonthlyLimit}:{result.UpgradeUrl ?? ""}";
                     OnSubmitCompleted?.Invoke(false, payload);
                 }
                 else

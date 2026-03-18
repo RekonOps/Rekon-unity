@@ -82,6 +82,8 @@ namespace GaoZombie.BugBeacon
             public string reason;
             /// <summary>업그레이드 안내 URL</summary>
             public string upgradeUrl;
+            /// <summary>플랜별 월간 한도 (사용량 초과 시)</summary>
+            public int monthly_limit;
         }
 
         // ─── 생성자 ─────────────────────────────────────────────────────────────
@@ -241,6 +243,7 @@ namespace GaoZombie.BugBeacon
                     Success = false,
                     IsUsageLimitExceeded = true,
                     UsageLimitReason = ex.LimitReason,
+                    MonthlyLimit = ex.MonthlyLimit,
                     UpgradeUrl = ex.UpgradeUrl,
                     ErrorMessage = ex.Message
                 };
@@ -482,6 +485,7 @@ namespace GaoZombie.BugBeacon
                         string detailMessage = errorMessage;
                         string usageLimitReason = null;
                         string upgradeUrl = null;
+                        int monthlyLimit = 0;
                         try
                         {
                             var errorObj = JsonUtility.FromJson<ErrorResponse>(responseText);
@@ -491,8 +495,9 @@ namespace GaoZombie.BugBeacon
                             // 429 사용량 초과 전용 필드 추출
                             if (statusCode == 429 && errorObj?.code == "usage_limit_exceeded")
                             {
-                                usageLimitReason = errorObj.reason;   // "monthly"
+                                usageLimitReason = errorObj.reason;      // "monthly"
                                 upgradeUrl = errorObj.upgradeUrl;
+                                monthlyLimit = errorObj.monthly_limit;
                             }
                         }
                         catch { /* JSON 파싱 실패 시 기본 에러 메시지 사용 */ }
@@ -504,9 +509,10 @@ namespace GaoZombie.BugBeacon
                         }
                         else if (statusCode == 429 && usageLimitReason != null)
                         {
-                            // 사용량 초과 전용 예외: reason + upgradeUrl 포함
+                            // 사용량 초과 전용 예외: reason + monthlyLimit + upgradeUrl 포함
                             tcs.TrySetException(new UsageLimitExceededException(
                                 usageLimitReason,
+                                monthlyLimit,
                                 upgradeUrl,
                                 $"HTTP 429: {detailMessage}"));
                         }
@@ -704,6 +710,9 @@ namespace GaoZombie.BugBeacon
         /// <summary>사용량 초과 유형: "monthly" (IsUsageLimitExceeded가 true일 때만 유효)</summary>
         public string UsageLimitReason { get; set; }
 
+        /// <summary>플랜별 월간 한도 (IsUsageLimitExceeded가 true일 때만 유효)</summary>
+        public int MonthlyLimit { get; set; }
+
         /// <summary>업그레이드 안내 URL (IsUsageLimitExceeded가 true일 때만 유효)</summary>
         public string UpgradeUrl { get; set; }
     }
@@ -717,13 +726,17 @@ namespace GaoZombie.BugBeacon
         /// <summary>초과 유형: "monthly"</summary>
         public string LimitReason { get; }
 
+        /// <summary>플랜별 월간 한도</summary>
+        public int MonthlyLimit { get; }
+
         /// <summary>업그레이드 안내 URL</summary>
         public string UpgradeUrl { get; }
 
-        public UsageLimitExceededException(string limitReason, string upgradeUrl, string message)
+        public UsageLimitExceededException(string limitReason, int monthlyLimit, string upgradeUrl, string message)
             : base(message)
         {
             LimitReason = limitReason ?? "";
+            MonthlyLimit = monthlyLimit;
             UpgradeUrl = upgradeUrl ?? "";
         }
     }

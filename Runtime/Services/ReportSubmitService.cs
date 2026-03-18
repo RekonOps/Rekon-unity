@@ -78,7 +78,7 @@ namespace GaoZombie.BugBeacon
         {
             public string error;
             public string code;
-            /// <summary>사용량 초과 시 제한 유형: "daily" | "monthly"</summary>
+            /// <summary>사용량 초과 시 제한 유형: "monthly"</summary>
             public string reason;
             /// <summary>업그레이드 안내 URL</summary>
             public string upgradeUrl;
@@ -491,7 +491,7 @@ namespace GaoZombie.BugBeacon
                             // 429 사용량 초과 전용 필드 추출
                             if (statusCode == 429 && errorObj?.code == "usage_limit_exceeded")
                             {
-                                usageLimitReason = errorObj.reason;   // "daily" | "monthly"
+                                usageLimitReason = errorObj.reason;   // "monthly"
                                 upgradeUrl = errorObj.upgradeUrl;
                             }
                         }
@@ -701,7 +701,7 @@ namespace GaoZombie.BugBeacon
         /// <summary>429 사용량 초과 에러 여부</summary>
         public bool IsUsageLimitExceeded { get; set; }
 
-        /// <summary>사용량 초과 유형: "daily" | "monthly" (IsUsageLimitExceeded가 true일 때만 유효)</summary>
+        /// <summary>사용량 초과 유형: "monthly" (IsUsageLimitExceeded가 true일 때만 유효)</summary>
         public string UsageLimitReason { get; set; }
 
         /// <summary>업그레이드 안내 URL (IsUsageLimitExceeded가 true일 때만 유효)</summary>
@@ -710,11 +710,11 @@ namespace GaoZombie.BugBeacon
 
     /// <summary>
     /// 429 사용량 초과 예외.
-    /// create-report API에서 { code: "usage_limit_exceeded", reason: "daily"|"monthly" } 응답 시 발생합니다.
+    /// create-report API에서 { code: "usage_limit_exceeded", reason: "monthly" } 응답 시 발생합니다.
     /// </summary>
     public class UsageLimitExceededException : Exception
     {
-        /// <summary>초과 유형: "daily" 또는 "monthly"</summary>
+        /// <summary>초과 유형: "monthly"</summary>
         public string LimitReason { get; }
 
         /// <summary>업그레이드 안내 URL</summary>

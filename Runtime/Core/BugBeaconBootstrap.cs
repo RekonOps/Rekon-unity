@@ -149,6 +149,10 @@ namespace GaoZombie.BugBeacon
                 }
 
                 var tokenStore = new SessionTokenStore();
+
+                // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
+                orchestrator.BindTokenStore(tokenStore);
+
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
                 // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩

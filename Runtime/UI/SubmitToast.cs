@@ -247,27 +247,17 @@ namespace GaoZombie.BugBeacon
                 // 429 사용량 초과 전용 처리
                 // 페이로드 형식: "USAGE_LIMIT:<reason>:<upgradeUrl>"
                 var parts = reportIdOrMessage.Split(new[] { ':' }, 3);
-                string reason = parts.Length > 1 ? parts[1] : "";
                 string rawUpgradeUrl = parts.Length > 2 ? parts[2] : "";
 
                 _toastType = ToastType.UsageLimit;
                 _reportUrl = "";
 
-                if (reason == "daily")
+                // 다음 월 1일 UTC 00:00까지 남은 일수 계산
                 {
-                    // 다음 UTC 00:00까지 남은 시간 계산
-                    var utcNow = System.DateTime.UtcNow;
-                    var tomorrow = utcNow.Date.AddDays(1);
-                    int hoursLeft = (int)System.Math.Ceiling((tomorrow - utcNow).TotalHours);
-                    _message = $"일일 리포트 한도(5개)에 도달했습니다.\n초기화까지 {hoursLeft}시간 남았습니다.";
-                }
-                else
-                {
-                    // 다음 월 1일 UTC 00:00까지 남은 일수 계산
                     var utcNow = System.DateTime.UtcNow;
                     var nextMonth = new System.DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, System.DateTimeKind.Utc).AddMonths(1);
                     int daysLeft = (int)System.Math.Ceiling((nextMonth - utcNow).TotalDays);
-                    _message = $"월간 리포트 한도(30개)에 도달했습니다.\n초기화까지 {daysLeft}일 남았습니다.";
+                    _message = $"월간 리포트 한도(10개)에 도달했습니다.\n초기화까지 {daysLeft}일 남았습니다.";
                 }
 
                 // 업그레이드 URL 구성: upgradeUrl이 "/pricing" 같은 상대 경로면 baseUrl과 합침

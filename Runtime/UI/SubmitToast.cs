@@ -254,9 +254,21 @@ namespace GaoZombie.BugBeacon
                 _reportUrl = "";
 
                 if (reason == "daily")
-                    _message = "일일 리포트 한도(5개)에 도달했습니다.\n내일 다시 시도하거나 업그레이드하세요.";
+                {
+                    // 다음 UTC 00:00까지 남은 시간 계산
+                    var utcNow = System.DateTime.UtcNow;
+                    var tomorrow = utcNow.Date.AddDays(1);
+                    int hoursLeft = (int)System.Math.Ceiling((tomorrow - utcNow).TotalHours);
+                    _message = $"일일 리포트 한도(5개)에 도달했습니다.\n초기화까지 {hoursLeft}시간 남았습니다.";
+                }
                 else
-                    _message = "월간 리포트 한도(30개)에 도달했습니다.\n업그레이드하세요.";
+                {
+                    // 다음 월 1일 UTC 00:00까지 남은 일수 계산
+                    var utcNow = System.DateTime.UtcNow;
+                    var nextMonth = new System.DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, System.DateTimeKind.Utc).AddMonths(1);
+                    int daysLeft = (int)System.Math.Ceiling((nextMonth - utcNow).TotalDays);
+                    _message = $"월간 리포트 한도(30개)에 도달했습니다.\n초기화까지 {daysLeft}일 남았습니다.";
+                }
 
                 // 업그레이드 URL 구성: upgradeUrl이 "/pricing" 같은 상대 경로면 baseUrl과 합침
                 _upgradeUrl = BuildUpgradeUrl(BugBeaconSettings.WEB_DASHBOARD_URL, rawUpgradeUrl);

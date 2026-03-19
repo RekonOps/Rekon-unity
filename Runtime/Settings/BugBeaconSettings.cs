@@ -77,7 +77,7 @@ namespace GaoZombie.BugBeacon
 
         [Tooltip("Video buffer duration in seconds")]
         [Range(10, 120)]
-        public int videoBufferSeconds = 30;
+        public int videoBufferSeconds = 90;
 
         [Tooltip("Target bitrate in Mbps")]
         [Range(1, 20)]

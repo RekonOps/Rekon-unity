@@ -60,7 +60,7 @@ Unity 플러그인
 3. 아래 URL 입력:
 
 ```
-https://github.com/Project-Rekon/Rekon-unity.git#v1.0.0
+https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```
 
 4. **Add** 클릭 -- Unity가 패키지를 자동으로 다운로드합니다.
@@ -70,12 +70,12 @@ https://github.com/Project-Rekon/Rekon-unity.git#v1.0.0
 ```json
 {
   "dependencies": {
-    "dev.rekonops.rekon": "https://github.com/Project-Rekon/Rekon-unity.git#v1.0.0"
+    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v1.0.0"
   }
 }
 ```
 
-> **최신 버전 확인**: [GitHub Releases](https://github.com/Project-Rekon/Rekon-unity/releases) 페이지에서 최신 태그를 확인하세요.
+> **최신 버전 확인**: [GitHub Releases](https://github.com/RekonOps/Rekon-unity/releases) 페이지에서 최신 태그를 확인하세요.
 
 ---
 
@@ -94,7 +94,7 @@ Unity 에디터에서 **Project Settings > Rekon** 열기 > **[웹 로그인]** 
 
 ### 2. 라이선스 키 입력 (팀 사용 시)
 
-관리자가 [웹 대시보드](https://rekon.com)에서 발급한 라이선스 키를 Settings에 입력:
+관리자가 [웹 대시보드](https://rekonops.dev)에서 발급한 라이선스 키를 Settings에 입력:
 - **Project Settings > Rekon > License Key** 에 `BOT-XXXX-XXXX-XXXX-XXXX` 입력
 
 ### 3. 버그 캡처
@@ -104,7 +104,7 @@ Unity 에디터에서 **Project Settings > Rekon** 열기 > **[웹 로그인]** 
 3. 제목과 설명 입력
 4. **[웹 저장]** 버튼 클릭하여 제출 (웹 대시보드에 저장됨)
 
-> **Jira 이슈 등록**: Unity 플러그인에서 Jira에 직접 등록하지 않습니다. 버그 리포트가 웹 대시보드에 저장된 후, [웹 대시보드](https://rekon.com)의 **워크스페이스 > 이슈 상세** 페이지에서 [Jira 등록] 버튼을 클릭하여 Jira 이슈를 생성하세요.
+> **Jira 이슈 등록**: Unity 플러그인에서 Jira에 직접 등록하지 않습니다. 버그 리포트가 웹 대시보드에 저장된 후, [웹 대시보드](https://rekonops.dev)의 **워크스페이스 > 이슈 상세** 페이지에서 [Jira 등록] 버튼을 클릭하여 Jira 이슈를 생성하세요.
 
 ### 4. Jira 연동 (웹 대시보드에서)
 
@@ -191,8 +191,8 @@ docs/              # 사용자 가이드, API 레퍼런스
 
 | 저장소 | 설명 |
 |--------|------|
-| [Rekon-backend](https://github.com/Project-Rekon/Rekon-backend) | Supabase 백엔드 (Edge Functions, DB) |
-| [Rekon-web](https://github.com/Project-Rekon/Rekon-web) | 웹 대시보드 (Next.js) |
+| [Rekon-backend](https://github.com/RekonOps/Rekon-backend) | Supabase 백엔드 (Edge Functions, DB) |
+| [Rekon-web](https://github.com/RekonOps/Rekon-web) | 웹 대시보드 (Next.js) |
 
 ---
 

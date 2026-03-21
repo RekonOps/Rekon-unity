@@ -292,6 +292,7 @@ namespace RekonOps.BugBeacon
                 $"\"workspace_id\":\"{EscapeJson(request.WorkspaceId)}\"," +
                 $"\"title\":\"{EscapeJson(request.Title)}\"," +
                 $"\"description\":\"{EscapeJson(request.Description ?? "")}\"," +
+                $"\"engine\":\"{EscapeJson(request.Engine ?? "unity")}\"," +
                 $"\"files\":{filesJson}" +
                 "}";
 
@@ -645,6 +646,9 @@ namespace RekonOps.BugBeacon
 
         /// <summary>첨부 파일 목록</summary>
         public List<FileAttachment> Files { get; set; }
+
+        /// <summary>리포트를 생성한 엔진 식별자 (현재는 "unity"만 지원)</summary>
+        public string Engine { get; set; } = "unity";
     }
 
     /// <summary>첨부 파일 정보</summary>

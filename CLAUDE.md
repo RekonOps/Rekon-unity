@@ -1,4 +1,4 @@
-# BugBeacon Unity 플러그인
+# Rekon Unity 플러그인
 
 ## 프로젝트 컨텍스트
 이 프로젝트의 전체 컨텍스트는 `../.context/` 에 있습니다.
@@ -6,9 +6,9 @@
 
 ## 이 repo 전용 규칙
 - 언어: C# (Unity 2021.3+)
-- 네임스페이스: `RekonOps.BugBeacon`
-- 로그 접두사: `[BugBeacon]`
-- 설정: ScriptableObject (`BugBeaconSettings`)
+- 네임스페이스: `RekonOps.Rekon`
+- 로그 접두사: `[Rekon]`
+- 설정: ScriptableObject (`RekonSettings`)
 - 비동기: `async/await` + `Task`
 - 영상 인코딩: FFmpeg (PC/Mac 전용)
 - 기본 캡처: 15fps, 1280x720

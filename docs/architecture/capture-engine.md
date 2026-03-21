@@ -1,4 +1,4 @@
-# BugBeacon Unity 캡처 엔진 아키텍처 설계
+# Rekon Unity 캡처 엔진 아키텍처 설계
 
 ## 1. 개요
 
@@ -11,7 +11,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         RekonOps.BugBeacon                           │
+│                         RekonOps.Rekon                           │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                     Input Layer                                  │   │
@@ -32,7 +32,7 @@
 │  │  ┌──────────────────────────────────────────────────────────┐   │   │
 │  │  │ HotkeyManager : MonoBehaviour                             │   │   │
 │  │  │ - _provider: IHotkeyProvider                              │   │   │
-│  │  │ - _settings: BugBeaconSettings                          │   │   │
+│  │  │ - _settings: RekonSettings                          │   │   │
 │  │  │ + event OnCaptureTrigger: Action                          │   │   │
 │  │  │ + Update(): void   (Play Mode 한정)                        │   │   │
 │  │  └──────────────────────────────────────────────────────────┘   │   │
@@ -78,7 +78,7 @@
 │  │  (SystemInfo, Application, SceneManager, Time, Screen)           │   │
 │  │  (ContextProviderRegistry 참조)                                  │   │
 │  │                                                                  │   │
-│  │  StateSnapshot                      BugBeaconContext           │   │
+│  │  StateSnapshot                      RekonContext           │   │
 │  │  + engine: string                   + Add(key, value): void      │   │
 │  │  + engine_version: string           + Remove(key): void          │   │
 │  │  + app_version: string              + Clear(): void              │   │
@@ -155,7 +155,7 @@
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                   Settings Layer                                  │   │
 │  │                                                                  │   │
-│  │  BugBeaconSettings : ScriptableObject                          │   │
+│  │  RekonSettings : ScriptableObject                          │   │
 │  │  + captureHotkey: KeyCode                                        │   │
 │  │  + screenshotDownscale: int                                      │   │
 │  │  + videoEnabled: bool                                            │   │
@@ -222,7 +222,7 @@
 ### 4.1 ICaptureProvider (= IScreenshotCapturer)
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 스크린샷 캡처 전략 인터페이스.
@@ -241,7 +241,7 @@ namespace RekonOps.BugBeacon
 ### 4.2 IContextProvider
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 커스텀 K/V 컨텍스트 데이터를 제공하는 인터페이스.
@@ -261,7 +261,7 @@ namespace RekonOps.BugBeacon
 ### 4.3 IHotkeyProvider
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 핫키 입력 감지 전략 인터페이스.
@@ -280,7 +280,7 @@ namespace RekonOps.BugBeacon
 ### 4.4 ILogCollector
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 로그 수집기 인터페이스.
@@ -298,7 +298,7 @@ namespace RekonOps.BugBeacon
 ### 4.5 IStateSnapshotCollector
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 시스템/애플리케이션 상태 스냅샷 수집 인터페이스.
@@ -316,7 +316,7 @@ namespace RekonOps.BugBeacon
 ### 4.6 IFrameCapturer
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 프레임 캡처 인터페이스.
@@ -333,7 +333,7 @@ namespace RekonOps.BugBeacon
 ### 4.7 IVideoEncoder
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 영상 인코더 인터페이스.
@@ -352,7 +352,7 @@ namespace RekonOps.BugBeacon
 ### 4.8 ICaptureOrchestrator
 
 ```csharp
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 캡처 전체 파이프라인 오케스트레이터 인터페이스.
@@ -401,7 +401,7 @@ Runtime/
     StateSnapshot.cs
     IStateSnapshotCollector.cs
     StateSnapshotCollector.cs
-    BugBeaconContext.cs
+    RekonContext.cs
     IContextProvider.cs
     ContextProviderRegistry.cs
   Video/

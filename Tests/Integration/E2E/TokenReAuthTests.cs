@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon.Tests.Integration
+namespace RekonOps.Rekon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.1 E2E 통합 테스트 - 토큰 만료→Re-auth 플로우.

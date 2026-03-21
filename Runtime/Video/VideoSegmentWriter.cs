@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 30초 단위 슬라이딩 윈도우로 영상 세그먼트를 디스크에 플러시합니다.
@@ -151,11 +151,11 @@ namespace RekonOps.BugBeacon
                     TryDeleteDirectory(oldest);
                 }
 
-                Debug.Log($"[BugBeacon] 세그먼트 플러시 완료: {segDir} ({frames.Length}프레임, 유지 중: {_segmentPaths.Count})");
+                Debug.Log($"[Rekon] 세그먼트 플러시 완료: {segDir} ({frames.Length}프레임, 유지 중: {_segmentPaths.Count})");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 세그먼트 플러시 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 세그먼트 플러시 실패: {ex.Message}");
             }
         }
 
@@ -168,7 +168,7 @@ namespace RekonOps.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 세그먼트 디렉토리 삭제 실패 ({path}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] 세그먼트 디렉토리 삭제 실패 ({path}): {ex.Message}");
             }
         }
     }

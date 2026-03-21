@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using NUnit.Framework;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// TokenEncryptor 단위 테스트.

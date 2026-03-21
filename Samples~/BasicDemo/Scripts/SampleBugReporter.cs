@@ -1,8 +1,8 @@
 // SampleBugReporter.cs
-// BugBeacon BasicDemo 샘플
+// Rekon BasicDemo 샘플
 //
 // 커스텀 컨텍스트 데이터를 버그 리포트에 추가하는 방법을 보여주는 예제입니다.
-// BugBeaconContext.Add() / Remove() / Clear() 정적 API를 사용합니다.
+// RekonContext.Add() / Remove() / Clear() 정적 API를 사용합니다.
 //
 // 사용 방법:
 //   1. 이 컴포넌트를 Scene의 게임 오브젝트에 추가합니다.
@@ -10,12 +10,12 @@
 //   3. 리포트에 level, score, player_hp 등의 컨텍스트 데이터가 포함됩니다.
 
 using UnityEngine;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Samples
+namespace RekonOps.Rekon.Samples
 {
     /// <summary>
-    /// BugBeaconContext 정적 API 사용 예제.
+    /// RekonContext 정적 API 사용 예제.
     /// 게임 상태 변화에 따라 버그 리포트 컨텍스트를 업데이트합니다.
     /// </summary>
     public class SampleBugReporter : MonoBehaviour
@@ -38,12 +38,12 @@ namespace RekonOps.BugBeacon.Samples
         private void OnDisable()
         {
             // 컴포넌트 비활성화 시 컨텍스트 초기화
-            // 주의: BugBeaconContext.Clear()는 모든 컨텍스트를 제거합니다.
+            // 주의: RekonContext.Clear()는 모든 컨텍스트를 제거합니다.
             // 여러 컴포넌트가 컨텍스트를 관리한다면 특정 키만 제거하는 것을 권장합니다.
-            BugBeaconContext.Remove("level");
-            BugBeaconContext.Remove("score");
-            BugBeaconContext.Remove("player_hp");
-            BugBeaconContext.Remove("scene");
+            RekonContext.Remove("level");
+            RekonContext.Remove("score");
+            RekonContext.Remove("player_hp");
+            RekonContext.Remove("scene");
         }
 
         private void Update()
@@ -59,18 +59,18 @@ namespace RekonOps.BugBeacon.Samples
         // ──────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 현재 게임 상태를 BugBeaconContext에 업데이트합니다.
+        /// 현재 게임 상태를 RekonContext에 업데이트합니다.
         /// 버그 리포트 시 이 데이터가 상태 스냅샷에 포함됩니다.
         /// </summary>
         private void UpdateContext()
         {
-            BugBeaconContext.Add("level",     _currentLevel.ToString());
-            BugBeaconContext.Add("score",     _score.ToString());
-            BugBeaconContext.Add("player_hp", _playerHp.ToString());
-            BugBeaconContext.Add("scene",
+            RekonContext.Add("level",     _currentLevel.ToString());
+            RekonContext.Add("score",     _score.ToString());
+            RekonContext.Add("player_hp", _playerHp.ToString());
+            RekonContext.Add("scene",
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
-            BugBeaconContext.Add("frame",     Time.frameCount.ToString());
-            BugBeaconContext.Add("time",      Time.time.ToString("F2"));
+            RekonContext.Add("frame",     Time.frameCount.ToString());
+            RekonContext.Add("time",      Time.time.ToString("F2"));
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ namespace RekonOps.BugBeacon.Samples
         public void AddScore(int amount)
         {
             _score += amount;
-            BugBeaconContext.Add("score", _score.ToString());
+            RekonContext.Add("score", _score.ToString());
         }
 
         /// <summary>
@@ -103,11 +103,11 @@ namespace RekonOps.BugBeacon.Samples
         public void TakeDamage(int damage)
         {
             _playerHp = Mathf.Max(0, _playerHp - damage);
-            BugBeaconContext.Add("player_hp", _playerHp.ToString());
+            RekonContext.Add("player_hp", _playerHp.ToString());
 
             if (_playerHp <= 0)
             {
-                BugBeaconContext.Add("death_cause", "damage");
+                RekonContext.Add("death_cause", "damage");
                 Debug.LogWarning("[SampleBugReporter] 플레이어 사망. 버그 리포트 컨텍스트에 death_cause 추가.");
             }
         }

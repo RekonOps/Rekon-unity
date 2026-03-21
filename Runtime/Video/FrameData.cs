@@ -1,4 +1,4 @@
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 단일 비디오 프레임의 픽셀 데이터와 메타 정보를 담는 구조체.

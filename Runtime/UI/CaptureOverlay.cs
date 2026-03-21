@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 캡처 진행 상황을 Play Mode 화면에 오버레이로 표시하는 컴포넌트.
@@ -107,7 +107,7 @@ namespace RekonOps.BugBeacon
             CaptureOverlay existing = FindObjectOfType<CaptureOverlay>();
             if (existing != null) return existing;
 
-            GameObject go = new GameObject("[BugBeacon] CaptureOverlay");
+            GameObject go = new GameObject("[Rekon] CaptureOverlay");
             DontDestroyOnLoad(go);
             return go.AddComponent<CaptureOverlay>();
         }
@@ -131,7 +131,7 @@ namespace RekonOps.BugBeacon
             if (_orchestrator != null)
             {
                 _orchestrator.OnProgress += HandleProgress;
-                Debug.Log("[BugBeacon] CaptureOverlay: 오케스트레이터 바인딩 완료");
+                Debug.Log("[Rekon] CaptureOverlay: 오케스트레이터 바인딩 완료");
             }
         }
 
@@ -143,7 +143,7 @@ namespace RekonOps.BugBeacon
         public void SetSilentMode(bool silent)
         {
             _silentMode = silent;
-            Debug.Log($"[BugBeacon] CaptureOverlay: Silent 모드 {(silent ? "활성화" : "비활성화")}");
+            Debug.Log($"[Rekon] CaptureOverlay: Silent 모드 {(silent ? "활성화" : "비활성화")}");
         }
 
         /// <summary>

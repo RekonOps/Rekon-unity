@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// CaptureOrchestrator 통합 테스트.
@@ -111,7 +111,7 @@ namespace RekonOps.BugBeacon.Tests
         private FrameRingBuffer _frameBuffer;
         private MockVideoEncoder _videoEncoder;
         private VideoEncoderConfig _videoConfig;
-        private BugBeaconSettings _settings;
+        private RekonSettings _settings;
         private CaptureOrchestrator _orchestrator;
         private string _tempDir;
 
@@ -126,7 +126,7 @@ namespace RekonOps.BugBeacon.Tests
             _videoEncoder = new MockVideoEncoder();
             _videoConfig = new VideoEncoderConfig { Width = 320, Height = 180, Fps = 10 };
 
-            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
+            _settings = ScriptableObject.CreateInstance<RekonSettings>();
             _settings.videoEnabled = true;
 
             _orchestrator = new CaptureOrchestrator(
@@ -432,7 +432,7 @@ namespace RekonOps.BugBeacon.Tests
             var hotkey = go.AddComponent<HotkeyManager>();
             hotkey.SetProvider(new AlwaysTriggerOnceProvider());
 
-            var settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
+            var settings = ScriptableObject.CreateInstance<RekonSettings>();
             settings.captureHotkey = UnityEngine.KeyCode.F12;
             hotkey.SetSettings(settings);
 

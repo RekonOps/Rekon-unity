@@ -2,7 +2,7 @@
 
 ## 개요
 
-BugBeacon-unity의 Jira Cloud 연동 Unity 클라이언트 설계 문서입니다.
+Rekon-unity의 Jira Cloud 연동 Unity 클라이언트 설계 문서입니다.
 Auth Broker (Supabase Edge Functions)와 통신하여 Jira OAuth 인증 및 이슈 제출을 처리합니다.
 
 ---

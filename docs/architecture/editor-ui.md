@@ -2,20 +2,20 @@
 
 ## 개요
 
-BugBeacon Unity 플러그인의 에디터 UI 레이어 설계 문서입니다.
+Rekon Unity 플러그인의 에디터 UI 레이어 설계 문서입니다.
 설정 패널, Play Mode 오버레이, 번들 관리 윈도우 3개 영역으로 구성됩니다.
 
 ---
 
-## 1. 설정 패널 (BugBeaconSettingsWindow)
+## 1. 설정 패널 (RekonSettingsWindow)
 
-**메뉴 경로**: `Window/BugBeacon/Settings`
+**메뉴 경로**: `Window/Rekon/Settings`
 
 ### 와이어프레임
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  BugBeacon Settings                                    [X]    │
+│  Rekon Settings                                    [X]    │
 ├──────────────────────────────────────────────────────────────────┤
 │  [ General ] [ Video ] [ Crash Recovery ] [ Advanced ] [ Jira ]  │
 ├──────────────────────────────────────────────────────────────────┤
@@ -49,7 +49,7 @@ BugBeacon Unity 플러그인의 에디터 UI 레이어 설계 문서입니다.
 ## 2. ~~Jira 연결 패널 (JiraConnectionPanel)~~ — 제거됨
 
 > PLG 전환으로 Jira 연결 기능이 웹 대시보드로 이관되어 Unity 플러그인에서 삭제되었습니다.
-> Jira 연결/인증은 웹 대시보드(BugBeacon-web)의 Settings 페이지에서 처리합니다.
+> Jira 연결/인증은 웹 대시보드(Rekon-web)의 Settings 페이지에서 처리합니다.
 
 ---
 
@@ -93,19 +93,19 @@ BugBeacon Unity 플러그인의 에디터 UI 레이어 설계 문서입니다.
 ## 4. ~~버그 리포트 폼 (BugReportForm)~~ — 제거됨
 
 > PLG 전환으로 웹 대시보드로 이관되어 Unity 플러그인에서 삭제되었습니다.
-> 버그 리포트 입력은 웹 대시보드(BugBeacon-web)에서 처리합니다.
+> 버그 리포트 입력은 웹 대시보드(Rekon-web)에서 처리합니다.
 
 ---
 
 ## 5. 번들 관리 윈도우 (BundleManagerWindow)
 
-**메뉴 경로**: `Window/BugBeacon/Bundles`
+**메뉴 경로**: `Window/Rekon/Bundles`
 
 ### 와이어프레임
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  BugBeacon Bundle Manager                              [X]    │
+│  Rekon Bundle Manager                              [X]    │
 ├──────────────────────────────────────────────────────────────────┤
 │  필터: [ 전체 ▼ ]          [ 새로고침 ]   디스크: 128 MB / 5 GB  │
 ├──────────────────────────────────────────────────────────────────┤
@@ -154,7 +154,7 @@ BugBeacon Unity 플러그인의 에디터 UI 레이어 설계 문서입니다.
 ```
 Editor/
   UI/
-    BugBeaconSettingsWindow.cs   - 설정 EditorWindow (탭 포함)
+    RekonSettingsWindow.cs   - 설정 EditorWindow (탭 포함)
     BundleManagerWindow.cs         - 번들 관리 EditorWindow
 
 Runtime/
@@ -175,8 +175,8 @@ Tests/
 ## 7. 의존성 관계
 
 ```
-BugBeaconSettingsWindow
-  ├── BugBeaconSettings (ScriptableObject)
+RekonSettingsWindow
+  ├── RekonSettings (ScriptableObject)
   └── SerializedObject/SerializedProperty (Undo 지원)
 
 BundleManagerWindow

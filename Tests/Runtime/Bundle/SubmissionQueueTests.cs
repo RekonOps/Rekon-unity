@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// SubmissionQueue 단위 테스트.

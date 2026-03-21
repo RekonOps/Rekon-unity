@@ -1,6 +1,6 @@
 {
-  "name": "BugBeacon.Runtime",
-  "rootNamespace": "GaoZombie.BugBeacon",
+  "name": "Rekon.Runtime",
+  "rootNamespace": "RekonOps.Rekon",
   "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],

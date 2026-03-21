@@ -1,7 +1,7 @@
 {
-  "name": "BugBeacon.Editor",
-  "rootNamespace": "GaoZombie.BugBeacon.Editor",
-  "references": ["BugBeacon.Runtime"],
+  "name": "Rekon.Editor",
+  "rootNamespace": "RekonOps.Rekon.Editor",
+  "references": ["Rekon.Runtime"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

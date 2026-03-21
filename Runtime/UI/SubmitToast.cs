@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// Silent Submit 완료 후 인게임 화면 우하단에 결과 알림 토스트를 표시하는 컴포넌트.
@@ -99,7 +99,7 @@ namespace GaoZombie.BugBeacon
             _instance = FindObjectOfType<SubmitToast>();
             if (_instance != null) return _instance;
 
-            GameObject go = new GameObject("[BugBeacon] SubmitToast");
+            GameObject go = new GameObject("[Rekon] SubmitToast");
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<SubmitToast>();
             return _instance;
@@ -124,7 +124,7 @@ namespace GaoZombie.BugBeacon
             if (_submitManager != null)
             {
                 _submitManager.OnSubmitCompleted += HandleSubmitCompleted;
-                Debug.Log("[BugBeacon] SubmitToast: SilentSubmitManager 바인딩 완료");
+                Debug.Log("[Rekon] SubmitToast: SilentSubmitManager 바인딩 완료");
             }
         }
 
@@ -144,7 +144,7 @@ namespace GaoZombie.BugBeacon
             // 싱글톤 캐시 등록 (중복 인스턴스 방지)
             if (_instance != null && _instance != this)
             {
-                Debug.LogWarning("[BugBeacon] SubmitToast: 중복 인스턴스 감지, 제거합니다");
+                Debug.LogWarning("[Rekon] SubmitToast: 중복 인스턴스 감지, 제거합니다");
                 Destroy(gameObject);
                 return;
             }
@@ -239,7 +239,7 @@ namespace GaoZombie.BugBeacon
                     _upgradeUrl = "";
 
                     // 웹 대시보드 URL 구성 (보안 검증 포함, 상수 URL 사용)
-                    _reportUrl = BuildSecureReportUrl(BugBeaconSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
+                    _reportUrl = BuildSecureReportUrl(RekonSettings.WEB_DASHBOARD_URL, reportIdOrMessage);
                 }
             }
             else if (reportIdOrMessage != null && reportIdOrMessage.StartsWith("USAGE_LIMIT:"))
@@ -263,7 +263,7 @@ namespace GaoZombie.BugBeacon
                 }
 
                 // 업그레이드 URL 구성: upgradeUrl이 "/pricing" 같은 상대 경로면 baseUrl과 합침
-                _upgradeUrl = BuildUpgradeUrl(BugBeaconSettings.WEB_DASHBOARD_URL, rawUpgradeUrl);
+                _upgradeUrl = BuildUpgradeUrl(RekonSettings.WEB_DASHBOARD_URL, rawUpgradeUrl);
             }
             else
             {
@@ -278,7 +278,7 @@ namespace GaoZombie.BugBeacon
             _stateStartTime = Time.realtimeSinceStartup;
             _currentAlpha = 0f;
 
-            Debug.Log($"[BugBeacon] SubmitToast: 표시 (유형={_toastType}, 메시지={_message})");
+            Debug.Log($"[Rekon] SubmitToast: 표시 (유형={_toastType}, 메시지={_message})");
         }
 
         // ─── 렌더링 ───────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ namespace GaoZombie.BugBeacon
                     }
                     else
                     {
-                        Debug.LogWarning("[BugBeacon] SubmitToast: 유효하지 않은 URL이므로 열지 않음");
+                        Debug.LogWarning("[Rekon] SubmitToast: 유효하지 않은 URL이므로 열지 않음");
                     }
                     Hide();
                 }
@@ -375,7 +375,7 @@ namespace GaoZombie.BugBeacon
                     }
                     else
                     {
-                        Debug.LogWarning("[BugBeacon] SubmitToast: 업그레이드 URL이 유효하지 않아 열지 않음");
+                        Debug.LogWarning("[Rekon] SubmitToast: 업그레이드 URL이 유효하지 않아 열지 않음");
                     }
                     Hide();
                 }
@@ -448,7 +448,7 @@ namespace GaoZombie.BugBeacon
             // 경로에 한글/공백 등이 포함될 수 있으므로 Uri 클래스로 안전하게 변환
             Application.OpenURL(new Uri(pendingFolderPath).AbsoluteUri);
 #endif
-            Debug.Log($"[BugBeacon] SubmitToast: pending 폴더 열기 → {pendingFolderPath}");
+            Debug.Log($"[Rekon] SubmitToast: pending 폴더 열기 → {pendingFolderPath}");
         }
 
         /// <summary>
@@ -463,7 +463,7 @@ namespace GaoZombie.BugBeacon
             // 기본 URL 유효성 검증
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out Uri baseUri))
             {
-                Debug.LogWarning("[BugBeacon] SubmitToast: WEB_DASHBOARD_URL이 유효한 URI가 아닙니다");
+                Debug.LogWarning("[Rekon] SubmitToast: WEB_DASHBOARD_URL이 유효한 URI가 아닙니다");
                 return "";
             }
 
@@ -473,7 +473,7 @@ namespace GaoZombie.BugBeacon
                               && (baseUri.Host == "localhost" || baseUri.Host == "127.0.0.1");
             if (!isHttps && !isLocalDev)
             {
-                Debug.LogWarning($"[BugBeacon] SubmitToast: 허용되지 않는 스킴 거부 ({baseUri.Scheme}://{baseUri.Host})");
+                Debug.LogWarning($"[Rekon] SubmitToast: 허용되지 않는 스킴 거부 ({baseUri.Scheme}://{baseUri.Host})");
                 return "";
             }
 
@@ -484,7 +484,7 @@ namespace GaoZombie.BugBeacon
             // 최종 URL 재검증
             if (!IsValidHttpsUrl(fullUrl))
             {
-                Debug.LogWarning("[BugBeacon] SubmitToast: 구성된 최종 URL이 유효하지 않습니다");
+                Debug.LogWarning("[Rekon] SubmitToast: 구성된 최종 URL이 유효하지 않습니다");
                 return "";
             }
 

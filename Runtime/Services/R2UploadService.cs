@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// Presigned URL을 사용한 R2 파일 업로드 서비스.
@@ -115,18 +115,18 @@ namespace GaoZombie.BugBeacon
                 {
                     if (attempt > 0)
                     {
-                        Debug.Log($"[BugBeacon] R2 업로드 재시도 {attempt}/{MaxRetries}");
+                        Debug.Log($"[Rekon] R2 업로드 재시도 {attempt}/{MaxRetries}");
                     }
 
                     var result = await PutUploadAsync(
                         presignedUrl, fileData, contentType, progress, cancellationToken);
 
-                    Debug.Log($"[BugBeacon] R2 업로드 성공 ({fileData.Length / 1024}KB)");
+                    Debug.Log($"[Rekon] R2 업로드 성공 ({fileData.Length / 1024}KB)");
                     return result;
                 }
                 catch (OperationCanceledException)
                 {
-                    Debug.Log("[BugBeacon] R2 업로드 취소됨");
+                    Debug.Log("[Rekon] R2 업로드 취소됨");
                     throw;
                 }
                 catch (R2UploadException ex)
@@ -139,7 +139,7 @@ namespace GaoZombie.BugBeacon
                     if (ex.StatusCode >= 400 && ex.StatusCode < 500)
                     {
                         Debug.LogError(
-                            $"[BugBeacon] R2 업로드 클라이언트 오류 (HTTP {ex.StatusCode}), 재시도하지 않음: {ex.Message}");
+                            $"[Rekon] R2 업로드 클라이언트 오류 (HTTP {ex.StatusCode}), 재시도하지 않음: {ex.Message}");
                         break;
                     }
 
@@ -147,7 +147,7 @@ namespace GaoZombie.BugBeacon
                     {
                         float delay = BaseRetryDelaySec * Mathf.Pow(2f, attempt - 1);
                         Debug.LogWarning(
-                            $"[BugBeacon] R2 업로드 실패 (시도 {attempt}/{MaxRetries}), " +
+                            $"[Rekon] R2 업로드 실패 (시도 {attempt}/{MaxRetries}), " +
                             $"{delay:F1}초 후 재시도: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
                     }
@@ -161,14 +161,14 @@ namespace GaoZombie.BugBeacon
                     {
                         float delay = BaseRetryDelaySec * Mathf.Pow(2f, attempt - 1);
                         Debug.LogWarning(
-                            $"[BugBeacon] R2 업로드 실패 (시도 {attempt}/{MaxRetries}), " +
+                            $"[Rekon] R2 업로드 실패 (시도 {attempt}/{MaxRetries}), " +
                             $"{delay:F1}초 후 재시도: {ex.Message}");
                         await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
                     }
                 }
             }
 
-            Debug.LogError($"[BugBeacon] R2 업로드 최종 실패 (재시도 {MaxRetries}회 초과): {lastException?.Message}");
+            Debug.LogError($"[Rekon] R2 업로드 최종 실패 (재시도 {MaxRetries}회 초과): {lastException?.Message}");
 
             return new UploadResult
             {

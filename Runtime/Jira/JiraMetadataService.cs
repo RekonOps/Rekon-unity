@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     // ─── 공개 데이터 모델 ─────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string json = await _apiClient.GetAsync("/project/search?maxResults=50", ct);
-                Debug.Log($"[BugBeacon] 프로젝트 API 원문 응답 (처음 500자): {(json.Length > 500 ? json.Substring(0, 500) : json)}");
+                Debug.Log($"[Rekon] 프로젝트 API 원문 응답 (처음 500자): {(json.Length > 500 ? json.Substring(0, 500) : json)}");
                 var response = JsonUtility.FromJson<ProjectSearchResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraProject>();
             }
@@ -128,7 +128,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 프로젝트 목록 조회 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 프로젝트 목록 조회 실패: {ex.Message}");
                 throw;
             }
         }
@@ -147,7 +147,7 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string json = await _apiClient.GetAsync($"/issue/createmeta/{projectKey}/issuetypes", ct);
-                Debug.Log($"[BugBeacon] 이슈 타입 API 원문 응답 (처음 500자): {(json.Length > 500 ? json.Substring(0, 500) : json)}");
+                Debug.Log($"[Rekon] 이슈 타입 API 원문 응답 (처음 500자): {(json.Length > 500 ? json.Substring(0, 500) : json)}");
                 var response = JsonUtility.FromJson<IssueTypesResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraIssueTypeInfo>();
             }
@@ -157,7 +157,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 이슈 타입 목록 조회 실패 (프로젝트: {projectKey}): {ex.Message}");
+                Debug.LogError($"[Rekon] 이슈 타입 목록 조회 실패 (프로젝트: {projectKey}): {ex.Message}");
                 throw;
             }
         }
@@ -182,13 +182,13 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string endpoint = $"/issue/createmeta/{projectKey}/issuetypes/{issueTypeId}";
-                Debug.Log($"[BugBeacon] 필드 API 호출: GET {endpoint}");
+                Debug.Log($"[Rekon] 필드 API 호출: GET {endpoint}");
                 string json = await _apiClient.GetAsync(endpoint, ct);
-                Debug.Log($"[BugBeacon] 필드 API 응답 (첫 500자): {(json?.Length > 500 ? json.Substring(0, 500) + "..." : json)}");
+                Debug.Log($"[Rekon] 필드 API 응답 (첫 500자): {(json?.Length > 500 ? json.Substring(0, 500) + "..." : json)}");
 
                 if (string.IsNullOrEmpty(json))
                 {
-                    Debug.LogError("[BugBeacon] 필드 API 응답이 비어 있습니다.");
+                    Debug.LogError("[Rekon] 필드 API 응답이 비어 있습니다.");
                     throw new InvalidOperationException("API 응답이 비어 있습니다.");
                 }
 
@@ -199,14 +199,14 @@ namespace GaoZombie.BugBeacon
                 }
                 catch (Exception parseEx)
                 {
-                    Debug.LogError($"[BugBeacon] 필드 JSON 파싱 실패: {parseEx.Message}\n응답 내용: {json}");
+                    Debug.LogError($"[Rekon] 필드 JSON 파싱 실패: {parseEx.Message}\n응답 내용: {json}");
                     throw new InvalidOperationException($"필드 JSON 파싱 실패: {parseEx.Message}", parseEx);
                 }
 
                 var items = response?.GetItems();
                 if (items == null || items.Length == 0)
                 {
-                    Debug.LogWarning($"[BugBeacon] 필드 응답의 'fields'/'values' 필드가 null이거나 비어 있습니다. JSON: {json}");
+                    Debug.LogWarning($"[Rekon] 필드 응답의 'fields'/'values' 필드가 null이거나 비어 있습니다. JSON: {json}");
                     return Array.Empty<JiraFieldInfo>();
                 }
 
@@ -224,7 +224,7 @@ namespace GaoZombie.BugBeacon
                         allowedValues = raw.allowedValues ?? Array.Empty<JiraFieldAllowedValue>(),
                     };
                 }
-                Debug.Log($"[BugBeacon] 필드 파싱 완료: {items.Length}개 필드");
+                Debug.Log($"[Rekon] 필드 파싱 완료: {items.Length}개 필드");
                 return result;
             }
             catch (OperationCanceledException)
@@ -234,7 +234,7 @@ namespace GaoZombie.BugBeacon
             catch (Exception ex)
             {
                 Debug.LogError(
-                    $"[BugBeacon] 필드 목록 조회 실패 (프로젝트: {projectKey}, 이슈타입: {issueTypeId}): {ex.Message}");
+                    $"[Rekon] 필드 목록 조회 실패 (프로젝트: {projectKey}, 이슈타입: {issueTypeId}): {ex.Message}");
                 throw;
             }
         }
@@ -247,14 +247,14 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string json = await _apiClient.GetAsync("/myself", ct);
-                Debug.Log($"[BugBeacon] /myself 응답 (처음 200자): {(json.Length > 200 ? json.Substring(0, 200) : json)}");
+                Debug.Log($"[Rekon] /myself 응답 (처음 200자): {(json.Length > 200 ? json.Substring(0, 200) : json)}");
                 var user = JsonUtility.FromJson<JiraUser>(json);
                 return user;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 현재 사용자 조회 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 현재 사용자 조회 실패: {ex.Message}");
                 throw;
             }
         }
@@ -271,7 +271,7 @@ namespace GaoZombie.BugBeacon
             {
                 string json = await _apiClient.GetAsync(
                     $"/user/assignable/search?project={projectKey}&maxResults=100", ct);
-                Debug.Log($"[BugBeacon] assignable users 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] assignable users 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
 
                 // 최상위 배열 → 래퍼로 변환
                 if (json.TrimStart().StartsWith("["))
@@ -283,7 +283,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 할당 가능 사용자 조회 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 할당 가능 사용자 조회 실패: {ex.Message}");
                 throw;
             }
         }
@@ -301,7 +301,7 @@ namespace GaoZombie.BugBeacon
                 // Agile API - /rest/agile/ 로 시작하므로 BuildUrl이 절대 경로로 처리
                 string json = await _apiClient.GetAsync(
                     $"/rest/agile/1.0/board?projectKeyOrId={projectKey}&maxResults=50", ct);
-                Debug.Log($"[BugBeacon] boards 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] boards 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
 
                 var response = JsonUtility.FromJson<BoardSearchResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraBoard>();
@@ -314,14 +314,14 @@ namespace GaoZombie.BugBeacon
                 if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
                 {
                     Debug.LogWarning(
-                        "[BugBeacon] Agile API 접근 권한이 없습니다. " +
+                        "[Rekon] Agile API 접근 권한이 없습니다. " +
                         "Jira 앱 설정에서 'read:board-scope:jira-software' scope를 추가하세요. " +
                         "(connect-jira-start의 JIRA_SCOPES 및 connect-jira-callback의 scopes 배열도 함께 업데이트 필요) " +
                         $"원본 에러: {ex.Message}");
                 }
                 else
                 {
-                    Debug.LogWarning($"[BugBeacon] 보드 조회 실패 (스프린트 조회 불가): {ex.Message}");
+                    Debug.LogWarning($"[Rekon] 보드 조회 실패 (스프린트 조회 불가): {ex.Message}");
                 }
                 return Array.Empty<JiraBoard>();
             }
@@ -336,7 +336,7 @@ namespace GaoZombie.BugBeacon
             {
                 string json = await _apiClient.GetAsync(
                     $"/rest/agile/1.0/board/{boardId}/sprint?state=active,future&maxResults=50", ct);
-                Debug.Log($"[BugBeacon] sprints 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] sprints 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
 
                 var response = JsonUtility.FromJson<SprintSearchResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraSprint>();
@@ -349,14 +349,14 @@ namespace GaoZombie.BugBeacon
                 if (ex.Message.Contains("401") || ex.Message.Contains("Unauthorized"))
                 {
                     Debug.LogWarning(
-                        "[BugBeacon] Agile API 접근 권한이 없습니다. " +
+                        "[Rekon] Agile API 접근 권한이 없습니다. " +
                         "Jira 앱 설정에서 'read:sprint:jira-software' scope를 추가하세요. " +
                         "(connect-jira-start의 JIRA_SCOPES 및 connect-jira-callback의 scopes 배열도 함께 업데이트 필요) " +
                         $"원본 에러: {ex.Message}");
                 }
                 else
                 {
-                    Debug.LogWarning($"[BugBeacon] 스프린트 조회 실패: {ex.Message}");
+                    Debug.LogWarning($"[Rekon] 스프린트 조회 실패: {ex.Message}");
                 }
                 return Array.Empty<JiraSprint>();
             }
@@ -376,11 +376,11 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string json = await _apiClient.GetAsync("/configuration", cancellationToken);
-                Debug.Log($"[BugBeacon] /configuration 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] /configuration 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
                 var config = JsonUtility.FromJson<JiraConfigurationResponse>(json);
                 if (config != null && config.attachmentSize > 0)
                 {
-                    Debug.Log($"[BugBeacon] 첨부파일 크기 제한 조회 성공: {config.attachmentSize} 바이트");
+                    Debug.Log($"[Rekon] 첨부파일 크기 제한 조회 성공: {config.attachmentSize} 바이트");
                     return config.attachmentSize;
                 }
             }
@@ -390,7 +390,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] /configuration 조회 실패: {ex.Message}. 기본값({defaultLimitBytes} 바이트)을 사용합니다.");
+                Debug.LogWarning($"[Rekon] /configuration 조회 실패: {ex.Message}. 기본값({defaultLimitBytes} 바이트)을 사용합니다.");
             }
 
             // 기본값 반환 (Jira Cloud 250MB)
@@ -409,13 +409,13 @@ namespace GaoZombie.BugBeacon
             try
             {
                 string json = await _apiClient.GetAsync("/serverInfo", ct);
-                Debug.Log($"[BugBeacon] /serverInfo 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] /serverInfo 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
                 return JsonUtility.FromJson<JiraServerInfo>(json);
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] /serverInfo 조회 실패: {ex.Message}");
+                Debug.LogWarning($"[Rekon] /serverInfo 조회 실패: {ex.Message}");
                 return null;
             }
         }
@@ -439,7 +439,7 @@ namespace GaoZombie.BugBeacon
                 string encodedJql = UnityWebRequest.EscapeURL(jql);
                 string json = await _apiClient.GetAsync(
                     $"/rest/api/3/search/jql?jql={encodedJql}&fields=summary&maxResults=100", ct);
-                Debug.Log($"[BugBeacon] search 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] search 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
 
                 var response = JsonUtility.FromJson<IssueSearchResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraIssueSummary>();
@@ -447,7 +447,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 이슈 검색 실패: {ex.Message}");
+                Debug.LogWarning($"[Rekon] 이슈 검색 실패: {ex.Message}");
                 return Array.Empty<JiraIssueSummary>();
             }
         }
@@ -465,7 +465,7 @@ namespace GaoZombie.BugBeacon
                 string jql = UnityWebRequest.EscapeURL($"project={projectKey} AND issuetype=Epic ORDER BY created DESC");
                 string json = await _apiClient.GetAsync(
                     $"/rest/api/3/search?jql={jql}&fields=summary&maxResults=50", ct);
-                Debug.Log($"[BugBeacon] SearchEpicsAsync 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
+                Debug.Log($"[Rekon] SearchEpicsAsync 응답 (처음 300자): {(json.Length > 300 ? json.Substring(0, 300) : json)}");
 
                 var response = JsonUtility.FromJson<IssueSearchResponse>(json);
                 return response?.GetItems() ?? Array.Empty<JiraIssueSummary>();
@@ -473,7 +473,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 에픽 검색 실패 (프로젝트: {projectKey}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] 에픽 검색 실패 (프로젝트: {projectKey}): {ex.Message}");
                 return Array.Empty<JiraIssueSummary>();
             }
         }

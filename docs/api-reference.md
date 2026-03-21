@@ -1,24 +1,24 @@
-# BugBeacon API 레퍼런스
+# Rekon API 레퍼런스
 
-> 네임스페이스: `GaoZombie.BugBeacon`
+> 네임스페이스: `RekonOps.Rekon`
 
 ---
 
 ## 목차
 
-1. [BugBeaconContext](#bugonетouchcontext)
+1. [RekonContext](#bugonетouchcontext)
 2. [IContextProvider](#icontextprovider)
 3. [ContextProviderRegistry](#contextproviderregistry)
-4. [BugBeaconSettings](#bugonетouchsettings)
+4. [RekonSettings](#bugonетouchsettings)
 5. [CaptureOrchestrator](#captureorchestrator)
 6. [LogMasker](#logmasker)
 7. [MaskingRuleLoader](#maskingruleloader)
 
 ---
 
-## BugBeaconContext
+## RekonContext
 
-`Runtime/Capture/BugBeaconContext.cs`
+`Runtime/Capture/RekonContext.cs`
 
 버그 리포트에 포함될 커스텀 키-값 데이터를 관리하는 정적 API 클래스입니다. 스레드 안전하게 구현되어 있으며, 어느 스레드에서도 호출할 수 있습니다.
 
@@ -46,12 +46,12 @@ public static void Add(string key, string value)
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 void OnLevelStart(int levelIndex)
 {
-    BugBeaconContext.Add("current_level", levelIndex.ToString());
-    BugBeaconContext.Add("difficulty", GameSettings.Difficulty.ToString());
+    RekonContext.Add("current_level", levelIndex.ToString());
+    RekonContext.Add("difficulty", GameSettings.Difficulty.ToString());
 }
 ```
 
@@ -74,12 +74,12 @@ public static void Remove(string key)
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 void OnLevelEnd()
 {
     // 레벨 종료 시 해당 레벨의 컨텍스트 제거
-    BugBeaconContext.Remove("current_level");
+    RekonContext.Remove("current_level");
 }
 ```
 
@@ -96,12 +96,12 @@ public static void Clear()
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 void OnSceneUnloaded(Scene scene)
 {
     // 씬 전환 시 이전 씬의 컨텍스트 초기화
-    BugBeaconContext.Clear();
+    RekonContext.Clear();
 }
 ```
 
@@ -120,11 +120,11 @@ public static Dictionary<string, string> GetSnapshot()
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 void DebugPrintContext()
 {
-    var snapshot = BugBeaconContext.GetSnapshot();
+    var snapshot = RekonContext.GetSnapshot();
     foreach (var kvp in snapshot)
     {
         Debug.Log($"[Context] {kvp.Key}: {kvp.Value}");
@@ -140,17 +140,17 @@ void DebugPrintContext()
 public static IContextProvider AsProvider()
 ```
 
-`BugBeaconContext`를 `IContextProvider`로 감싸는 어댑터를 반환합니다. `ContextProviderRegistry`에 등록할 때 사용합니다.
+`RekonContext`를 `IContextProvider`로 감싸는 어댑터를 반환합니다. `ContextProviderRegistry`에 등록할 때 사용합니다.
 
-**반환값:** `IContextProvider` - BugBeaconContext를 감싸는 프로바이더
+**반환값:** `IContextProvider` - RekonContext를 감싸는 프로바이더
 
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 // ContextProviderRegistry에 정적 컨텍스트 등록
-registry.Register(BugBeaconContext.AsProvider());
+registry.Register(RekonContext.AsProvider());
 ```
 
 ---
@@ -178,7 +178,7 @@ public static int Count { get; }
 ### 인터페이스 정의
 
 ```csharp
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     public interface IContextProvider
     {
@@ -209,7 +209,7 @@ Dictionary<string, string> GetContext()
 
 ```csharp
 using System.Collections.Generic;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 public class GameStateContextProvider : IContextProvider
 {
@@ -259,7 +259,7 @@ public void Register(IContextProvider provider)
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 public class GameBootstrapper : MonoBehaviour
 {
@@ -268,12 +268,12 @@ public class GameBootstrapper : MonoBehaviour
     void Awake()
     {
         _contextProvider = new GameStateContextProvider();
-        BugBeacon.Instance.ContextRegistry.Register(_contextProvider);
+        Rekon.Instance.ContextRegistry.Register(_contextProvider);
     }
 
     void OnDestroy()
     {
-        BugBeacon.Instance.ContextRegistry.Unregister(_contextProvider);
+        Rekon.Instance.ContextRegistry.Unregister(_contextProvider);
     }
 }
 ```
@@ -335,17 +335,17 @@ public int Count { get; }
 
 ---
 
-## BugBeaconSettings
+## RekonSettings
 
-`Runtime/Settings/BugBeaconSettings.cs`
+`Runtime/Settings/RekonSettings.cs`
 
-플러그인 동작을 제어하는 ScriptableObject 설정 클래스입니다. Unity 에디터에서 `Project Settings` → `BugBeacon` 패널을 통해 관리합니다.
+플러그인 동작을 제어하는 ScriptableObject 설정 클래스입니다. Unity 에디터에서 `Project Settings` → `Rekon` 패널을 통해 관리합니다.
 
 ### 생성
 
 ```csharp
-// 에디터 메뉴: Assets > Create > BugBeacon > Settings
-[CreateAssetMenu(fileName = "BugBeaconSettings", menuName = "BugBeacon/Settings")]
+// 에디터 메뉴: Assets > Create > Rekon > Settings
+[CreateAssetMenu(fileName = "RekonSettings", menuName = "Rekon/Settings")]
 ```
 
 ### 주요 프로퍼티
@@ -432,21 +432,21 @@ public event Action<CaptureProgressEvent> OnProgress
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 public class CaptureProgressDisplay : MonoBehaviour
 {
     void Start()
     {
-        var orchestrator = BugBeacon.Instance.Orchestrator;
+        var orchestrator = Rekon.Instance.Orchestrator;
         orchestrator.OnProgress += HandleProgress;
     }
 
     void OnDestroy()
     {
-        if (BugBeacon.Instance != null)
+        if (Rekon.Instance != null)
         {
-            BugBeacon.Instance.Orchestrator.OnProgress -= HandleProgress;
+            Rekon.Instance.Orchestrator.OnProgress -= HandleProgress;
         }
     }
 
@@ -509,7 +509,7 @@ public async Task<CaptureResult> StartAsync()
 public void BindHotkeyManager(HotkeyManager hotkeyManager)
 ```
 
-HotkeyManager를 등록하고 `OnCaptureTrigger` 이벤트를 구독합니다. 초기화 시 BugBeacon 시스템이 자동으로 호출합니다.
+HotkeyManager를 등록하고 `OnCaptureTrigger` 이벤트를 구독합니다. 초기화 시 Rekon 시스템이 자동으로 호출합니다.
 
 ---
 
@@ -621,7 +621,7 @@ public class MaskingRule
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 var masker = new LogMasker();
 masker.AddRule(new LogMasker.MaskingRule
@@ -703,7 +703,7 @@ public static int LoadFromFile(LogMasker masker, string filePath)
 **사용 예:**
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 var masker = new LogMasker();
 string rulesPath = "/path/to/custom-masking-rules.json";

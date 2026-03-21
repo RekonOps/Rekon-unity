@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 핫키 입력을 감지하여 OnCaptureTrigger 이벤트를 발행하는 MonoBehaviour.
@@ -16,7 +16,7 @@ namespace GaoZombie.BugBeacon
 
         [SerializeField]
         [Tooltip("사용할 버그 캡처 설정 에셋")]
-        private BugBeaconSettings _settings;
+        private RekonSettings _settings;
 
         private IHotkeyProvider _provider;
 
@@ -33,7 +33,7 @@ namespace GaoZombie.BugBeacon
         /// 설정을 외부에서 주입합니다 (테스트 지원).
         /// </summary>
         /// <param name="settings">사용할 설정 에셋</param>
-        public void SetSettings(BugBeaconSettings settings)
+        public void SetSettings(RekonSettings settings)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         }

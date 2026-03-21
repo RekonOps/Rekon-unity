@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon.Tests.Integration
+namespace RekonOps.Rekon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.3 보안 테스트 - 로컬 보안.
@@ -46,7 +46,7 @@ namespace GaoZombie.BugBeacon.Tests.Integration
         public void SetUp()
         {
             // 각 테스트마다 고유한 패키지명으로 격리
-            _tokenStore = new SessionTokenStore($"com.gaozombie.sectest.{Guid.NewGuid().ToString("N")[..8]}");
+            _tokenStore = new SessionTokenStore($"com.rekonops.sectest.{Guid.NewGuid().ToString("N")[..8]}");
             _tokenStore.Clear();
             _logMasker = new LogMasker();
         }

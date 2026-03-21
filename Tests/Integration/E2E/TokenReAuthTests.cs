@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon.Tests.Integration
+namespace RekonOps.Rekon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.1 E2E 통합 테스트 - 토큰 만료→Re-auth 플로우.
@@ -29,7 +29,7 @@ namespace GaoZombie.BugBeacon.Tests.Integration
         public void SetUp()
         {
             // 테스트용 TokenStore (고유한 패키지명으로 격리)
-            _tokenStore = new SessionTokenStore($"com.gaozombie.test.{Guid.NewGuid().ToString("N")[..8]}");
+            _tokenStore = new SessionTokenStore($"com.rekonops.test.{Guid.NewGuid().ToString("N")[..8]}");
             _tokenStore.Clear();
 
             _reAuthHandler = new ReAuthHandler(_tokenStore);

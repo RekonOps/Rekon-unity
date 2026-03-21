@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// Auth Broker Edge Functions와 HTTP 통신하는 클라이언트.
@@ -59,7 +59,7 @@ namespace GaoZombie.BugBeacon
         /// <summary>
         /// AuthBrokerClient를 초기화합니다.
         /// </summary>
-        /// <param name="baseUrl">Auth Broker 기본 URL (BugBeaconSettings.authBrokerUrl)</param>
+        /// <param name="baseUrl">Auth Broker 기본 URL (RekonSettings.authBrokerUrl)</param>
         /// <param name="tokenStore">세션 토큰 저장소</param>
         public AuthBrokerClient(string baseUrl, SessionTokenStore tokenStore)
         {

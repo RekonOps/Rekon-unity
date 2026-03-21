@@ -1,4 +1,4 @@
-# BugBeacon 사용자 가이드
+# Rekon 사용자 가이드
 
 > Unity 개발자를 위한 원터치 버그 리포트 플러그인
 
@@ -27,14 +27,14 @@
 Unity Package Manager에서 Git URL로 설치합니다.
 
 ```
-https://github.com/GaoZombie/BugBeacon-unity.git
+https://github.com/RekonOps/Rekon-unity.git
 ```
 
 ### 2단계: Settings 생성
 
-`Assets` 메뉴 → `Create` → `BugBeacon` → `Settings`를 선택하여 `BugBeaconSettings` 에셋을 생성합니다.
+`Assets` 메뉴 → `Create` → `Rekon` → `Settings`를 선택하여 `RekonSettings` 에셋을 생성합니다.
 
-생성된 에셋을 Project Settings의 BugBeacon 항목에 할당합니다.
+생성된 에셋을 Project Settings의 Rekon 항목에 할당합니다.
 
 ### 3단계: Play Mode에서 테스트
 
@@ -51,18 +51,18 @@ Play Mode 진입 후 `F12` 키를 누릅니다. 버그 리포트 UI가 열리면
 3. 아래 URL 입력 후 `Add` 클릭:
 
 ```
-https://github.com/GaoZombie/BugBeacon-unity.git
+https://github.com/RekonOps/Rekon-unity.git
 ```
 
 특정 버전을 사용하려면 URL 끝에 `#버전태그`를 붙입니다:
 
 ```
-https://github.com/GaoZombie/BugBeacon-unity.git#v0.1.0
+https://github.com/RekonOps/Rekon-unity.git#v0.1.0
 ```
 
 ### .unitypackage로 설치
 
-1. [GitHub Releases](https://github.com/GaoZombie/BugBeacon-unity/releases) 페이지에서 최신 `.unitypackage` 파일 다운로드
+1. [GitHub Releases](https://github.com/RekonOps/Rekon-unity/releases) 페이지에서 최신 `.unitypackage` 파일 다운로드
 2. Unity 에디터로 해당 파일을 드래그 앤 드롭하거나, `Assets` 메뉴 → `Import Package` → `Custom Package...` 선택
 3. 모든 파일이 체크된 상태로 `Import` 클릭
 
@@ -71,7 +71,7 @@ https://github.com/GaoZombie/BugBeacon-unity.git#v0.1.0
 1. 저장소를 클론하거나 ZIP으로 다운로드:
 
 ```
-git clone https://github.com/GaoZombie/BugBeacon-unity.git
+git clone https://github.com/RekonOps/Rekon-unity.git
 ```
 
 2. 클론한 폴더를 Unity 프로젝트의 `Packages` 디렉토리 안으로 복사합니다:
@@ -79,7 +79,7 @@ git clone https://github.com/GaoZombie/BugBeacon-unity.git
 ```
 YourUnityProject/
   Packages/
-    com.gaozombie.bugbeacon/   ← 여기에 복사
+    dev.rekonops.rekon/   ← 여기에 복사
 ```
 
 3. Unity 에디터를 재시작하면 자동으로 인식됩니다.
@@ -91,12 +91,12 @@ YourUnityProject/
 ### Settings 에셋 생성
 
 1. Project 창에서 설정을 저장할 폴더로 이동 (예: `Assets/Settings`)
-2. 우클릭 → `Create` → `BugBeacon` → `Settings` 선택
-3. 파일명은 `BugBeaconSettings`로 유지하거나 원하는 이름으로 변경
+2. 우클릭 → `Create` → `Rekon` → `Settings` 선택
+3. 파일명은 `RekonSettings`로 유지하거나 원하는 이름으로 변경
 
 ### Project Settings에 등록
 
-1. `Edit` 메뉴 → `Project Settings` → `BugBeacon` 항목 선택
+1. `Edit` 메뉴 → `Project Settings` → `Rekon` 항목 선택
 2. `Settings Asset` 필드에 생성한 에셋을 드래그하여 할당
 3. 설정 패널에서 각 항목을 조정
 
@@ -106,7 +106,7 @@ YourUnityProject/
 |------|------|--------|
 | Capture Hotkey | 버그 캡처를 시작하는 키 | `F12` |
 
-핫키는 Play Mode에서만 작동합니다. 에디터 모드에서는 BugBeacon 에디터 윈도우를 통해 수동으로 캡처할 수 있습니다.
+핫키는 Play Mode에서만 작동합니다. 에디터 모드에서는 Rekon 에디터 윈도우를 통해 수동으로 캡처할 수 있습니다.
 
 ### 영상 녹화 설정
 
@@ -144,7 +144,7 @@ YourUnityProject/
 
 **1단계: Auth Broker URL 설정**
 
-`BugBeaconSettings` 에셋의 `Auth Broker URL` 필드에 Auth Broker 서버 주소를 입력합니다:
+`RekonSettings` 에셋의 `Auth Broker URL` 필드에 Auth Broker 서버 주소를 입력합니다:
 
 ```
 https://your-project.supabase.co/functions/v1
@@ -152,11 +152,11 @@ https://your-project.supabase.co/functions/v1
 
 **2단계: OAuth 인증 시작**
 
-`Project Settings` → `BugBeacon` → `Jira 연결` 버튼을 클릭합니다.
+`Project Settings` → `Rekon` → `Jira 연결` 버튼을 클릭합니다.
 
 **3단계: 브라우저 인증**
 
-자동으로 브라우저가 열리고 Jira OAuth 인증 페이지로 이동합니다. Atlassian 계정으로 로그인하고 BugBeacon 앱의 권한 요청을 승인합니다.
+자동으로 브라우저가 열리고 Jira OAuth 인증 페이지로 이동합니다. Atlassian 계정으로 로그인하고 Rekon 앱의 권한 요청을 승인합니다.
 
 **4단계: 연결 확인**
 
@@ -165,7 +165,7 @@ https://your-project.supabase.co/functions/v1
 **5단계: Jira 프로젝트 설정**
 
 - `Default Project Key`: 이슈를 생성할 기본 Jira 프로젝트 키 입력 (예: `GAME`)
-- `Default Labels`: 자동으로 추가할 레이블 설정 (기본값: `bugbeacon-unity`, `unity`)
+- `Default Labels`: 자동으로 추가할 레이블 설정 (기본값: `rekon-unity`, `unity`)
 
 ### 토큰 갱신
 
@@ -183,7 +183,7 @@ Play Mode 실행 중 버그가 발생하면 설정된 핫키(`F12`)를 누릅니
 
 **2단계: 자동 캡처**
 
-BugBeacon가 자동으로 다음 항목을 수집합니다:
+Rekon가 자동으로 다음 항목을 수집합니다:
 
 - 현재 화면 스크린샷 (PNG)
 - 최근 로그 (링 버퍼에 저장된 내용)
@@ -227,7 +227,7 @@ BugBeacon가 자동으로 다음 항목을 수집합니다:
 
 ### 번들 관리 창
 
-`Window` 메뉴 → `BugBeacon` → `Bundle Manager`를 선택하여 번들 관리 창을 엽니다.
+`Window` 메뉴 → `Rekon` → `Bundle Manager`를 선택하여 번들 관리 창을 엽니다.
 
 - 번들 목록과 상태를 확인할 수 있습니다
 - 특정 번들을 수동으로 재시도할 수 있습니다
@@ -252,7 +252,7 @@ BugBeacon가 자동으로 다음 항목을 수집합니다:
 
 ### 자동 크래시 감지
 
-BugBeacon는 Play Mode 진입 시 자동으로 이전 세션의 비정상 종료를 감지합니다. 에디터 크래시, 강제 종료, 또는 비정상 종료가 감지되면 세션 시작 시 크래시 복구 윈도우가 표시됩니다.
+Rekon는 Play Mode 진입 시 자동으로 이전 세션의 비정상 종료를 감지합니다. 에디터 크래시, 강제 종료, 또는 비정상 종료가 감지되면 세션 시작 시 크래시 복구 윈도우가 표시됩니다.
 
 ### 크래시 데이터 수집
 
@@ -299,18 +299,18 @@ BugBeacon는 Play Mode 진입 시 자동으로 이전 세션의 비정상 종료
 게임 코드에서 버그 리포트에 포함될 커스텀 데이터를 동적으로 추가할 수 있습니다.
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 // 게임 데이터를 컨텍스트에 추가
-BugBeaconContext.Add("current_level", "5");
-BugBeaconContext.Add("player_hp", playerHp.ToString());
-BugBeaconContext.Add("scene_name", SceneManager.GetActiveScene().name);
+RekonContext.Add("current_level", "5");
+RekonContext.Add("player_hp", playerHp.ToString());
+RekonContext.Add("scene_name", SceneManager.GetActiveScene().name);
 
 // 특정 키 제거
-BugBeaconContext.Remove("current_level");
+RekonContext.Remove("current_level");
 
 // 모든 컨텍스트 초기화 (씬 전환 시 등)
-BugBeaconContext.Clear();
+RekonContext.Clear();
 ```
 
 추가된 데이터는 버그 리포트의 상태 스냅샷에 포함되어 Jira 이슈 설명란에 첨부됩니다.
@@ -321,7 +321,7 @@ BugBeaconContext.Clear();
 
 ```csharp
 using System.Collections.Generic;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 // IContextProvider 구현
 public class GameStateContextProvider : IContextProvider
@@ -342,14 +342,14 @@ public class GameStateContextProvider : IContextProvider
 구현한 프로바이더를 `ContextProviderRegistry`에 등록합니다:
 
 ```csharp
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
 // 게임 시작 시 등록
 var provider = new GameStateContextProvider();
-BugBeacon.Instance.ContextRegistry.Register(provider);
+Rekon.Instance.ContextRegistry.Register(provider);
 
 // 게임 종료 시 해제
-BugBeacon.Instance.ContextRegistry.Unregister(provider);
+Rekon.Instance.ContextRegistry.Unregister(provider);
 ```
 
 버그 캡처 시 `GetContext()`가 자동으로 호출되어 최신 상태가 수집됩니다.
@@ -379,7 +379,7 @@ BugBeacon.Instance.ContextRegistry.Unregister(provider);
 }
 ```
 
-작성한 파일 경로를 `BugBeaconSettings`의 `Masking Rules Path`에 입력합니다.
+작성한 파일 경로를 `RekonSettings`의 `Masking Rules Path`에 입력합니다.
 
 ---
 
@@ -389,8 +389,8 @@ BugBeacon.Instance.ContextRegistry.Unregister(provider);
 
 **확인 사항:**
 
-1. Play Mode인지 확인합니다. BugBeacon는 에디터 모드에서 핫키가 작동하지 않습니다.
-2. `BugBeaconSettings` 에셋이 Project Settings에 올바르게 할당되어 있는지 확인합니다.
+1. Play Mode인지 확인합니다. Rekon는 에디터 모드에서 핫키가 작동하지 않습니다.
+2. `RekonSettings` 에셋이 Project Settings에 올바르게 할당되어 있는지 확인합니다.
 3. `Capture Hotkey` 설정이 `F12`로 되어 있는지 확인합니다.
 4. 게임 코드에서 `Input.GetKeyDown(KeyCode.F12)`를 별도로 처리하고 있다면 이벤트가 소비될 수 있습니다. Input System이 Input Manager(Legacy)로 설정되어 있는지 확인합니다.
 
@@ -408,9 +408,9 @@ BugBeacon.Instance.ContextRegistry.Unregister(provider);
 
 **확인 사항:**
 
-1. `BugBeaconSettings`에서 `Video Enabled`가 체크되어 있는지 확인합니다.
+1. `RekonSettings`에서 `Video Enabled`가 체크되어 있는지 확인합니다.
 2. Play Mode 진입 후 충분한 시간(최소 몇 초)이 지난 후 캡처했는지 확인합니다. 링 버퍼가 채워지기 전에 캡처하면 영상이 없을 수 있습니다.
-3. Unity 에디터 Console 창에서 `[BugBeacon]` 관련 오류 메시지를 확인합니다.
+3. Unity 에디터 Console 창에서 `[Rekon]` 관련 오류 메시지를 확인합니다.
 4. 메모리 제한으로 인해 영상 버퍼가 비활성화되지 않았는지 확인합니다.
 
 ### Q4. 크래시 복구 윈도우가 표시되지 않습니다.
@@ -418,7 +418,7 @@ BugBeacon.Instance.ContextRegistry.Unregister(provider);
 **확인 사항:**
 
 1. 이전 Play Mode 세션이 실제로 비정상 종료(크래시)되었는지 확인합니다. 정상 종료된 경우에는 표시되지 않습니다.
-2. `BugBeaconSettings`의 Crash Recovery 설정이 활성화되어 있는지 확인합니다.
+2. `RekonSettings`의 Crash Recovery 설정이 활성화되어 있는지 확인합니다.
 3. `Application.persistentDataPath` 경로에 크래시 복구 데이터가 저장되었는지 확인합니다.
 
 ### Q5. 로그에 민감 정보가 포함되어 있습니다.
@@ -432,5 +432,5 @@ BugBeacon.Instance.ContextRegistry.Unregister(provider);
 ## 추가 도움말
 
 - [API 레퍼런스](api-reference.md) - 공개 API 전체 목록
-- [GitHub Issues](https://github.com/GaoZombie/BugBeacon-unity/issues) - 버그 리포트 및 기능 요청
+- [GitHub Issues](https://github.com/RekonOps/Rekon-unity/issues) - 버그 리포트 및 기능 요청
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - 기여 방법

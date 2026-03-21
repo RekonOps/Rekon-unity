@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// PeriodicFlushManager 및 MappedFileWriter 단위 테스트.

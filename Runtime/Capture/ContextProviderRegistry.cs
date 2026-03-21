@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// IContextProvider 구현체를 등록/해제하고, 전체 컨텍스트 데이터를 수집하는 레지스트리.
@@ -90,7 +90,7 @@ namespace GaoZombie.BugBeacon
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugBeacon] ContextProvider '{provider.GetType().Name}' 오류: {ex.Message}");
+                    Debug.LogWarning($"[Rekon] ContextProvider '{provider.GetType().Name}' 오류: {ex.Message}");
                 }
             }
 

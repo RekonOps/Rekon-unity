@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 핫키 입력 감지 전략 인터페이스.

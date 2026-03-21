@@ -6,10 +6,10 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEditor;
-using GaoZombie.BugBeacon;
-using GaoZombie.BugBeacon.Editor;
+using RekonOps.Rekon;
+using RekonOps.Rekon.Editor;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// BundleManagerWindow 에디터 모드 단위 테스트.
@@ -69,8 +69,8 @@ namespace GaoZombie.BugBeacon.Tests
         {
             // 메뉴 경로 상수 검증
             Assert.AreEqual(
-                "Window/BugBeacon",
-                BugBeaconEditorInfo.MenuRoot,
+                "Window/Rekon",
+                RekonEditorInfo.MenuRoot,
                 "메뉴 루트 경로가 일치해야 합니다.");
         }
 
@@ -222,8 +222,8 @@ namespace GaoZombie.BugBeacon.Tests
         public void MenuPath_Settings_IsCorrect()
         {
             Assert.AreEqual(
-                "Window/BugBeacon/Settings",
-                BugBeaconEditorInfo.MenuRoot + "/Settings",
+                "Window/Rekon/Settings",
+                RekonEditorInfo.MenuRoot + "/Settings",
                 "Settings 메뉴 경로가 올바라야 합니다.");
         }
 
@@ -231,8 +231,8 @@ namespace GaoZombie.BugBeacon.Tests
         public void MenuPath_Bundles_IsCorrect()
         {
             Assert.AreEqual(
-                "Window/BugBeacon/Bundles",
-                BugBeaconEditorInfo.MenuRoot + "/Bundles",
+                "Window/Rekon/Bundles",
+                RekonEditorInfo.MenuRoot + "/Bundles",
                 "Bundles 메뉴 경로가 올바라야 합니다.");
         }
 

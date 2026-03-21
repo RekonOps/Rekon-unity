@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// LogEntry 배열을 텍스트로 직렬화하고 .txt 파일로 저장하는 클래스.
@@ -50,7 +50,7 @@ namespace GaoZombie.BugBeacon
             var sb = new StringBuilder(entries.Length * 200);
 
             // 헤더 정보
-            sb.AppendLine($"# BugBeacon 로그 덤프");
+            sb.AppendLine($"# Rekon 로그 덤프");
             sb.AppendLine($"# 생성 시각: {DateTime.UtcNow:O}");
             sb.AppendLine($"# 항목 수: {entries.Length}");
             sb.AppendLine($"# 플랫폼: {Application.platform}");
@@ -102,11 +102,11 @@ namespace GaoZombie.BugBeacon
 
                 await File.WriteAllTextAsync(txtPath, serialized, Encoding.UTF8);
 
-                Debug.Log($"[BugBeacon] 로그 저장 완료: {txtPath} ({entries.Length}개 항목)");
+                Debug.Log($"[Rekon] 로그 저장 완료: {txtPath} ({entries.Length}개 항목)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 로그 저장 실패 (경로: {txtPath}): {ex.Message}");
+                Debug.LogError($"[Rekon] 로그 저장 실패 (경로: {txtPath}): {ex.Message}");
                 throw;
             }
         }

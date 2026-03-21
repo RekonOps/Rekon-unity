@@ -1,9 +1,9 @@
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// LogMasker 및 MaskingRuleLoader 단위 테스트.

@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 시스템/애플리케이션 상태 스냅샷 수집 인터페이스.

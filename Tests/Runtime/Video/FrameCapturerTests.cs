@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// FrameCapturer 단위 테스트.
@@ -17,12 +17,12 @@ namespace GaoZombie.BugBeacon.Tests
         private FrameCapturer _capturer;
         private FrameRingBuffer _ringBuffer;
         private VideoEncoderConfig _config;
-        private BugBeaconSettings _settings;
+        private RekonSettings _settings;
 
         [SetUp]
         public void SetUp()
         {
-            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
+            _settings = ScriptableObject.CreateInstance<RekonSettings>();
             _settings.videoWidth = 320;
             _settings.videoHeight = 180;
             _settings.videoFps = 10;

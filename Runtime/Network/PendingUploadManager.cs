@@ -4,13 +4,13 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 오프라인/미로그인 시 전송 실패한 번들을 pending 큐에 등록하는 매니저.
     ///
     /// pending 큐 관리:
-    ///   - {persistentDataPath}/BugBeacon/pending/ 폴더 사용
+    ///   - {persistentDataPath}/Rekon/pending/ 폴더 사용
     ///   - 각 항목은 {bundleId}.pending.json 파일
     ///   - 번들 자체는 BundleWriter가 이미 로컬에 저장
     ///
@@ -45,7 +45,7 @@ namespace GaoZombie.BugBeacon
         public PendingUploadManager()
         {
             EnsurePendingDirectory();
-            Debug.Log("[BugBeacon] PendingUploadManager 초기화 완료");
+            Debug.Log("[Rekon] PendingUploadManager 초기화 완료");
         }
 
         // ─── 공개 메서드 ──────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ namespace GaoZombie.BugBeacon
         {
             if (manifest == null)
             {
-                Debug.LogWarning("[BugBeacon] PendingUpload: null 매니페스트를 enqueue 시도");
+                Debug.LogWarning("[Rekon] PendingUpload: null 매니페스트를 enqueue 시도");
                 return;
             }
 
@@ -83,11 +83,11 @@ namespace GaoZombie.BugBeacon
                     File.Move(tempPath, pendingPath);
                 });
 
-                Debug.Log($"[BugBeacon] PendingUpload: 큐에 등록 완료 (bundleId={manifest.id})");
+                Debug.Log($"[Rekon] PendingUpload: 큐에 등록 완료 (bundleId={manifest.id})");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] PendingUpload: 큐 등록 실패 ({manifest.id}): {ex.Message}");
+                Debug.LogError($"[Rekon] PendingUpload: 큐 등록 실패 ({manifest.id}): {ex.Message}");
             }
         }
 
@@ -118,7 +118,7 @@ namespace GaoZombie.BugBeacon
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugBeacon] PendingUpload: pending 파일 파싱 실패 ({filePath}): {ex.Message}");
+                    Debug.LogWarning($"[Rekon] PendingUpload: pending 파일 파싱 실패 ({filePath}): {ex.Message}");
                 }
             }
 
@@ -151,12 +151,12 @@ namespace GaoZombie.BugBeacon
                 if (File.Exists(pendingPath))
                 {
                     File.Delete(pendingPath);
-                    Debug.Log($"[BugBeacon] PendingUpload: pending 파일 제거 (bundleId={bundleId})");
+                    Debug.Log($"[Rekon] PendingUpload: pending 파일 제거 (bundleId={bundleId})");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] PendingUpload: pending 파일 삭제 실패 ({bundleId}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] PendingUpload: pending 파일 삭제 실패 ({bundleId}): {ex.Message}");
             }
         }
 
@@ -167,7 +167,7 @@ namespace GaoZombie.BugBeacon
         /// </summary>
         public static string GetPendingDirectory()
         {
-            return Path.Combine(Application.persistentDataPath, "BugBeacon", PendingFolderName);
+            return Path.Combine(Application.persistentDataPath, "Rekon", PendingFolderName);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace GaoZombie.BugBeacon
             if (!Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
-                Debug.Log($"[BugBeacon] PendingUpload: pending 디렉토리 생성: {dir}");
+                Debug.Log($"[Rekon] PendingUpload: pending 디렉토리 생성: {dir}");
             }
         }
     }

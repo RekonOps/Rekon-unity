@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 스크린샷 캡처 전략 인터페이스.

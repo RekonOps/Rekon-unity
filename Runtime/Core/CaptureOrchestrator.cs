@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 캡처 파이프라인 전체를 조율하는 오케스트레이터.
@@ -31,7 +31,7 @@ namespace GaoZombie.BugBeacon
         private readonly FrameRingBuffer _frameBuffer;
         private readonly IVideoEncoder _videoEncoder;
         private readonly VideoEncoderConfig _videoConfig;
-        private readonly BugBeaconSettings _settings;
+        private readonly RekonSettings _settings;
         // 생성자 주입 토큰 스토어 (null 허용)
         private readonly SessionTokenStore _tokenStore;
         // 런타임 바인딩 토큰 스토어 — BindTokenStore() 호출 시 설정되며, _tokenStore보다 우선합니다.
@@ -64,7 +64,7 @@ namespace GaoZombie.BugBeacon
             FrameRingBuffer frameBuffer,
             IVideoEncoder videoEncoder,
             VideoEncoderConfig videoConfig,
-            BugBeaconSettings settings,
+            RekonSettings settings,
             SessionTokenStore tokenStore = null)
         {
             _screenshotCapturer = screenshotCapturer ?? throw new ArgumentNullException(nameof(screenshotCapturer));
@@ -88,7 +88,7 @@ namespace GaoZombie.BugBeacon
             // _tokenStore는 readonly가 아니므로 필드를 직접 교체하는 대신
             // 별도의 런타임 오버라이드 필드를 사용합니다.
             _runtimeTokenStore = tokenStore;
-            Debug.Log("[BugBeacon] CaptureOrchestrator: SessionTokenStore 바인딩 완료");
+            Debug.Log("[Rekon] CaptureOrchestrator: SessionTokenStore 바인딩 완료");
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace GaoZombie.BugBeacon
         public void BindSilentSubmitManager(SilentSubmitManager manager)
         {
             _silentSubmitManager = manager;
-            Debug.Log("[BugBeacon] CaptureOrchestrator: SilentSubmitManager 바인딩 완료");
+            Debug.Log("[Rekon] CaptureOrchestrator: SilentSubmitManager 바인딩 완료");
         }
 
         /// <summary>
@@ -124,14 +124,14 @@ namespace GaoZombie.BugBeacon
             // 원자적 CAS: 0(대기) → 1(캡처 중) 으로 교체. 이미 1이면 중복 진입 차단
             if (Interlocked.CompareExchange(ref _isCapturingFlag, 1, 0) != 0)
             {
-                Debug.LogWarning("[BugBeacon] 이미 캡처가 진행 중입니다.");
+                Debug.LogWarning("[Rekon] 이미 캡처가 진행 중입니다.");
                 return null;
             }
 
             // 제출 진행 중이면 새 캡처 차단
             if (_silentSubmitManager != null && _silentSubmitManager.IsSubmitting)
             {
-                Debug.LogWarning("[BugBeacon] 제출이 진행 중입니다. 캡처를 시작할 수 없습니다.");
+                Debug.LogWarning("[Rekon] 제출이 진행 중입니다. 캡처를 시작할 수 없습니다.");
                 // 획득한 캡처 플래그 반환
                 Interlocked.Exchange(ref _isCapturingFlag, 0);
                 return null;
@@ -148,7 +148,7 @@ namespace GaoZombie.BugBeacon
                 if (usageCheck != null && !usageCheck.Allowed)
                 {
                     string limitLabel = "월간 한도 도달";
-                    Debug.LogWarning($"[BugBeacon] 사용량 한도 초과: {usageCheck.Reason}");
+                    Debug.LogWarning($"[Rekon] 사용량 한도 초과: {usageCheck.Reason}");
                     ReportProgress("usage_limit", 0f, limitLabel);
                     // 획득한 캡처 플래그 반환
                     Interlocked.Exchange(ref _isCapturingFlag, 0);
@@ -181,12 +181,12 @@ namespace GaoZombie.BugBeacon
             }
             catch (OperationCanceledException)
             {
-                Debug.LogWarning($"[BugBeacon] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
+                Debug.LogWarning($"[Rekon] 캡처 타임아웃 ({effectiveTimeout}초 초과). 수집된 아티팩트만 반환합니다.");
                 ReportProgress("complete", 1.0f, "타임아웃");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 캡처 중 예기치 않은 오류: {ex.Message}");
+                Debug.LogError($"[Rekon] 캡처 중 예기치 않은 오류: {ex.Message}");
             }
             finally
             {
@@ -240,7 +240,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 스크린샷 캡처 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 스크린샷 캡처 실패: {ex.Message}");
                 ReportProgress("screenshot", 0.25f, ex.Message);
             }
         }
@@ -261,7 +261,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 로그 수집 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 로그 수집 실패: {ex.Message}");
                 ReportProgress("logs", 0.50f, ex.Message);
             }
         }
@@ -287,7 +287,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 상태 수집 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 상태 수집 실패: {ex.Message}");
                 ReportProgress("state", 0.75f, ex.Message);
             }
         }
@@ -332,7 +332,7 @@ namespace GaoZombie.BugBeacon
 
                             int nextCrf = crfSteps[attempt];
                             Debug.LogWarning(
-                                $"[BugBeacon] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                $"[Rekon] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
                                 $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
                                 $"CRF {nextCrf}으로 재인코딩합니다. (시도 {attempt + 1}/2)");
 
@@ -386,7 +386,7 @@ namespace GaoZombie.BugBeacon
                             if (finalSize > activeConfig.TargetMaxSizeBytes)
                             {
                                 Debug.LogWarning(
-                                    $"[BugBeacon] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                    $"[Rekon] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
                                     $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
                                     "Jira 업로드 시 거부될 수 있습니다.");
                             }
@@ -401,7 +401,7 @@ namespace GaoZombie.BugBeacon
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 영상 수집 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 영상 수집 실패: {ex.Message}");
                 ReportProgress("video", 1.0f, ex.Message);
             }
         }
@@ -410,7 +410,7 @@ namespace GaoZombie.BugBeacon
         {
             string tempBase = Path.Combine(
                 Application.temporaryCachePath,
-                "BugBeacon",
+                "Rekon",
                 timestamp.ToString("yyyyMMdd_HHmmss_fff"));
 
             Directory.CreateDirectory(tempBase);
@@ -426,7 +426,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] OnProgress 핸들러 오류: {ex.Message}");
+                Debug.LogWarning($"[Rekon] OnProgress 핸들러 오류: {ex.Message}");
             }
         }
 
@@ -451,13 +451,13 @@ namespace GaoZombie.BugBeacon
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     // 토큰 없음 → fail-open
-                    Debug.Log("[BugBeacon] 사용량 사전 체크: 토큰 없음. 캡처를 계속 진행합니다.");
+                    Debug.Log("[Rekon] 사용량 사전 체크: 토큰 없음. 캡처를 계속 진행합니다.");
                     return null;
                 }
 
                 // URL: {WEB_DASHBOARD_URL}/api/usage?workspace_id={workspaceId}
                 string workspaceId = _settings.tenantId;
-                string baseUrl = BugBeaconSettings.WEB_DASHBOARD_URL.TrimEnd('/');
+                string baseUrl = RekonSettings.WEB_DASHBOARD_URL.TrimEnd('/');
                 string url = $"{baseUrl}/api/usage?workspace_id={Uri.EscapeDataString(workspaceId)}";
 
                 var tcs = new TaskCompletionSource<string>();
@@ -494,14 +494,14 @@ namespace GaoZombie.BugBeacon
                         else
                         {
                             // fail-open: 네트워크 오류, 4xx, 5xx 모두 null로 처리
-                            Debug.Log($"[BugBeacon] 사용량 사전 체크 응답 오류 " +
+                            Debug.Log($"[Rekon] 사용량 사전 체크 응답 오류 " +
                                       $"(fail-open, HTTP {request.responseCode}): {request.error}");
                             tcs.TrySetResult(null);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.Log($"[BugBeacon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
+                        Debug.Log($"[Rekon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
                         tcs.TrySetResult(null);
                     }
                     finally
@@ -517,7 +517,7 @@ namespace GaoZombie.BugBeacon
 
                 if (completedTask == timeoutTask || !tcs.Task.IsCompleted)
                 {
-                    Debug.Log("[BugBeacon] 사용량 사전 체크 타임아웃 (fail-open). 캡처를 계속 진행합니다.");
+                    Debug.Log("[Rekon] 사용량 사전 체크 타임아웃 (fail-open). 캡처를 계속 진행합니다.");
                     return null;
                 }
 
@@ -536,7 +536,7 @@ namespace GaoZombie.BugBeacon
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log($"[BugBeacon] 사용량 사전 체크 JSON 파싱 실패 (fail-open): {ex.Message}");
+                    Debug.Log($"[Rekon] 사용량 사전 체크 JSON 파싱 실패 (fail-open): {ex.Message}");
                     return null;
                 }
 
@@ -557,7 +557,7 @@ namespace GaoZombie.BugBeacon
             catch (Exception ex)
             {
                 // fail-open: 예외 시 캡처 허용
-                Debug.Log($"[BugBeacon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
+                Debug.Log($"[Rekon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
                 return null;
             }
         }

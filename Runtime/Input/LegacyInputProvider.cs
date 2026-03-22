@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// Unity Legacy Input System 기반 핫키 제공자.

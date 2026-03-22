@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// Jira 이슈를 생성합니다.
@@ -14,7 +14,7 @@ namespace GaoZombie.BugBeacon
     /// AdditionalLabels로 지정된 레이블을 자동으로 추가합니다.
     ///
     /// ⚠️ JAM.dev 패턴 적용 (ADR-047):
-    /// 이 클래스는 웹 대시보드(BugBeacon-web)의 push-to-jira API에서만 호출됩니다.
+    /// 이 클래스는 웹 대시보드(Rekon-web)의 push-to-jira API에서만 호출됩니다.
     /// Unity 플러그인(런타임)에서는 직접 호출하지 마세요.
     /// Unity → Web Backend → Jira 순서로만 동작해야 합니다.
     /// </summary>
@@ -197,7 +197,7 @@ namespace GaoZombie.BugBeacon
 
         /// <summary>
         /// 추가 레이블 배열을 중복 제거 후 반환합니다.
-        /// 기본 레이블은 웹 대시보드(BugBeacon-web)에서 관리됩니다 (ADR-047).
+        /// 기본 레이블은 웹 대시보드(Rekon-web)에서 관리됩니다 (ADR-047).
         /// </summary>
         private static string[] MergeLabels(string[] additionalLabels)
         {

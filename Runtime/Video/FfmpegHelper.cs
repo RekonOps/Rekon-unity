@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// FFmpeg 설치 상태를 감지하는 유틸리티 클래스.
@@ -61,7 +61,7 @@ namespace GaoZombie.BugBeacon
                 }
 
                 _isInstalled = false;
-                UnityEngine.Debug.LogWarning("[BugBeacon] FFmpeg가 설치되어 있지 않습니다.");
+                UnityEngine.Debug.LogWarning("[Rekon] FFmpeg가 설치되어 있지 않습니다.");
                 return _isInstalled.Value;
             }
         }
@@ -103,7 +103,7 @@ namespace GaoZombie.BugBeacon
                         _versionInfo = firstLine.Trim();
                         _ffmpegPath = executablePath;
                         _isInstalled = true;
-                        UnityEngine.Debug.Log($"[BugBeacon] FFmpeg 감지됨: {_versionInfo} (경로: {executablePath})");
+                        UnityEngine.Debug.Log($"[Rekon] FFmpeg 감지됨: {_versionInfo} (경로: {executablePath})");
                         return true;
                     }
                 }
@@ -112,7 +112,7 @@ namespace GaoZombie.BugBeacon
             catch (System.IO.FileNotFoundException) { /* 파일 없음 */ }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[BugBeacon] FFmpeg 감지 중 오류 ({executablePath}): {ex.GetType().Name}");
+                UnityEngine.Debug.LogWarning($"[Rekon] FFmpeg 감지 중 오류 ({executablePath}): {ex.GetType().Name}");
             }
             return false;
         }
@@ -139,7 +139,7 @@ namespace GaoZombie.BugBeacon
                 string encoderList = GetAvailableEncoders();
                 if (string.IsNullOrEmpty(encoderList))
                 {
-                    UnityEngine.Debug.Log("[BugBeacon] GPU 인코더 감지 실패: ffmpeg -encoders 출력 없음");
+                    UnityEngine.Debug.Log("[Rekon] GPU 인코더 감지 실패: ffmpeg -encoders 출력 없음");
                     return null;
                 }
 
@@ -155,12 +155,12 @@ namespace GaoZombie.BugBeacon
                     if (availableEncoders.Contains(candidate))
                     {
                         _detectedGpuEncoder = candidate;
-                        UnityEngine.Debug.Log($"[BugBeacon] GPU 인코더 감지됨: {candidate}");
+                        UnityEngine.Debug.Log($"[Rekon] GPU 인코더 감지됨: {candidate}");
                         return _detectedGpuEncoder;
                     }
                 }
 
-                UnityEngine.Debug.Log("[BugBeacon] 사용 가능한 GPU 인코더 없음. libx264 CPU 인코더를 사용합니다.");
+                UnityEngine.Debug.Log("[Rekon] 사용 가능한 GPU 인코더 없음. libx264 CPU 인코더를 사용합니다.");
                 return null;
             }
         }
@@ -210,7 +210,7 @@ namespace GaoZombie.BugBeacon
                     if (!exited)
                     {
                         try { process.Kill(); } catch { /* 무시 */ }
-                        UnityEngine.Debug.LogWarning("[BugBeacon] GetAvailableEncoders: ffmpeg 타임아웃 (5초 초과)");
+                        UnityEngine.Debug.LogWarning("[Rekon] GetAvailableEncoders: ffmpeg 타임아웃 (5초 초과)");
                         return string.Empty;
                     }
 
@@ -225,7 +225,7 @@ namespace GaoZombie.BugBeacon
             catch (System.IO.FileNotFoundException) { /* 파일 없음 */ }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[BugBeacon] GetAvailableEncoders 오류: {ex.GetType().Name}: {ex.Message}");
+                UnityEngine.Debug.LogWarning($"[Rekon] GetAvailableEncoders 오류: {ex.GetType().Name}: {ex.Message}");
             }
 
             return string.Empty;
@@ -294,7 +294,7 @@ namespace GaoZombie.BugBeacon
     }
 }
 #else
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 모바일 등 미지원 플랫폼에서의 FFmpeg 스텁 구현.

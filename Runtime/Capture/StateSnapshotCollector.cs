@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// SystemInfo, Application, SceneManager, Time, Screen, QualitySettings를 사용하여
@@ -73,7 +73,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 상태 스냅샷 수집 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 상태 스냅샷 수집 실패: {ex.Message}");
                 // 실패 시에도 빈 스냅샷 반환 (null 방지)
                 return Task.FromResult(new StateSnapshot
                 {

@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 번들 제출 재시도 큐.
@@ -76,11 +76,11 @@ namespace GaoZombie.BugBeacon
 
             if (pending.Count == 0)
             {
-                Debug.Log("[BugBeacon] 제출 대기 중인 번들이 없습니다.");
+                Debug.Log("[Rekon] 제출 대기 중인 번들이 없습니다.");
                 return 0;
             }
 
-            Debug.Log($"[BugBeacon] Pending 번들 {pending.Count}개 제출 시작.");
+            Debug.Log($"[Rekon] Pending 번들 {pending.Count}개 제출 시작.");
 
             int successCount = 0;
 
@@ -88,7 +88,7 @@ namespace GaoZombie.BugBeacon
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    Debug.Log("[BugBeacon] 제출 큐 처리가 취소되었습니다.");
+                    Debug.Log("[Rekon] 제출 큐 처리가 취소되었습니다.");
                     break;
                 }
 
@@ -115,7 +115,7 @@ namespace GaoZombie.BugBeacon
                 // 최대 재시도 횟수 초과 시 건너뜀
                 if (manifest.retry_count >= MaxRetryCount)
                 {
-                    Debug.LogWarning($"[BugBeacon] 최대 재시도 초과 - 번들 건너뜀: {manifest.id} " +
+                    Debug.LogWarning($"[Rekon] 최대 재시도 초과 - 번들 건너뜀: {manifest.id} " +
                                      $"(재시도 횟수: {manifest.retry_count}/{MaxRetryCount})");
                     continue;
                 }
@@ -123,12 +123,12 @@ namespace GaoZombie.BugBeacon
                 try
                 {
                     await _repository.UpdateStateAsync(manifest.id, BundleState.Pending);
-                    Debug.Log($"[BugBeacon] 실패 번들 재시도 큐 등록: {manifest.id} (재시도 횟수: {manifest.retry_count})");
+                    Debug.Log($"[Rekon] 실패 번들 재시도 큐 등록: {manifest.id} (재시도 횟수: {manifest.retry_count})");
                     requeuedCount++;
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"[BugBeacon] 번들 상태 변경 실패 ({manifest.id}): {ex.Message}");
+                    Debug.LogError($"[Rekon] 번들 상태 변경 실패 ({manifest.id}): {ex.Message}");
                 }
             }
 
@@ -149,7 +149,7 @@ namespace GaoZombie.BugBeacon
             BundleManifest manifest = await _repository.GetByIdAsync(bundleId);
             if (manifest == null)
             {
-                Debug.LogError($"[BugBeacon] 번들을 찾을 수 없습니다: {bundleId}");
+                Debug.LogError($"[Rekon] 번들을 찾을 수 없습니다: {bundleId}");
                 return false;
             }
 
@@ -175,7 +175,7 @@ namespace GaoZombie.BugBeacon
             {
                 // Submitting 상태로 전환
                 await _repository.UpdateStateAsync(bundleId, BundleState.Submitting);
-                Debug.Log($"[BugBeacon] 번들 제출 시작: {bundleId}");
+                Debug.Log($"[Rekon] 번들 제출 시작: {bundleId}");
 
                 // 지수 백오프 재시도
                 string jiraIssueKey = await SubmitWithExponentialBackoffAsync(manifest, cancellationToken);
@@ -183,14 +183,14 @@ namespace GaoZombie.BugBeacon
                 // 성공: Submitted 상태로 전환
                 await _repository.MarkSubmittedAsync(bundleId, jiraIssueKey);
 
-                Debug.Log($"[BugBeacon] 번들 제출 성공: {bundleId} → Jira={jiraIssueKey}");
+                Debug.Log($"[Rekon] 번들 제출 성공: {bundleId} → Jira={jiraIssueKey}");
                 OnSubmitted?.Invoke(bundleId, jiraIssueKey);
 
                 return true;
             }
             catch (OperationCanceledException)
             {
-                Debug.Log($"[BugBeacon] 번들 제출 취소됨: {bundleId}");
+                Debug.Log($"[Rekon] 번들 제출 취소됨: {bundleId}");
                 // 취소 시 Pending으로 복원
                 await SafeUpdateStateAsync(bundleId, BundleState.Pending);
                 return false;
@@ -198,7 +198,7 @@ namespace GaoZombie.BugBeacon
             catch (Exception ex)
             {
                 // 실패: 재시도 횟수 증가 및 Failed 상태로 전환
-                Debug.LogError($"[BugBeacon] 번들 제출 최종 실패: {bundleId} - {ex.Message}");
+                Debug.LogError($"[Rekon] 번들 제출 최종 실패: {bundleId} - {ex.Message}");
 
                 int retryCount = await SafeIncrementRetryCountAsync(bundleId);
                 await SafeUpdateStateAsync(bundleId, BundleState.Failed);
@@ -224,7 +224,7 @@ namespace GaoZombie.BugBeacon
                 {
                     // 지수 백오프 대기 (5초, 15초, 45초)
                     int delaySeconds = RetryDelaysSeconds[Math.Min(attempt - 1, RetryDelaysSeconds.Length - 1)];
-                    Debug.Log($"[BugBeacon] 번들 재시도 대기 {delaySeconds}초: {manifest.id} (시도 {attempt}/{MaxRetryCount})");
+                    Debug.Log($"[Rekon] 번들 재시도 대기 {delaySeconds}초: {manifest.id} (시도 {attempt}/{MaxRetryCount})");
 
                     await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
                 }
@@ -247,7 +247,7 @@ namespace GaoZombie.BugBeacon
                 catch (Exception ex)
                 {
                     lastException = ex;
-                    Debug.LogWarning($"[BugBeacon] 번들 제출 시도 {attempt + 1} 실패: {manifest.id} - {ex.Message}");
+                    Debug.LogWarning($"[Rekon] 번들 제출 시도 {attempt + 1} 실패: {manifest.id} - {ex.Message}");
                 }
             }
 
@@ -267,7 +267,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 번들 상태 변경 실패 ({bundleId} → {state}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] 번들 상태 변경 실패 ({bundleId} → {state}): {ex.Message}");
             }
         }
 
@@ -282,7 +282,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 재시도 횟수 증가 실패 ({bundleId}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] 재시도 횟수 증가 실패 ({bundleId}): {ex.Message}");
                 return -1;
             }
         }

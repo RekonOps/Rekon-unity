@@ -3,7 +3,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// ScreenCapture.CaptureScreenshotIntoRenderTexture()를 사용하여
@@ -53,7 +53,7 @@ namespace GaoZombie.BugBeacon
             _currentHeight = Screen.height;
             CreateRenderResources(_currentWidth, _currentHeight);
 
-            Debug.Log($"[BugBeacon] FrameCapturer 초기화: {_currentWidth}x{_currentHeight}@{_config.Fps}fps, " +
+            Debug.Log($"[Rekon] FrameCapturer 초기화: {_currentWidth}x{_currentHeight}@{_config.Fps}fps, " +
                       $"AsyncGPUReadback={_asyncGpuReadbackSupported}");
         }
 
@@ -61,7 +61,7 @@ namespace GaoZombie.BugBeacon
         {
             if (_ringBuffer == null)
             {
-                Debug.LogError("[BugBeacon] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
+                Debug.LogError("[Rekon] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
                 return;
             }
             if (_isCapturing) return;
@@ -136,7 +136,7 @@ namespace GaoZombie.BugBeacon
                     _currentWidth = sw;
                     _currentHeight = sh;
                     CreateRenderResources(sw, sh);
-                    Debug.Log($"[BugBeacon] 화면 크기 변경 감지: {sw}x{sh}, RT 재생성");
+                    Debug.Log($"[Rekon] 화면 크기 변경 감지: {sw}x{sh}, RT 재생성");
                 }
 
                 // 현재 화면을 RenderTexture에 캡처 (렌더링 완료 후, 추가 렌더링 없음)

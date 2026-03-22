@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon.Tests.Integration
+namespace RekonOps.Rekon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.3 보안 테스트 - Auth Broker 보안.
@@ -29,7 +29,7 @@ namespace GaoZombie.BugBeacon.Tests.Integration
         [SetUp]
         public void SetUp()
         {
-            _tokenStore = new SessionTokenStore($"com.gaozombie.test.{Guid.NewGuid().ToString("N")[..8]}");
+            _tokenStore = new SessionTokenStore($"com.rekonops.test.{Guid.NewGuid().ToString("N")[..8]}");
             _tokenStore.Clear();
         }
 

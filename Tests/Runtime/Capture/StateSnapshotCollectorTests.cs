@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// StateSnapshotCollector 단위 테스트.

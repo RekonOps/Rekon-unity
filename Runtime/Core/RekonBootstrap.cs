@@ -1,12 +1,12 @@
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
-    /// Play Mode 진입 시 BugBeacon 시스템 전체를 자동 초기화하는 부트스트랩 클래스.
+    /// Play Mode 진입 시 Rekon 시스템 전체를 자동 초기화하는 부트스트랩 클래스.
     ///
     /// 초기화 순서:
-    ///   1. BugBeaconSettings 로드 (없으면 경고 후 중단)
+    ///   1. RekonSettings 로드 (없으면 경고 후 중단)
     ///   2. DontDestroyOnLoad GameObject 생성
     ///   3. 의존성 객체 생성 (LogRingBuffer, LogSerializer, ScreenshotCapturer 등)
     ///   4. 영상 녹화 활성화 시 FrameRingBuffer, VideoEncoder, FrameCapturer 초기화
@@ -17,7 +17,7 @@ namespace GaoZombie.BugBeacon
     ///   9. SilentSubmitManager 초기화
     ///  10. SubmitToast 초기화 및 SilentSubmitManager 바인딩
     /// </summary>
-    public static class BugBeaconBootstrap
+    public static class RekonBootstrap
     {
         private static bool _initialized;
 
@@ -28,22 +28,22 @@ namespace GaoZombie.BugBeacon
             _initialized = true;
 
             // ── 1. Settings 로드 ───────────────────────────────────────────────────
-            BugBeaconSettings settings = BugBeaconSettingsProvider.Settings;
+            RekonSettings settings = RekonSettingsProvider.Settings;
 
             if (settings == null)
             {
-                Debug.LogWarning("[BugBeacon] BugBeaconSettings를 찾을 수 없습니다. " +
-                                 "Resources/BugBeaconSettings.asset을 생성하세요. 시스템 초기화를 건너뜁니다.");
+                Debug.LogWarning("[Rekon] RekonSettings를 찾을 수 없습니다. " +
+                                 "Resources/RekonSettings.asset을 생성하세요. 시스템 초기화를 건너뜁니다.");
                 return;
             }
 
             try
             {
                 // ── 2. 루트 GameObject 생성 (씬 전환 후에도 유지) ─────────────────
-                var root = new GameObject("[BugBeacon]");
+                var root = new GameObject("[Rekon]");
                 Object.DontDestroyOnLoad(root);
 
-                Debug.Log("[BugBeacon] 부트스트랩 시작...");
+                Debug.Log("[Rekon] 부트스트랩 시작...");
 
                 // ── 3. 공통 의존성 생성 ───────────────────────────────────────────
 
@@ -80,7 +80,7 @@ namespace GaoZombie.BugBeacon
 
                     if (!ffmpegAvailable)
                     {
-                        Debug.LogWarning("[BugBeacon] FFmpeg 미설치로 영상 녹화가 비활성화됩니다. " +
+                        Debug.LogWarning("[Rekon] FFmpeg 미설치로 영상 녹화가 비활성화됩니다. " +
                                          "스크린샷과 로그 캡처는 정상 동작합니다.");
                         // frameRingBuffer, videoEncoder, videoConfig, frameCapturer 모두 null 유지
                     }
@@ -97,7 +97,7 @@ namespace GaoZombie.BugBeacon
                         frameCapturer.Initialize(frameRingBuffer, videoConfig);
                         frameCapturer.StartCapturing();
 
-                        Debug.Log($"[BugBeacon] 영상 녹화 활성화: {videoConfig}");
+                        Debug.Log($"[Rekon] 영상 녹화 활성화: {videoConfig}");
                     }
                 }
 
@@ -140,11 +140,11 @@ namespace GaoZombie.BugBeacon
                     {
                         var r2UploadService = new R2UploadService();
                         submitService = new ReportSubmitService(r2UploadService);
-                        Debug.Log("[BugBeacon] ReportSubmitService 초기화 완료 (Web 프록시 모드)");
+                        Debug.Log("[Rekon] ReportSubmitService 초기화 완료 (Web 프록시 모드)");
                     }
                     catch (System.Exception submitEx)
                     {
-                        Debug.LogWarning($"[BugBeacon] ReportSubmitService 초기화 실패 (로컬 저장만 가능): {submitEx.Message}");
+                        Debug.LogWarning($"[Rekon] ReportSubmitService 초기화 실패 (로컬 저장만 가능): {submitEx.Message}");
                     }
                 }
 
@@ -167,18 +167,18 @@ namespace GaoZombie.BugBeacon
                 int pendingCount = pendingUploadManager.GetPendingCount();
                 if (pendingCount > 0)
                 {
-                    Debug.Log($"[BugBeacon] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
+                    Debug.Log($"[Rekon] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
                 }
 
                 // ── 11. SubmitToast 초기화 ──────────────────────────────────────────
                 var submitToast = SubmitToast.EnsureInstance();
                 submitToast.BindSilentSubmitManager(silentSubmitManager);
 
-                Debug.Log("[BugBeacon] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, PendingUpload, 토스트 UI가 활성화되었습니다.");
+                Debug.Log("[Rekon] 부트스트랩 완료. 핫키 시스템, 캡처 파이프라인, Silent Submit, PendingUpload, 토스트 UI가 활성화되었습니다.");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 부트스트랩 초기화 실패: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[Rekon] 부트스트랩 초기화 실패: {ex.Message}\n{ex.StackTrace}");
             }
         }
     }

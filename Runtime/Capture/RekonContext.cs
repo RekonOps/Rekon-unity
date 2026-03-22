@@ -1,21 +1,21 @@
 using System;
 using System.Collections.Generic;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 게임 코드에서 버그 리포트에 포함할 커스텀 K/V 데이터를 관리하는 정적 API.
     ///
-    /// BugBeaconContext 자체도 IContextProvider를 구현하여
+    /// RekonContext 자체도 IContextProvider를 구현하여
     /// ContextProviderRegistry에 자동 등록됩니다.
     ///
     /// 사용 예:
-    ///   BugBeaconContext.Add("current_level", "5");
-    ///   BugBeaconContext.Add("player_hp", playerHp.ToString());
-    ///   BugBeaconContext.Remove("current_level");
-    ///   BugBeaconContext.Clear();
+    ///   RekonContext.Add("current_level", "5");
+    ///   RekonContext.Add("player_hp", playerHp.ToString());
+    ///   RekonContext.Remove("current_level");
+    ///   RekonContext.Clear();
     /// </summary>
-    public static class BugBeaconContext
+    public static class RekonContext
     {
         private static readonly Dictionary<string, string> s_Context = new Dictionary<string, string>();
         private static readonly object s_Lock = new object();
@@ -90,7 +90,7 @@ namespace GaoZombie.BugBeacon
 
         private class StaticContextProvider : IContextProvider
         {
-            public Dictionary<string, string> GetContext() => BugBeaconContext.GetSnapshot();
+            public Dictionary<string, string> GetContext() => RekonContext.GetSnapshot();
         }
     }
 }

@@ -2,7 +2,7 @@
 
 ## 개요
 
-BugBeacon Unity 플러그인의 M2 마일스톤은 캡처 파이프라인(M1)에서 생성된 아티팩트를
+Rekon Unity 플러그인의 M2 마일스톤은 캡처 파이프라인(M1)에서 생성된 아티팩트를
 로컬 디스크에 번들 단위로 패키징하고 관리하는 시스템을 구현합니다.
 
 ---
@@ -11,7 +11,7 @@ BugBeacon Unity 플러그인의 M2 마일스톤은 캡처 파이프라인(M1)에
 
 ```
 {Application.persistentDataPath}/
-└── BugBeacon/
+└── Rekon/
     └── bundles/
         └── {bundle-id}/              # GUID 기반 고유 번들 디렉토리
             ├── manifest.json          # 번들 메타데이터 (상태, 아티팩트 목록 등)
@@ -165,8 +165,8 @@ BugBeacon Unity 플러그인의 M2 마일스톤은 캡처 파이프라인(M1)에
 
 ## 보관 정책 (Retention Policy)
 
-- **최대 번들 수**: 200개 (BugBeaconSettings.maxBundles)
-- **최대 디스크 사용량**: 5,120MB / 5GB (BugBeaconSettings.maxDiskUsageMB)
+- **최대 번들 수**: 200개 (RekonSettings.maxBundles)
+- **최대 디스크 사용량**: 5,120MB / 5GB (RekonSettings.maxDiskUsageMB)
 - **삭제 전략**: FIFO (가장 오래된 번들부터 삭제)
 - **삭제 조건**: 둘 중 하나라도 초과 시 삭제 진행
 
@@ -192,7 +192,7 @@ BugBeacon Unity 플러그인의 M2 마일스톤은 캡처 파이프라인(M1)에
 
 ---
 
-## 관련 설정 (BugBeaconSettings)
+## 관련 설정 (RekonSettings)
 
 ```csharp
 [Header("Bundle")]

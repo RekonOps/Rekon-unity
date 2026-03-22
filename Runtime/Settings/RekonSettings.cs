@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 영상 프리셋 종류.
@@ -18,8 +18,8 @@ namespace GaoZombie.BugBeacon
         Custom = 3,
     }
 
-    [CreateAssetMenu(fileName = "BugBeaconSettings", menuName = "BugBeacon/Settings")]
-    public class BugBeaconSettings : ScriptableObject
+    [CreateAssetMenu(fileName = "RekonSettings", menuName = "Rekon/Settings")]
+    public class RekonSettings : ScriptableObject
     {
         [Header("Hotkey")]
         [Tooltip("Key to trigger bug capture")]
@@ -152,16 +152,16 @@ namespace GaoZombie.BugBeacon
         // ─── 웹 대시보드 연동 ────────────────────────────────────────────────
         /// <summary>웹 대시보드 기본 URL (Scripting Define Symbol로 전환)</summary>
         /// <remarks>
-        /// BUGBEACON_LOCAL: http://localhost:3000 (로컬 개발)
-        /// BUGBEACON_DEV: https://bugbeacon.vercel.app (Vercel dev 배포)
-        /// 없음: https://app.bugbeacon.com (prod)
+        /// REKON_LOCAL: http://localhost:3000 (로컬 개발)
+        /// REKON_DEV: https://rekon.vercel.app (Vercel dev 배포)
+        /// 없음: https://app.rekonops.dev (prod)
         /// </remarks>
-#if BUGBEACON_LOCAL
+#if REKON_LOCAL
         public const string WEB_DASHBOARD_URL = "http://localhost:3000";
-#elif BUGBEACON_DEV
-        public const string WEB_DASHBOARD_URL = "https://bugbeacon.vercel.app";
+#elif REKON_DEV
+        public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
 #else
-        public const string WEB_DASHBOARD_URL = "https://app.bugbeacon.com";
+        public const string WEB_DASHBOARD_URL = "https://app.rekonops.dev";
 #endif
 
         [Header("웹 연동")]
@@ -175,7 +175,7 @@ namespace GaoZombie.BugBeacon
         // 아래 두 필드는 Web 프록시 도입으로 더 이상 사용되지 않습니다.
         // Unity 플러그인은 WEB_DASHBOARD_URL 상수를 통해 Web API를 직접 호출합니다.
         [Tooltip("Supabase 프로젝트 URL (예: https://xxxxx.supabase.co) — Web 프록시로 대체됨")]
-        [System.Obsolete("Web 프록시로 대체됨. BugBeaconSettings.WEB_DASHBOARD_URL 상수를 사용하세요.")]
+        [System.Obsolete("Web 프록시로 대체됨. RekonSettings.WEB_DASHBOARD_URL 상수를 사용하세요.")]
         [UnityEngine.HideInInspector]
         public string supabaseUrl = "";
 

@@ -1,8 +1,8 @@
 using System;
 using NUnit.Framework;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// 토큰 갱신 관련 단위 테스트.
@@ -32,7 +32,7 @@ namespace GaoZombie.BugBeacon.Tests
         [SetUp]
         public void SetUp()
         {
-            _tokenStore = new SessionTokenStore("com.gaozombie.test");
+            _tokenStore = new SessionTokenStore("com.rekonops.test");
             _tokenStore.Clear();
         }
 
@@ -262,8 +262,8 @@ namespace GaoZombie.BugBeacon.Tests
         public void 다른_PackageName_다른_키_복호화_실패()
         {
             // Arrange
-            var store1 = new SessionTokenStore("com.gaozombie.test.app1");
-            var store2 = new SessionTokenStore("com.gaozombie.test.app2");
+            var store1 = new SessionTokenStore("com.rekonops.test.app1");
+            var store2 = new SessionTokenStore("com.rekonops.test.app2");
 
             const string token = "test-jwt-token";
 

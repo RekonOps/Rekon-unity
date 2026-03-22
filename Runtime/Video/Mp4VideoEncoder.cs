@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// FFmpeg를 사용하여 FrameData 배열을 MP4 파일로 인코딩하는 클래스.
@@ -54,11 +54,11 @@ namespace GaoZombie.BugBeacon
 
             if (frames == null || frames.Length == 0)
             {
-                UnityEngine.Debug.LogWarning("[BugBeacon] Mp4VideoEncoder: 인코딩할 프레임이 없습니다.");
+                UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: 인코딩할 프레임이 없습니다.");
                 return;
             }
 
-            UnityEngine.Debug.Log($"[BugBeacon] MP4 인코딩 시작: {outputPath} ({frames.Length}프레임, {config})");
+            UnityEngine.Debug.Log($"[Rekon] MP4 인코딩 시작: {outputPath} ({frames.Length}프레임, {config})");
 
             await Task.Run(() =>
             {
@@ -68,12 +68,12 @@ namespace GaoZombie.BugBeacon
 
                 if (!string.IsNullOrEmpty(gpuEncoder))
                 {
-                    UnityEngine.Debug.Log($"[BugBeacon] GPU 인코더 시도: {gpuEncoder}");
+                    UnityEngine.Debug.Log($"[Rekon] GPU 인코더 시도: {gpuEncoder}");
                     success = TryRunFfmpeg(frames, outputPath, config, gpuEncoder, cancellationToken);
 
                     if (!success)
                     {
-                        UnityEngine.Debug.LogWarning($"[BugBeacon] GPU 인코더 실패 ({gpuEncoder}). CPU 인코더(libx264)로 재시도합니다.");
+                        UnityEngine.Debug.LogWarning($"[Rekon] GPU 인코더 실패 ({gpuEncoder}). CPU 인코더(libx264)로 재시도합니다.");
                         // 손상된 중간 파일 정리
                         if (System.IO.File.Exists(outputPath))
                         {
@@ -85,7 +85,7 @@ namespace GaoZombie.BugBeacon
                 if (!success)
                 {
                     // CPU fallback (libx264) — encoderName null이면 libx264 사용
-                    UnityEngine.Debug.Log("[BugBeacon] CPU 인코더(libx264)로 인코딩합니다.");
+                    UnityEngine.Debug.Log("[Rekon] CPU 인코더(libx264)로 인코딩합니다.");
                     RunFfmpegEncoding(frames, outputPath, config, cancellationToken, null);
                 }
             }, cancellationToken);
@@ -114,7 +114,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                UnityEngine.Debug.LogWarning($"[BugBeacon] TryRunFfmpeg({encoderName}) 예외: {ex.GetType().Name}: {ex.Message}");
+                UnityEngine.Debug.LogWarning($"[Rekon] TryRunFfmpeg({encoderName}) 예외: {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -172,7 +172,7 @@ namespace GaoZombie.BugBeacon
                 }
                 catch (Exception ex)
                 {
-                    UnityEngine.Debug.LogError($"[BugBeacon] FFmpeg 프로세스 시작 실패: {ex.Message}\n" +
+                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg 프로세스 시작 실패: {ex.Message}\n" +
                                                $"FFmpeg 경로: {ffmpegPath}\n" +
                                                "FfmpegHelper.IsInstalled()로 설치 여부를 확인하세요.");
                     throw;
@@ -202,7 +202,7 @@ namespace GaoZombie.BugBeacon
                             // FFmpeg 프로세스가 이미 종료된 경우 루프 탈출
                             if (process.HasExited)
                             {
-                                UnityEngine.Debug.LogWarning("[BugBeacon] Mp4VideoEncoder: FFmpeg 프로세스가 예기치 않게 종료되었습니다. stdin 쓰기를 중단합니다.");
+                                UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: FFmpeg 프로세스가 예기치 않게 종료되었습니다. stdin 쓰기를 중단합니다.");
                                 break;
                             }
 
@@ -212,7 +212,7 @@ namespace GaoZombie.BugBeacon
                             if (!frame.IsValid)
                             {
                                 UnityEngine.Debug.LogWarning(
-                                    $"[BugBeacon] Mp4VideoEncoder: 프레임 {i}번 건너뜀 (유효하지 않은 데이터).");
+                                    $"[Rekon] Mp4VideoEncoder: 프레임 {i}번 건너뜀 (유효하지 않은 데이터).");
                                 continue;
                             }
 
@@ -224,24 +224,24 @@ namespace GaoZombie.BugBeacon
                             catch (IOException ioEx)
                             {
                                 // FFmpeg 프로세스 종료로 인한 파이프 깨짐 처리
-                                UnityEngine.Debug.LogWarning($"[BugBeacon] Mp4VideoEncoder: stdin 쓰기 중 IOException (FFmpeg 종료 가능성): {ioEx.Message}");
+                                UnityEngine.Debug.LogWarning($"[Rekon] Mp4VideoEncoder: stdin 쓰기 중 IOException (FFmpeg 종료 가능성): {ioEx.Message}");
                                 break;
                             }
                         }
 
-                        UnityEngine.Debug.Log($"[BugBeacon] FFmpeg stdin 전송 완료: {writtenFrames}/{frames.Length}프레임");
+                        UnityEngine.Debug.Log($"[Rekon] FFmpeg stdin 전송 완료: {writtenFrames}/{frames.Length}프레임");
                     }
                     // stdin.Close()는 using 블록 종료 시 자동 호출됨
                 }
                 catch (OperationCanceledException)
                 {
-                    UnityEngine.Debug.LogWarning("[BugBeacon] Mp4VideoEncoder: 취소 요청으로 인코딩을 중단합니다.");
+                    UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: 취소 요청으로 인코딩을 중단합니다.");
                     hasError = true;
                     // CancellationToken.Register에서 process.Kill()이 이미 호출됨
                 }
                 catch (Exception ex)
                 {
-                    UnityEngine.Debug.LogError($"[BugBeacon] FFmpeg stdin 쓰기 중 오류: {ex.Message}");
+                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg stdin 쓰기 중 오류: {ex.Message}");
                     hasError = true;
 
                     try { process.Kill(); } catch { /* 무시 */ }
@@ -252,7 +252,7 @@ namespace GaoZombie.BugBeacon
 
                 if (!exited)
                 {
-                    UnityEngine.Debug.LogError($"[BugBeacon] FFmpeg 프로세스 타임아웃 ({FfmpegTimeoutMs / 1000}초 초과). 강제 종료합니다.");
+                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg 프로세스 타임아웃 ({FfmpegTimeoutMs / 1000}초 초과). 강제 종료합니다.");
                     try { process.Kill(); } catch { /* 무시 */ }
                     hasError = true;
                 }
@@ -272,7 +272,7 @@ namespace GaoZombie.BugBeacon
                     }
 
                     UnityEngine.Debug.LogError(
-                        $"[BugBeacon] FFmpeg 비정상 종료 (ExitCode={process.ExitCode}).\n" +
+                        $"[Rekon] FFmpeg 비정상 종료 (ExitCode={process.ExitCode}).\n" +
                         $"FFmpeg stderr (마지막 {StderrTailLines}줄):\n{stderrSummary}");
                 }
 
@@ -289,13 +289,13 @@ namespace GaoZombie.BugBeacon
                     {
                         long fileSize = new FileInfo(outputPath).Length;
                         UnityEngine.Debug.Log(
-                            $"[BugBeacon] MP4 인코딩 완료: {outputPath} " +
+                            $"[Rekon] MP4 인코딩 완료: {outputPath} " +
                             $"({frames.Length}프레임, {fileSize / 1024.0:F1} KB)");
                     }
                     else
                     {
                         UnityEngine.Debug.LogWarning(
-                            $"[BugBeacon] MP4 인코딩 완료했으나 출력 파일이 존재하지 않습니다: {outputPath}");
+                            $"[Rekon] MP4 인코딩 완료했으나 출력 파일이 존재하지 않습니다: {outputPath}");
                     }
                 }
                 else
@@ -304,7 +304,7 @@ namespace GaoZombie.BugBeacon
                     if (!File.Exists(outputPath))
                     {
                         UnityEngine.Debug.LogWarning(
-                            $"[BugBeacon] FFmpeg 인코딩 실패로 출력 파일이 생성되지 않았습니다: {outputPath}");
+                            $"[Rekon] FFmpeg 인코딩 실패로 출력 파일이 생성되지 않았습니다: {outputPath}");
                     }
                 }
             }

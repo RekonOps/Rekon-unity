@@ -4,7 +4,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// CaptureResult를 BundleManifest로 변환하는 생성기.
@@ -184,7 +184,7 @@ namespace GaoZombie.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 디렉토리 크기 계산 실패: {ex.Message}");
+                Debug.LogWarning($"[Rekon] 디렉토리 크기 계산 실패: {ex.Message}");
             }
             return total;
         }

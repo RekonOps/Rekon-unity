@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugBeacon;
-using GaoZombie.BugBeacon.Editor;
+using RekonOps.Rekon;
+using RekonOps.Rekon.Editor;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// CrashRecoveryWindow, CrashBundleScanner, CrashJiraSubmitter 단위 테스트.

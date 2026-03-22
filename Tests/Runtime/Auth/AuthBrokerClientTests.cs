@@ -2,9 +2,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// AuthBrokerClient 단위 테스트.
@@ -19,7 +19,7 @@ namespace GaoZombie.BugBeacon.Tests
         [SetUp]
         public void SetUp()
         {
-            _tokenStore = new SessionTokenStore("com.gaozombie.test");
+            _tokenStore = new SessionTokenStore("com.rekonops.test");
             _tokenStore.Clear(); // 이전 테스트 잔여 데이터 제거
         }
 

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// Jira API 클라이언트 단위 테스트.

@@ -4,7 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon.Editor
+namespace RekonOps.Rekon.Editor
 {
     /// <summary>
     /// 크래시 번들 목록을 표시하고 Jira 제출을 지원하는 EditorWindow.
@@ -16,7 +16,7 @@ namespace GaoZombie.BugBeacon.Editor
     ///   - 상태: unregistered / registered
     ///   - Jira 제출 버튼
     ///
-    /// 메뉴: Window/BugBeacon/Crash Recovery
+    /// 메뉴: Window/Rekon/Crash Recovery
     /// </summary>
     public class CrashRecoveryWindow : EditorWindow
     {
@@ -25,7 +25,7 @@ namespace GaoZombie.BugBeacon.Editor
         // ──────────────────────────────────────────────────────────────
 
         private const string WindowTitle = "크래시 복구";
-        private const string MenuPath = BugBeaconEditorInfo.MenuRoot + "/Crash Recovery";
+        private const string MenuPath = RekonEditorInfo.MenuRoot + "/Crash Recovery";
 
         // UI 색상
         private static readonly Color ColorOk = new Color(0.2f, 0.8f, 0.2f);
@@ -495,8 +495,8 @@ namespace GaoZombie.BugBeacon.Editor
         /// </summary>
         private static void OpenJiraIssue(string issueKey)
         {
-            Debug.LogWarning($"[BugBeacon] Jira 직접 연동은 더 이상 지원되지 않습니다. 웹 대시보드에서 이슈를 확인하세요. 이슈 키: {issueKey}");
-            Application.OpenURL(BugBeaconSettings.WEB_DASHBOARD_URL);
+            Debug.LogWarning($"[Rekon] Jira 직접 연동은 더 이상 지원되지 않습니다. 웹 대시보드에서 이슈를 확인하세요. 이슈 키: {issueKey}");
+            Application.OpenURL(RekonSettings.WEB_DASHBOARD_URL);
         }
 
         // ──────────────────────────────────────────────────────────────

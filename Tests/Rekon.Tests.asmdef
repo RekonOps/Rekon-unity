@@ -1,9 +1,9 @@
 {
-  "name": "BugBeacon.IntegrationTests",
-  "rootNamespace": "GaoZombie.BugBeacon.Tests.Integration",
+  "name": "Rekon.Tests",
+  "rootNamespace": "RekonOps.Rekon.Tests",
   "references": [
-    "BugBeacon.Runtime",
-    "BugBeacon.Editor",
+    "Rekon.Runtime",
+    "Rekon.Editor",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon.Editor
+namespace RekonOps.Rekon.Editor
 {
     /// <summary>
     /// 크래시 번들을 Jira 이슈로 자동 제출하는 Editor 전용 클래스.
@@ -107,7 +107,7 @@ namespace GaoZombie.BugBeacon.Editor
                 // 이슈 설명 생성
                 string description = BuildIssueDescription(manifest);
 
-                Debug.Log($"[BugBeacon] 크래시 Jira 제출 시작: {summary}");
+                Debug.Log($"[Rekon] 크래시 Jira 제출 시작: {summary}");
 
                 string issueKey;
 
@@ -120,7 +120,7 @@ namespace GaoZombie.BugBeacon.Editor
                 else
                 {
                     // 시뮬레이션 모드 (JiraSubmissionService 미주입 시 폴백)
-                    Debug.LogWarning("[BugBeacon] JiraSubmissionService가 주입되지 않아 시뮬레이션 모드로 동작합니다.");
+                    Debug.LogWarning("[Rekon] JiraSubmissionService가 주입되지 않아 시뮬레이션 모드로 동작합니다.");
                     issueKey = await SimulateJiraSubmission(projectKey, summary, description, cancellationToken);
                 }
 
@@ -129,7 +129,7 @@ namespace GaoZombie.BugBeacon.Editor
                     // manifest 갱신 (jira_issue_key + registered_at + registered=true)
                     await UpdateManifestAsync(manifest, issueKey);
 
-                    Debug.Log($"[BugBeacon] 크래시 Jira 제출 완료: {issueKey}");
+                    Debug.Log($"[Rekon] 크래시 Jira 제출 완료: {issueKey}");
 
                     return new SubmitResult
                     {
@@ -154,7 +154,7 @@ namespace GaoZombie.BugBeacon.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 크래시 Jira 제출 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] 크래시 Jira 제출 실패: {ex.Message}");
                 return new SubmitResult
                 {
                     Success = false,
@@ -331,7 +331,7 @@ namespace GaoZombie.BugBeacon.Editor
 
             if (!Directory.Exists(bundleDir))
             {
-                Debug.LogWarning($"[BugBeacon] 크래시 번들 디렉토리가 없습니다: {bundleDir}");
+                Debug.LogWarning($"[Rekon] 크래시 번들 디렉토리가 없습니다: {bundleDir}");
                 return;
             }
 
@@ -339,9 +339,9 @@ namespace GaoZombie.BugBeacon.Editor
             bool ok = await _fileWriter.WriteTextAsync(manifestPath, json);
 
             if (ok)
-                Debug.Log($"[BugBeacon] 크래시 번들 manifest 갱신 완료: {manifest.id} → {issueKey} (registered=true)");
+                Debug.Log($"[Rekon] 크래시 번들 manifest 갱신 완료: {manifest.id} → {issueKey} (registered=true)");
             else
-                Debug.LogWarning($"[BugBeacon] 크래시 번들 manifest 갱신 실패: {manifest.id}");
+                Debug.LogWarning($"[Rekon] 크래시 번들 manifest 갱신 실패: {manifest.id}");
         }
 
         // ──────────────────────────────────────────────────────────────

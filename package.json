@@ -1,18 +1,18 @@
 {
-  "name": "com.gaozombie.bugbeacon",
+  "name": "dev.rekonops.rekon",
   "version": "0.1.0",
-  "displayName": "BugBeacon",
+  "displayName": "Rekon",
   "description": "Local-first bug reporting plugin for Unity with Jira Cloud integration",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "author": {
-    "name": "GaoZombie",
-    "url": "https://github.com/GaoZombie"
+    "name": "RekonOps",
+    "url": "https://github.com/RekonOps"
   },
   "keywords": ["bug-report", "jira", "qa", "testing", "capture"],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GaoZombie/BugBeacon-unity.git"
+    "url": "https://github.com/RekonOps/Rekon-unity.git"
   }
 }

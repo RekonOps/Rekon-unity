@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # validate-package.sh
-# BugBeacon UPM 패키지 검증 스크립트
+# Rekon UPM 패키지 검증 스크립트
 #
 # 기능:
 #   1. package.json 필수 필드 검증
 #   2. Assembly Definition (.asmdef) 참조 무결성 검증
-#   3. 네임스페이스 일관성 검증 (GaoZombie.BugBeacon)
+#   3. 네임스페이스 일관성 검증 (RekonOps.Rekon)
 #
 # 사용법:
 #   chmod +x scripts/validate-package.sh
@@ -207,7 +207,7 @@ fi
 
 log_section "3단계: 네임스페이스 일관성 검증"
 
-EXPECTED_NAMESPACE="GaoZombie.BugBeacon"
+EXPECTED_NAMESPACE="RekonOps.Rekon"
 NAMESPACE_ERRORS=0
 
 # Runtime과 Editor의 .cs 파일만 검사 (Tests, Samples는 제외)
@@ -233,7 +233,7 @@ else
 
         # 예상 네임스페이스 포함 여부 확인
         if ! grep -q "namespace $EXPECTED_NAMESPACE" "$cs_file" 2>/dev/null; then
-            # 서브네임스페이스(예: GaoZombie.BugBeacon.Samples)는 허용
+            # 서브네임스페이스(예: RekonOps.Rekon.Samples)는 허용
             if ! grep -q "namespace ${EXPECTED_NAMESPACE}\." "$cs_file" 2>/dev/null; then
                 actual_ns=$(grep "namespace " "$cs_file" | head -1 | awk '{print $2}' | tr -d '{')
                 log_warn "$cs_basename: 네임스페이스 불일치 (발견: '$actual_ns', 예상: '$EXPECTED_NAMESPACE')"
@@ -258,8 +258,8 @@ REQUIRED_FILES=(
     "README.md"
     "CHANGELOG.md"
     "LICENSE"
-    "Runtime/BugBeacon.Runtime.asmdef"
-    "Editor/BugBeacon.Editor.asmdef"
+    "Runtime/Rekon.Runtime.asmdef"
+    "Editor/Rekon.Editor.asmdef"
 )
 
 for file in "${REQUIRED_FILES[@]}"; do
@@ -283,7 +283,7 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  BugBeacon 패키지 검증 결과"
+echo "  Rekon 패키지 검증 결과"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "  패키지 이름: ${BLUE}$PKG_NAME${NC}"
 echo -e "  버전:        ${BLUE}$PKG_VERSION${NC}"

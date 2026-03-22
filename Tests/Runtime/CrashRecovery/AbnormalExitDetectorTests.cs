@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using UnityEngine;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// AbnormalExitDetector 단위 테스트.

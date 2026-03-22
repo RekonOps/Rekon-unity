@@ -3,9 +3,9 @@ using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// VideoEncoder 단위 테스트.
@@ -174,7 +174,7 @@ namespace GaoZombie.BugBeacon.Tests
         [Test]
         public void VideoEncoderConfig_FromSettings_ReadsCorrectValues()
         {
-            var settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
+            var settings = ScriptableObject.CreateInstance<RekonSettings>();
             settings.videoWidth = 1280;
             settings.videoHeight = 720;
             settings.videoFps = 30;

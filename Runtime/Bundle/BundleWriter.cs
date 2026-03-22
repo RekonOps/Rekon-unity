@@ -3,13 +3,13 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 캡처 아티팩트를 번들 디렉토리에 복사하고 manifest.json을 생성하는 클래스.
     ///
     /// 번들 디렉토리 구조:
-    ///   {persistentDataPath}/BugBeacon/bundles/{id}/
+    ///   {persistentDataPath}/Rekon/bundles/{id}/
     ///   ├── manifest.json
     ///   ├── screenshot.png
     ///   ├── logs.zip
@@ -62,7 +62,7 @@ namespace GaoZombie.BugBeacon
             string bundleDir = GetBundleDirectory(manifest.id);
             Directory.CreateDirectory(bundleDir);
 
-            Debug.Log($"[BugBeacon] 번들 디렉토리 생성: {bundleDir}");
+            Debug.Log($"[Rekon] 번들 디렉토리 생성: {bundleDir}");
 
             // 3단계: 아티팩트 복사 및 SHA-256 해시 계산
             await CopyArtifactsAsync(captureResult, bundleDir, manifest);
@@ -73,7 +73,7 @@ namespace GaoZombie.BugBeacon
             // 5단계: manifest.json 원자적 쓰기
             await WriteManifestAtomicAsync(manifest, bundleDir);
 
-            Debug.Log($"[BugBeacon] 번들 생성 완료: {manifest}");
+            Debug.Log($"[Rekon] 번들 생성 완료: {manifest}");
 
             return manifest;
         }
@@ -91,7 +91,7 @@ namespace GaoZombie.BugBeacon
             string bundleDir = GetBundleDirectory(manifest.id);
             await WriteManifestAtomicAsync(manifest, bundleDir);
 
-            Debug.Log($"[BugBeacon] manifest.json 재저장 완료 (id={manifest.id})");
+            Debug.Log($"[Rekon] manifest.json 재저장 완료 (id={manifest.id})");
         }
 
         /// <summary>
@@ -104,10 +104,36 @@ namespace GaoZombie.BugBeacon
 
         /// <summary>
         /// 번들 루트 디렉토리를 반환합니다.
+        /// BugBeacon → Rekon 리네이밍 마이그레이션: 기존 BugBeacon 경로가 존재하면
+        /// Rekon 경로로 자동 이동하여 데이터 유실을 방지합니다.
         /// </summary>
         public static string GetBundlesRootDirectory()
         {
-            return _bundlesRootDirectory ??= Path.Combine(Application.persistentDataPath, "BugBeacon", "bundles");
+            if (_bundlesRootDirectory != null)
+                return _bundlesRootDirectory;
+
+            string newPath = Path.Combine(Application.persistentDataPath, "Rekon", "bundles");
+            string legacyPath = Path.Combine(Application.persistentDataPath, "BugBeacon", "bundles");
+
+            // 레거시 BugBeacon 경로가 존재하고 새 경로가 없는 경우 자동 이동
+            if (Directory.Exists(legacyPath) && !Directory.Exists(newPath))
+            {
+                try
+                {
+                    string rekonRoot = Path.Combine(Application.persistentDataPath, "Rekon");
+                    if (!Directory.Exists(rekonRoot))
+                        Directory.CreateDirectory(rekonRoot);
+
+                    Directory.Move(legacyPath, newPath);
+                    Debug.Log($"[Rekon] 레거시 BugBeacon 번들 경로를 Rekon으로 마이그레이션 완료: {legacyPath} → {newPath}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Rekon] 레거시 경로 마이그레이션 실패, 새 경로 사용: {ex.Message}");
+                }
+            }
+
+            return _bundlesRootDirectory = newPath;
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -149,7 +175,7 @@ namespace GaoZombie.BugBeacon
                         break;
 
                     default:
-                        Debug.LogWarning($"[BugBeacon] 알 수 없는 아티팩트 타입: {artifact.type}");
+                        Debug.LogWarning($"[Rekon] 알 수 없는 아티팩트 타입: {artifact.type}");
                         break;
                 }
             }
@@ -163,7 +189,7 @@ namespace GaoZombie.BugBeacon
         {
             if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
             {
-                Debug.LogWarning($"[BugBeacon] 아티팩트 원본 파일 없음: {sourcePath}");
+                Debug.LogWarning($"[Rekon] 아티팩트 원본 파일 없음: {sourcePath}");
                 return;
             }
 
@@ -178,11 +204,11 @@ namespace GaoZombie.BugBeacon
                 // 파일 크기 갱신 (원본과 동일하지만 명시적으로 재계산)
                 artifact.size_bytes = new FileInfo(destPath).Length;
 
-                Debug.Log($"[BugBeacon] 아티팩트 복사 완료: {artifact.file_name} ({artifact.size_bytes}B, sha256={artifact.sha256_hash[..8]}...)");
+                Debug.Log($"[Rekon] 아티팩트 복사 완료: {artifact.file_name} ({artifact.size_bytes}B, sha256={artifact.sha256_hash[..8]}...)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 아티팩트 복사 실패 ({artifact.file_name}): {ex.Message}");
+                Debug.LogError($"[Rekon] 아티팩트 복사 실패 ({artifact.file_name}): {ex.Message}");
             }
         }
 
@@ -194,7 +220,7 @@ namespace GaoZombie.BugBeacon
         {
             if (string.IsNullOrEmpty(sourcePath) || !Directory.Exists(sourcePath))
             {
-                Debug.LogWarning($"[BugBeacon] 영상 디렉토리 없음: {sourcePath}");
+                Debug.LogWarning($"[Rekon] 영상 디렉토리 없음: {sourcePath}");
                 return;
             }
 
@@ -208,11 +234,11 @@ namespace GaoZombie.BugBeacon
                 artifact.size_bytes = await Task.Run(() => CalculateDirectorySize(destDir));
                 artifact.sha256_hash = string.Empty; // 디렉토리는 해시 없음
 
-                Debug.Log($"[BugBeacon] 영상 디렉토리 복사 완료: {artifact.file_name} ({artifact.size_bytes}B)");
+                Debug.Log($"[Rekon] 영상 디렉토리 복사 완료: {artifact.file_name} ({artifact.size_bytes}B)");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] 영상 디렉토리 복사 실패 ({artifact.file_name}): {ex.Message}");
+                Debug.LogError($"[Rekon] 영상 디렉토리 복사 실패 ({artifact.file_name}): {ex.Message}");
             }
         }
 
@@ -245,11 +271,11 @@ namespace GaoZombie.BugBeacon
                     File.Move(tempPath, manifestPath);
                 });
 
-                Debug.Log($"[BugBeacon] manifest.json 저장 완료: {manifestPath}");
+                Debug.Log($"[Rekon] manifest.json 저장 완료: {manifestPath}");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] manifest.json 저장 실패: {ex.Message}");
+                Debug.LogError($"[Rekon] manifest.json 저장 실패: {ex.Message}");
 
                 // 임시 파일 정리
                 if (File.Exists(tempPath))

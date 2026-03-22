@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// HotkeyManager 단위 테스트.
@@ -50,7 +50,7 @@ namespace GaoZombie.BugBeacon.Tests
 
         private GameObject _gameObject;
         private HotkeyManager _manager;
-        private BugBeaconSettings _settings;
+        private RekonSettings _settings;
 
         [SetUp]
         public void SetUp()
@@ -58,7 +58,7 @@ namespace GaoZombie.BugBeacon.Tests
             _gameObject = new GameObject("HotkeyManagerTest");
             _manager = _gameObject.AddComponent<HotkeyManager>();
 
-            _settings = ScriptableObject.CreateInstance<BugBeaconSettings>();
+            _settings = ScriptableObject.CreateInstance<RekonSettings>();
             _settings.captureHotkey = KeyCode.F12;
             _manager.SetSettings(_settings);
         }

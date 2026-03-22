@@ -1,8 +1,8 @@
 using System;
 using NUnit.Framework;
-using GaoZombie.BugBeacon;
+using RekonOps.Rekon;
 
-namespace GaoZombie.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// FrameRingBuffer 단위 테스트.

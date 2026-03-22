@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace GaoZombie.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 번들 보관 정책을 적용하는 클래스.
     ///
     /// FIFO(선입선출) 방식으로 다음 기준 중 하나라도 초과 시 오래된 번들을 삭제합니다:
-    ///   - 최대 번들 수: BugBeaconSettings.maxBundles (기본 200개)
-    ///   - 최대 디스크 사용량: BugBeaconSettings.maxDiskUsageMB (기본 5,120MB)
+    ///   - 최대 번들 수: RekonSettings.maxBundles (기본 200개)
+    ///   - 최대 디스크 사용량: RekonSettings.maxDiskUsageMB (기본 5,120MB)
     /// </summary>
     public class BundleRetentionPolicy
     {
-        private readonly BugBeaconSettings _settings;
+        private readonly RekonSettings _settings;
         private readonly BundleRepository _repository;
 
         /// <summary>
@@ -23,9 +23,9 @@ namespace GaoZombie.BugBeacon
         /// <param name="settings">플러그인 설정 (maxBundles, maxDiskUsageMB 참조).</param>
         /// <param name="repository">번들 저장소.</param>
         /// <exception cref="ArgumentNullException">settings 또는 repository가 null인 경우.</exception>
-        public BundleRetentionPolicy(BugBeaconSettings settings, BundleRepository repository)
+        public BundleRetentionPolicy(RekonSettings settings, BundleRepository repository)
         {
-            _settings   = settings   ?? throw new ArgumentNullException(nameof(settings), "BugBeaconSettings가 null입니다.");
+            _settings   = settings   ?? throw new ArgumentNullException(nameof(settings), "RekonSettings가 null입니다.");
             _repository = repository ?? throw new ArgumentNullException(nameof(repository), "BundleRepository가 null입니다.");
         }
 
@@ -49,7 +49,7 @@ namespace GaoZombie.BugBeacon
             deletedCount += await ApplyDiskLimitAsync(allBundles);
 
             if (deletedCount > 0)
-                Debug.Log($"[BugBeacon] 보관 정책 적용 완료: {deletedCount}개 번들 삭제됨");
+                Debug.Log($"[Rekon] 보관 정책 적용 완료: {deletedCount}개 번들 삭제됨");
 
             return deletedCount;
         }
@@ -87,12 +87,12 @@ namespace GaoZombie.BugBeacon
                 try
                 {
                     await _repository.DeleteAsync(oldest.id);
-                    Debug.Log($"[BugBeacon] 보관 정책(개수 초과) - 번들 삭제: {oldest.id} (생성: {oldest.created_at})");
+                    Debug.Log($"[Rekon] 보관 정책(개수 초과) - 번들 삭제: {oldest.id} (생성: {oldest.created_at})");
                     deletedCount++;
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"[BugBeacon] 번들 삭제 실패 ({oldest.id}): {ex.Message}");
+                    Debug.LogError($"[Rekon] 번들 삭제 실패 ({oldest.id}): {ex.Message}");
                     break; // 삭제 실패 시 중단 (무한 루프 방지)
                 }
             }
@@ -123,14 +123,14 @@ namespace GaoZombie.BugBeacon
                 {
                     await _repository.DeleteAsync(oldest.id);
                     currentBytes -= oldest.total_size_bytes;
-                    Debug.Log($"[BugBeacon] 보관 정책(용량 초과) - 번들 삭제: {oldest.id} " +
+                    Debug.Log($"[Rekon] 보관 정책(용량 초과) - 번들 삭제: {oldest.id} " +
                               $"(크기: {oldest.total_size_bytes}B, 잔여: {currentBytes}B/{maxBytes}B)");
                     deletedCount++;
                     index++;
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"[BugBeacon] 번들 삭제 실패 ({oldest.id}): {ex.Message}");
+                    Debug.LogError($"[Rekon] 번들 삭제 실패 ({oldest.id}): {ex.Message}");
                     break; // 삭제 실패 시 중단
                 }
             }

@@ -1,3 +1,29 @@
+## 🔴 브랜치 전략 (절대 규칙)
+
+**main 브랜치에 직접 push/commit 절대 금지!**
+
+| 브랜치 | 역할 | 규칙 |
+|--------|------|------|
+| `main` | 릴리스 전용 | PR only, 직접 push 금지 |
+| `develop` | 개발 통합 (default) | feature/* 머지 대상 |
+| `feature/*` | 기능 개발 | develop에서 분기 → develop에 머지 |
+
+### 작업 흐름
+```
+feature/* → develop (자유 머지) → main (PR only, 리뷰 후) → v태그 (배포)
+```
+
+### 금지 사항
+- `git push origin main` ❌
+- `git checkout main && git commit` ❌
+- main 브랜치에서 직접 파일 수정 ❌
+
+### 커밋/PR 시 체크
+- 현재 브랜치가 main이 아닌지 반드시 확인
+- main 대상 작업은 반드시 develop에서 PR 생성
+
+---
+
 # Rekon Unity 플러그인
 
 ## 프로젝트 컨텍스트

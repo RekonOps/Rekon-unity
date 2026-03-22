@@ -1,7 +1,9 @@
 {
   "name": "Rekon.Runtime",
   "rootNamespace": "RekonOps.Rekon",
-  "references": [],
+  "references": [
+    "Unity.InputSystem"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

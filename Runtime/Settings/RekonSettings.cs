@@ -155,11 +155,10 @@ namespace RekonOps.Rekon
         /// REKON_LOCAL: http://localhost:3000 (로컬 개발)
         /// REKON_DEV: https://rekon.vercel.app (Vercel dev 배포)
         /// 없음: https://app.rekonops.dev (prod)
-        /// BUGBEACON_LOCAL / BUGBEACON_DEV: 이전 이름 — 한 버전 동안 alias로 유지 (deprecated)
         /// </remarks>
-#if REKON_LOCAL || BUGBEACON_LOCAL
+#if REKON_LOCAL
         public const string WEB_DASHBOARD_URL = "http://localhost:3000";
-#elif REKON_DEV || BUGBEACON_DEV
+#elif REKON_DEV
         public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
 #else
         public const string WEB_DASHBOARD_URL = "https://app.rekonops.dev";

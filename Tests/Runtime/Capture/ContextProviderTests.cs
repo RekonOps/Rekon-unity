@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
-    /// ContextProviderRegistry 및 BugBeaconContext 단위 테스트.
+    /// ContextProviderRegistry 및 RekonContext 단위 테스트.
     /// </summary>
     [TestFixture]
     public class ContextProviderTests
@@ -17,13 +17,13 @@ namespace RekonOps.BugBeacon.Tests
         public void SetUp()
         {
             _registry = new ContextProviderRegistry();
-            BugBeaconContext.Clear();
+            RekonContext.Clear();
         }
 
         [TearDown]
         public void TearDown()
         {
-            BugBeaconContext.Clear();
+            RekonContext.Clear();
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -173,77 +173,77 @@ namespace RekonOps.BugBeacon.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
-        // BugBeaconContext 테스트
+        // RekonContext 테스트
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public void BugBeaconContext_Add_StoresValue()
+        public void RekonContext_Add_StoresValue()
         {
-            BugBeaconContext.Add("testKey", "testValue");
-            var snapshot = BugBeaconContext.GetSnapshot();
+            RekonContext.Add("testKey", "testValue");
+            var snapshot = RekonContext.GetSnapshot();
             Assert.IsTrue(snapshot.ContainsKey("testKey"));
             Assert.AreEqual("testValue", snapshot["testKey"]);
         }
 
         [Test]
-        public void BugBeaconContext_Add_UpdatesExistingKey()
+        public void RekonContext_Add_UpdatesExistingKey()
         {
-            BugBeaconContext.Add("key", "first");
-            BugBeaconContext.Add("key", "second");
-            var snapshot = BugBeaconContext.GetSnapshot();
+            RekonContext.Add("key", "first");
+            RekonContext.Add("key", "second");
+            var snapshot = RekonContext.GetSnapshot();
             Assert.AreEqual("second", snapshot["key"]);
         }
 
         [Test]
-        public void BugBeaconContext_Add_NullKey_ThrowsException()
+        public void RekonContext_Add_NullKey_ThrowsException()
         {
-            Assert.Throws<System.ArgumentNullException>(() => BugBeaconContext.Add(null, "value"));
-            Assert.Throws<System.ArgumentNullException>(() => BugBeaconContext.Add("", "value"));
+            Assert.Throws<System.ArgumentNullException>(() => RekonContext.Add(null, "value"));
+            Assert.Throws<System.ArgumentNullException>(() => RekonContext.Add("", "value"));
         }
 
         [Test]
-        public void BugBeaconContext_Remove_DeletesKey()
+        public void RekonContext_Remove_DeletesKey()
         {
-            BugBeaconContext.Add("removeMe", "value");
-            BugBeaconContext.Remove("removeMe");
-            var snapshot = BugBeaconContext.GetSnapshot();
+            RekonContext.Add("removeMe", "value");
+            RekonContext.Remove("removeMe");
+            var snapshot = RekonContext.GetSnapshot();
             Assert.IsFalse(snapshot.ContainsKey("removeMe"));
         }
 
         [Test]
-        public void BugBeaconContext_Remove_NonExistentKey_NoError()
+        public void RekonContext_Remove_NonExistentKey_NoError()
         {
-            Assert.DoesNotThrow(() => BugBeaconContext.Remove("nonexistent"));
+            Assert.DoesNotThrow(() => RekonContext.Remove("nonexistent"));
         }
 
         [Test]
-        public void BugBeaconContext_Clear_RemovesAll()
+        public void RekonContext_Clear_RemovesAll()
         {
-            BugBeaconContext.Add("a", "1");
-            BugBeaconContext.Add("b", "2");
-            BugBeaconContext.Clear();
-            Assert.AreEqual(0, BugBeaconContext.Count);
+            RekonContext.Add("a", "1");
+            RekonContext.Add("b", "2");
+            RekonContext.Clear();
+            Assert.AreEqual(0, RekonContext.Count);
         }
 
         [Test]
-        public void BugBeaconContext_AsProvider_ReturnsContextData()
+        public void RekonContext_AsProvider_ReturnsContextData()
         {
-            BugBeaconContext.Add("level", "42");
-            var provider = BugBeaconContext.AsProvider();
+            RekonContext.Add("level", "42");
+            var provider = RekonContext.AsProvider();
             var context = provider.GetContext();
             Assert.IsTrue(context.ContainsKey("level"));
             Assert.AreEqual("42", context["level"]);
         }
 
         [Test]
-        public void BugBeaconContext_GetSnapshot_ReturnsCopy()
+        public void RekonContext_GetSnapshot_ReturnsCopy()
         {
-            BugBeaconContext.Add("original", "value");
-            var snapshot = BugBeaconContext.GetSnapshot();
+            RekonContext.Add("original", "value");
+            var snapshot = RekonContext.GetSnapshot();
 
             // 스냅샷 수정이 원본에 영향을 주지 않아야 함
             snapshot["original"] = "modified";
-            var snapshot2 = BugBeaconContext.GetSnapshot();
+            var snapshot2 = RekonContext.GetSnapshot();
             Assert.AreEqual("value", snapshot2["original"], "스냅샷은 복사본이어야 합니다.");
         }
 

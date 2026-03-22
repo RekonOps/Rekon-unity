@@ -1,4 +1,4 @@
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 프레임 캡처 인터페이스.

@@ -7,13 +7,13 @@ using UnityEngine;
 using System.Security.Cryptography;
 #endif
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// AES-256-CBC 암호화를 사용하여 토큰/민감 문자열을 보호하는 클래스.
     ///
     /// 키 파생 방식:
-    ///   - 재료: SystemInfo.deviceUniqueIdentifier + 패키지명("com.rekonops.bugbeacon")
+    ///   - 재료: SystemInfo.deviceUniqueIdentifier + 패키지명("dev.rekonops.rekon")
     ///   - 알고리즘: PBKDF2 (SHA256, 100,000회 반복)
     ///   - 출력 키 길이: 256비트 (32바이트)
     ///
@@ -36,7 +36,7 @@ namespace RekonOps.BugBeacon
         private const int    KeySizeBytes = KeySizeBits / 8;   // 32
         private const int    IvSizeBytes  = 16;
         private const int    Pbkdf2Iterations = 100_000;
-        private const string PackageName  = "com.rekonops.bugbeacon";
+        private const string PackageName  = "dev.rekonops.rekon";
 
         // ──────────────────────────────────────────────────────────────
         // 파생 키 (지연 초기화, 스레드 안전)

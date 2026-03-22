@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 핫키 한 번으로 캡처 → 자동 제목 생성 → 번들 저장 → 웹 API 전송까지
@@ -33,7 +33,7 @@ namespace RekonOps.BugBeacon
 
         // ─── 의존성 ──────────────────────────────────────────────────────────
 
-        private readonly BugBeaconSettings _settings;
+        private readonly RekonSettings _settings;
         private readonly BundleWriter _bundleWriter;
         private readonly ReportSubmitService _submitService;
         private readonly SessionTokenStore _tokenStore;
@@ -58,12 +58,12 @@ namespace RekonOps.BugBeacon
         /// <summary>
         /// SilentSubmitManager를 초기화합니다.
         /// </summary>
-        /// <param name="settings">BugBeacon 설정</param>
+        /// <param name="settings">Rekon 설정</param>
         /// <param name="bundleWriter">번들 기록기</param>
         /// <param name="tokenStore">세션 토큰 저장소 (DI)</param>
         /// <param name="submitService">리포트 제출 서비스 (null 허용: 미로그인 시)</param>
         public SilentSubmitManager(
-            BugBeaconSettings settings,
+            RekonSettings settings,
             BundleWriter bundleWriter,
             SessionTokenStore tokenStore,
             ReportSubmitService submitService = null)
@@ -83,7 +83,7 @@ namespace RekonOps.BugBeacon
         public void BindPendingUploadManager(PendingUploadManager pendingUploadManager)
         {
             _pendingUploadManager = pendingUploadManager;
-            Debug.Log("[BugBeacon] SilentSubmitManager: PendingUploadManager 바인딩 완료");
+            Debug.Log("[Rekon] SilentSubmitManager: PendingUploadManager 바인딩 완료");
         }
 
         /// <summary>
@@ -100,7 +100,7 @@ namespace RekonOps.BugBeacon
             if (_orchestrator != null)
                 _orchestrator.OnCaptureCompleted += HandleCaptureCompleted;
 
-            Debug.Log("[BugBeacon] SilentSubmitManager: 오케스트레이터 바인딩 완료");
+            Debug.Log("[Rekon] SilentSubmitManager: 오케스트레이터 바인딩 완료");
         }
 
         /// <summary>
@@ -111,20 +111,20 @@ namespace RekonOps.BugBeacon
         {
             if (captureResult == null)
             {
-                Debug.LogWarning("[BugBeacon] SilentSubmit: CaptureResult가 null입니다.");
+                Debug.LogWarning("[Rekon] SilentSubmit: CaptureResult가 null입니다.");
                 return;
             }
 
             if (!captureResult.IsPartialSuccess)
             {
-                Debug.LogWarning("[BugBeacon] SilentSubmit: 유효한 아티팩트가 없습니다. 건너뜁니다.");
+                Debug.LogWarning("[Rekon] SilentSubmit: 유효한 아티팩트가 없습니다. 건너뜁니다.");
                 return;
             }
 
             // 원자적 CAS: 0(대기) → 1(제출 중) 으로 교체. 이미 1이면 중복 진입 차단
             if (Interlocked.CompareExchange(ref _isSubmittingFlag, 1, 0) != 0)
             {
-                Debug.LogWarning("[BugBeacon] SilentSubmit: 이미 제출이 진행 중입니다.");
+                Debug.LogWarning("[Rekon] SilentSubmit: 이미 제출이 진행 중입니다.");
                 return;
             }
 
@@ -132,11 +132,11 @@ namespace RekonOps.BugBeacon
             {
                 // 1. 자동 제목 생성
                 string title = GenerateTitle(captureResult.Timestamp);
-                Debug.Log($"[BugBeacon] SilentSubmit: 자동 생성 제목 = \"{title}\"");
+                Debug.Log($"[Rekon] SilentSubmit: 자동 생성 제목 = \"{title}\"");
 
                 // 2. 메타데이터 수집
                 var metadata = CollectMetadata();
-                Debug.Log($"[BugBeacon] SilentSubmit: 메타데이터 {metadata.Count}개 수집 완료");
+                Debug.Log($"[Rekon] SilentSubmit: 메타데이터 {metadata.Count}개 수집 완료");
 
                 // 3. BundleWriter로 번들 저장
                 BundleManifest manifest = await _bundleWriter.WriteAsync(captureResult);
@@ -152,7 +152,7 @@ namespace RekonOps.BugBeacon
                 // manifest.json을 디스크에 다시 저장 (WriteAsync 시점에는 title/metadata가 비어 있었으므로)
                 await _bundleWriter.RewriteManifestAsync(manifest);
 
-                Debug.Log($"[BugBeacon] SilentSubmit: 번들 저장 완료 (id={manifest.id})");
+                Debug.Log($"[Rekon] SilentSubmit: 번들 저장 완료 (id={manifest.id})");
 
                 // 4. 웹 API 전송
                 if (_submitService != null)
@@ -161,13 +161,13 @@ namespace RekonOps.BugBeacon
                 }
                 else
                 {
-                    Debug.Log("[BugBeacon] SilentSubmit: ReportSubmitService 미설정. 로컬 저장만 완료합니다.");
+                    Debug.Log("[Rekon] SilentSubmit: ReportSubmitService 미설정. 로컬 저장만 완료합니다.");
                     OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료: {manifest.id}");
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[BugBeacon] SilentSubmit 실패: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError($"[Rekon] SilentSubmit 실패: {ex.Message}\n{ex.StackTrace}");
                 OnSubmitCompleted?.Invoke(false, ex.Message);
             }
             finally
@@ -300,7 +300,7 @@ namespace RekonOps.BugBeacon
 
                 if (files.Count == 0)
                 {
-                    Debug.LogWarning("[BugBeacon] SilentSubmit: 전송할 파일이 없습니다. 로컬 저장만 완료합니다.");
+                    Debug.LogWarning("[Rekon] SilentSubmit: 전송할 파일이 없습니다. 로컬 저장만 완료합니다.");
                     OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (파일 없음): {manifest.id}");
                     return;
                 }
@@ -314,7 +314,7 @@ namespace RekonOps.BugBeacon
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[BugBeacon] SilentSubmit: 토큰 로드 실패 (pending 큐로 폴백): {ex.Message}");
+                    Debug.LogWarning($"[Rekon] SilentSubmit: 토큰 로드 실패 (pending 큐로 폴백): {ex.Message}");
 
                     // 토큰 로드 실패 시 pending 큐에 등록
                     if (_pendingUploadManager != null)
@@ -331,7 +331,7 @@ namespace RekonOps.BugBeacon
 
                 if (string.IsNullOrEmpty(accessToken))
                 {
-                    Debug.Log("[BugBeacon] SilentSubmit: 로그인되지 않았습니다. pending 큐에 등록합니다.");
+                    Debug.Log("[Rekon] SilentSubmit: 로그인되지 않았습니다. pending 큐에 등록합니다.");
 
                     // pending 큐에 등록 (로그인 시 자동 업로드)
                     if (_pendingUploadManager != null)
@@ -363,14 +363,14 @@ namespace RekonOps.BugBeacon
                     manifest.state = BundleState.Submitted;
                     manifest.registered_at = DateTime.UtcNow.ToString("O");
 
-                    Debug.Log($"[BugBeacon] SilentSubmit: 웹 전송 성공! ReportId={result.ReportId}");
+                    Debug.Log($"[Rekon] SilentSubmit: 웹 전송 성공! ReportId={result.ReportId}");
                     OnSubmitCompleted?.Invoke(true, result.ReportId);
                 }
                 else if (result.IsUsageLimitExceeded)
                 {
                     // 429 사용량 초과: pending 큐 등록 없이 사용자 안내만 수행
                     manifest.state = BundleState.Failed;
-                    Debug.LogWarning($"[BugBeacon] SilentSubmit: 사용량 한도 초과 " +
+                    Debug.LogWarning($"[Rekon] SilentSubmit: 사용량 한도 초과 " +
                                      $"(reason={result.UsageLimitReason}, upgradeUrl={result.UpgradeUrl})");
 
                     // 이벤트 페이로드: "USAGE_LIMIT:<reason>:<monthly_limit>:<upgradeUrl>"
@@ -380,13 +380,13 @@ namespace RekonOps.BugBeacon
                 else
                 {
                     manifest.state = BundleState.Failed;
-                    Debug.LogWarning($"[BugBeacon] SilentSubmit: 웹 전송 실패: {result.ErrorMessage}");
+                    Debug.LogWarning($"[Rekon] SilentSubmit: 웹 전송 실패: {result.ErrorMessage}");
 
                     // pending 큐에 등록 (재시도 스케줄)
                     if (_pendingUploadManager != null)
                     {
                         await _pendingUploadManager.EnqueueAsync(manifest);
-                        Debug.Log($"[BugBeacon] SilentSubmit: pending 큐에 등록 완료 (bundleId={manifest.id})");
+                        Debug.Log($"[Rekon] SilentSubmit: pending 큐에 등록 완료 (bundleId={manifest.id})");
                     }
 
                     OnSubmitCompleted?.Invoke(false, result.ErrorMessage);
@@ -395,7 +395,7 @@ namespace RekonOps.BugBeacon
             catch (OperationCanceledException)
             {
                 manifest.state = BundleState.Failed;
-                Debug.LogWarning("[BugBeacon] SilentSubmit: 웹 전송 타임아웃 (60초 초과)");
+                Debug.LogWarning("[Rekon] SilentSubmit: 웹 전송 타임아웃 (60초 초과)");
 
                 // pending 큐에 등록 (재시도 스케줄)
                 if (_pendingUploadManager != null)
@@ -409,7 +409,7 @@ namespace RekonOps.BugBeacon
             catch (Exception ex)
             {
                 manifest.state = BundleState.Failed;
-                Debug.LogError($"[BugBeacon] SilentSubmit: 웹 전송 중 오류: {ex.Message}");
+                Debug.LogError($"[Rekon] SilentSubmit: 웹 전송 중 오류: {ex.Message}");
 
                 // pending 큐에 등록 (재시도 스케줄)
                 if (_pendingUploadManager != null)

@@ -1,8 +1,8 @@
 using System;
 using NUnit.Framework;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// 토큰 갱신 관련 단위 테스트.

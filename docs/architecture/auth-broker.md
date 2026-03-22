@@ -2,7 +2,7 @@
 
 ## 개요
 
-BugBeacon-unity 프로젝트의 Supabase 기반 OAuth 2.0 Auth Broker 설계 문서입니다.
+Rekon-unity 프로젝트의 Supabase 기반 OAuth 2.0 Auth Broker 설계 문서입니다.
 Unity 클라이언트와 Jira(Atlassian) 간의 OAuth 3-Legged OAuth(3LO) 인증을 중개합니다.
 
 ---

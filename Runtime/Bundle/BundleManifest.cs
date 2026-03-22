@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 메타데이터 키-값 쌍. JsonUtility 직렬화를 위해 클래스로 정의.

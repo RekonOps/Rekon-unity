@@ -3,9 +3,9 @@ using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// LogSerializer 단위 테스트.
@@ -105,7 +105,7 @@ namespace RekonOps.BugBeacon.Tests
 
             string result = _serializer.Serialize(entries);
 
-            StringAssert.Contains("BugBeacon", result);
+            StringAssert.Contains("Rekon", result);
             StringAssert.Contains("항목 수: 1", result);
         }
 

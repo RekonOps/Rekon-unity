@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon.Tests.Integration
+namespace RekonOps.Rekon.Tests.Integration
 {
     /// <summary>
     /// Phase 8.3 보안 테스트 - Auth Broker 보안.

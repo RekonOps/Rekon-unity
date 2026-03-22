@@ -2,9 +2,9 @@ using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
-using RekonOps.BugBeacon;
+using RekonOps.Rekon;
 
-namespace RekonOps.BugBeacon.Tests
+namespace RekonOps.Rekon.Tests
 {
     /// <summary>
     /// CaptureOverlay Play Mode 단위 테스트.
@@ -74,8 +74,8 @@ namespace RekonOps.BugBeacon.Tests
         {
             _overlay = CaptureOverlay.EnsureInstance();
 
-            Assert.AreEqual("[BugBeacon] CaptureOverlay", _overlay.gameObject.name,
-                "게임 오브젝트 이름이 '[BugBeacon] CaptureOverlay'여야 합니다.");
+            Assert.AreEqual("[Rekon] CaptureOverlay", _overlay.gameObject.name,
+                "게임 오브젝트 이름이 '[Rekon] CaptureOverlay'여야 합니다.");
         }
 
         // ──────────────────────────────────────────────────────────────

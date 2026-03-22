@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// 파일 및 바이트 배열의 SHA-256 해시를 계산하는 유틸리티 클래스.
@@ -29,7 +29,7 @@ namespace RekonOps.BugBeacon
 
             if (!File.Exists(filePath))
             {
-                Debug.LogWarning($"[BugBeacon] SHA256 계산 대상 파일을 찾을 수 없습니다: {filePath}");
+                Debug.LogWarning($"[Rekon] SHA256 계산 대상 파일을 찾을 수 없습니다: {filePath}");
                 return string.Empty;
             }
 
@@ -49,7 +49,7 @@ namespace RekonOps.BugBeacon
 
             if (!File.Exists(filePath))
             {
-                Debug.LogWarning($"[BugBeacon] SHA256 계산 대상 파일을 찾을 수 없습니다: {filePath}");
+                Debug.LogWarning($"[Rekon] SHA256 계산 대상 파일을 찾을 수 없습니다: {filePath}");
                 return string.Empty;
             }
 

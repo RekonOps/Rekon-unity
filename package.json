@@ -1,7 +1,7 @@
 {
-  "name": "com.rekonops.bugbeacon",
+  "name": "dev.rekonops.rekon",
   "version": "0.1.0",
-  "displayName": "BugBeacon",
+  "displayName": "Rekon",
   "description": "Local-first bug reporting plugin for Unity with Jira Cloud integration",
   "unity": "2022.3",
   "unityRelease": "22f1",
@@ -13,6 +13,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/RekonOps/BugBeacon-unity.git"
+    "url": "https://github.com/RekonOps/Rekon-unity.git"
   }
 }

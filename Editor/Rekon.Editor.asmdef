@@ -1,8 +1,8 @@
 {
-  "name": "BugBeacon.Runtime",
-  "rootNamespace": "RekonOps.BugBeacon",
-  "references": [],
-  "includePlatforms": [],
+  "name": "Rekon.Editor",
+  "rootNamespace": "RekonOps.Rekon.Editor",
+  "references": ["Rekon.Runtime"],
+  "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": false,

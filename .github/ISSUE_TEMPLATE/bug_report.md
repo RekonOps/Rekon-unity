@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve BugBeacon-unity
+about: Report a bug to help us improve Rekon-unity
 title: "[BUG] "
 labels: bug
 assignees: ''
@@ -38,7 +38,7 @@ assignees: ''
 |-------|-------|
 | Unity Version | e.g. 2022.3.45f1 |
 | Target Platform | e.g. iOS, Android, Windows |
-| BugBeacon version | e.g. 0.1.0 |
+| Rekon version | e.g. 0.1.0 |
 | Jira Cloud (if applicable) | e.g. myorg.atlassian.net |
 | OS | e.g. macOS 14.5 |
 

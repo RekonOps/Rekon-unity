@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-namespace RekonOps.BugBeacon
+namespace RekonOps.Rekon
 {
     /// <summary>
     /// FileStream 기반 원자적 파일 쓰기 유틸리티.
@@ -71,7 +71,7 @@ namespace RekonOps.BugBeacon
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[BugBeacon] 파일 쓰기 실패 ({filePath}): {ex.Message}");
+                Debug.LogWarning($"[Rekon] 파일 쓰기 실패 ({filePath}): {ex.Message}");
                 TryCleanupTemp(tempPath);
                 return false;
             }

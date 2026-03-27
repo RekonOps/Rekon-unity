@@ -1,0 +1,25 @@
+{
+  "name": "Rekon.Runtime.InputSystem",
+  "rootNamespace": "RekonOps.Rekon",
+  "references": [
+    "Rekon.Runtime",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [
+    "ENABLE_INPUT_SYSTEM"
+  ],
+  "versionDefines": [
+    {
+      "name": "com.unity.inputsystem",
+      "expression": "1.0.0",
+      "define": "ENABLE_INPUT_SYSTEM"
+    }
+  ],
+  "noEngineReferences": false
+}

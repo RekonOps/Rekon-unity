@@ -15,7 +15,5 @@
     "type": "git",
     "url": "https://github.com/RekonOps/Rekon-unity.git"
   },
-  "dependencies": {
-    "com.unity.inputsystem": "1.7.0"
-  }
+  "dependencies": {}
 }

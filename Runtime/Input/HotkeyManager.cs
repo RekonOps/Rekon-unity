@@ -72,16 +72,21 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 현재 환경에 맞는 기본 핫키 제공자를 생성합니다.
-        /// New Input System이 활성화되어 있으면 NewInputSystemProvider,
+        /// New Input System이 활성화되어 있으면 NewInputSystemProvider(리플렉션),
         /// 그렇지 않으면 LegacyInputProvider를 반환합니다.
+        /// NewInputSystemProvider는 별도 어셈블리(Rekon.Runtime.InputSystem)에 있으므로
+        /// 직접 참조 대신 리플렉션으로 생성합니다.
         /// </summary>
         private static IHotkeyProvider CreateDefaultProvider()
         {
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
-            return new NewInputSystemProvider();
-#else
-            return new LegacyInputProvider();
+            // NewInputSystemProvider는 Rekon.Runtime.InputSystem 어셈블리에 있으므로 리플렉션으로 생성
+            var type = System.Type.GetType(
+                "RekonOps.Rekon.NewInputSystemProvider, Rekon.Runtime.InputSystem");
+            if (type != null)
+                return (IHotkeyProvider)System.Activator.CreateInstance(type);
 #endif
+            return new LegacyInputProvider();
         }
     }
 }

@@ -4,9 +4,9 @@ namespace RekonOps.Rekon
 {
     /// <summary>
     /// Unity New Input System 기반 핫키 제공자.
-    /// ENABLE_INPUT_SYSTEM 심볼이 정의된 경우에만 컴파일됩니다.
+    /// Rekon.Runtime.InputSystem.asmdef의 defineConstraints에 의해
+    /// ENABLE_INPUT_SYSTEM 심볼이 정의된 경우에만 이 어셈블리 전체가 컴파일됩니다.
     /// </summary>
-#if ENABLE_INPUT_SYSTEM
     public class NewInputSystemProvider : IHotkeyProvider
     {
         // New Input System의 KeyCode → Key 매핑 테이블
@@ -127,32 +127,4 @@ namespace RekonOps.Rekon
             return keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed;
         }
     }
-#else
-    /// <summary>
-    /// New Input System이 비활성화된 경우의 더미 구현.
-    /// 항상 false를 반환합니다.
-    /// </summary>
-    public class NewInputSystemProvider : IHotkeyProvider
-    {
-        public bool IsTriggered(KeyCode key)
-        {
-            return false;
-        }
-
-        public bool IsCtrlOrCmdHeld()
-        {
-            return false;
-        }
-
-        public bool IsShiftHeld()
-        {
-            return false;
-        }
-
-        public bool IsAltHeld()
-        {
-            return false;
-        }
-    }
-#endif
 }

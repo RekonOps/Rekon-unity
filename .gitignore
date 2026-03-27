@@ -73,6 +73,19 @@ sysinfo.txt
 
 # Unity3D generated meta files
 *.meta
+# UPM 패키지 필수 .meta 파일은 추적 (git URL 설치 시 필요)
+!Runtime.meta
+!Runtime/**/*.meta
+!Editor.meta
+!Editor/**/*.meta
+!Settings.meta
+!Settings/**/*.meta
+!Tests.meta
+!Tests/**/*.meta
+!package.json.meta
+!README.md.meta
+!LICENSE.meta
+!CHANGELOG.md.meta
 
 # Unity3D Generated File On Crash Reports
 sysinfo.txt

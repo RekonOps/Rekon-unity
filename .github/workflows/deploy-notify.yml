@@ -1,0 +1,116 @@
+name: 배포 알림
+
+on:
+  push:
+    branches:
+      - develop
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  notify-dev:
+    name: dev 알림
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: changed
+        run: |
+          COUNT=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | wc -l | tr -d ' ')
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+      - name: Discord 알림
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_DEV }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${GITHUB_SHA}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CHANGED_COUNT="${{ steps.changed.outputs.count }}"
+          DEPLOY_TIME=$(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST')
+          PAYLOAD=$(jq -n \
+            --arg commit_msg "$COMMIT_MSG" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg actor "${{ github.actor }}" \
+            --arg changed_count "${CHANGED_COUNT}개" \
+            --arg deploy_time "$DEPLOY_TIME" \
+            --arg commit_url "$COMMIT_URL" \
+            --arg workflow_url "$WORKFLOW_URL" \
+            '{
+              embeds: [{
+                title: "✅ Rekon Unity dev 업데이트",
+                color: 3066993,
+                fields: [
+                  { name: "환경", value: "dev", inline: true },
+                  { name: "커밋", value: ("`" + $short_sha + "`"), inline: true },
+                  { name: "작성자", value: $actor, inline: true },
+                  { name: "커밋 메시지", value: $commit_msg, inline: false },
+                  { name: "변경 파일", value: $changed_count, inline: true },
+                  { name: "배포 시각", value: $deploy_time, inline: true }
+                ],
+                footer: {
+                  text: ("커밋: " + $commit_url + " | 워크플로우: " + $workflow_url)
+                }
+              }]
+            }')
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK"
+
+  notify-prod:
+    name: prod 릴리스 알림
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: changed
+        run: |
+          COUNT=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | wc -l | tr -d ' ')
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+      - name: Discord 알림
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_PROD }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${GITHUB_SHA}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CHANGED_COUNT="${{ steps.changed.outputs.count }}"
+          DEPLOY_TIME=$(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST')
+          TAG="${{ github.ref_name }}"
+          PAYLOAD=$(jq -n \
+            --arg commit_msg "$COMMIT_MSG" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg actor "${{ github.actor }}" \
+            --arg changed_count "${CHANGED_COUNT}개" \
+            --arg deploy_time "$DEPLOY_TIME" \
+            --arg commit_url "$COMMIT_URL" \
+            --arg workflow_url "$WORKFLOW_URL" \
+            --arg tag "$TAG" \
+            '{
+              embeds: [{
+                title: ("🚀 Rekon Unity " + $tag + " 릴리스"),
+                color: 3066993,
+                fields: [
+                  { name: "환경", value: "prod", inline: true },
+                  { name: "버전", value: $tag, inline: true },
+                  { name: "커밋", value: ("`" + $short_sha + "`"), inline: true },
+                  { name: "작성자", value: $actor, inline: true },
+                  { name: "커밋 메시지", value: $commit_msg, inline: false },
+                  { name: "변경 파일", value: $changed_count, inline: true },
+                  { name: "배포 시각", value: $deploy_time, inline: true }
+                ],
+                footer: {
+                  text: ("커밋: " + $commit_url + " | 워크플로우: " + $workflow_url)
+                }
+              }]
+            }')
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK"

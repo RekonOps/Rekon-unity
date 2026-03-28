@@ -193,6 +193,16 @@ namespace RekonOps.Rekon
         [Tooltip("Auth Broker base URL")]
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
 
+        // ─── 플랜별 동적 제한값 (런타임 적용, 직렬화 제외) ──────────────────────
+        // validate-license 응답 후 LicenseValidator가 채워줍니다.
+        // ScriptableObject에는 저장되지 않으며, 에디터 세션 동안만 유지됩니다.
+
+        /// <summary>플랜이 허용하는 최대 버퍼 시간(초). 라이선스 검증 후 갱신됩니다.</summary>
+        [NonSerialized] public int maxAllowedBufferSeconds = 60;
+
+        /// <summary>플랜이 허용하는 최대 스크린샷 개수. 라이선스 검증 후 갱신됩니다.</summary>
+        [NonSerialized] public int maxAllowedScreenshotCount = 3;
+
         /// <summary>
         /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.
         /// </summary>

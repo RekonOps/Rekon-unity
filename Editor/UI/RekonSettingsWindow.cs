@@ -124,6 +124,7 @@ namespace RekonOps.Rekon.Editor
         // ─── Foldout 상태 ────────────────────────────────────────────────────────
 
         private bool _foldWeb = true;
+        private bool _foldCodec = true;
         private bool _foldCapture = true;
         private bool _foldReport = true;
         private bool _foldHotkey = true;
@@ -199,6 +200,10 @@ namespace RekonOps.Rekon.Editor
 
             BeginSectionBox();
             DrawWebSection();
+            EndSectionBox();
+
+            BeginSectionBox();
+            DrawCodecStatusSection();
             EndSectionBox();
 
             // #31: 미연동 시 하위 섹션 비활성화
@@ -435,6 +440,59 @@ namespace RekonOps.Rekon.Editor
             });
         }
 
+        // ─── 코덱 상태 섹션 ─────────────────────────────────────────────────────
+
+        private void DrawCodecStatusSection()
+        {
+            _foldCodec = EditorGUILayout.Foldout(_foldCodec, "코덱 상태", true, EditorStyles.foldoutHeader);
+            if (!_foldCodec) return;
+
+            EditorGUI.indentLevel++;
+
+            bool isInstalled = FfmpegHelper.IsInstalled();
+
+            // 상태 배지 (연동 상태 배지와 동일 스타일)
+            Rect rect = EditorGUILayout.GetControlRect(false, 36f);
+            Color bgColor = isInstalled
+                ? new Color(0.15f, 0.35f, 0.15f, 0.5f)
+                : new Color(0.35f, 0.15f, 0.15f, 0.5f);
+            EditorGUI.DrawRect(rect, bgColor);
+
+            string label = isInstalled
+                ? "● 코덱 설치됨  |  FFmpeg"
+                : "○ 코덱 미설치  —  영상 캡처 불가";
+
+            GUI.Label(rect, label, new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize  = 12,
+            });
+
+            EditorGUILayout.Space(4f);
+
+            if (isInstalled)
+            {
+                // GPU 인코더 정보 표시
+                string gpuEncoder = FfmpegHelper.GetGpuEncoder();
+                EditorGUILayout.LabelField("GPU 인코더",
+                    !string.IsNullOrEmpty(gpuEncoder) ? $"✓ {gpuEncoder}" : "없음 (libx264 CPU 사용)",
+                    EditorStyles.miniLabel);
+            }
+            else
+            {
+                // 미설치 시 버튼
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("다시 확인", GUILayout.Height(24f)))
+                        FfmpegHelper.ClearCache();
+                    if (GUILayout.Button("FFmpeg 다운로드 페이지", GUILayout.Height(24f)))
+                        Application.OpenURL("https://ffmpeg.org/download.html");
+                }
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
         // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
 
         private void DrawCaptureSection()
@@ -443,15 +501,6 @@ namespace RekonOps.Rekon.Editor
             if (!_foldCapture) return;
 
             EditorGUI.indentLevel++;
-
-            // FFmpeg 미설치 시에만 경고 표시
-            if (!FfmpegHelper.IsInstalled())
-            {
-                EditorGUILayout.HelpBox(
-                    "FFmpeg 미설치: 영상 캡처가 비활성화됩니다.",
-                    MessageType.Warning);
-                EditorGUILayout.Space(4f);
-            }
 
             // ── 영상 캡처 설정 박스 ───────────────────────────────────────────
             BeginSectionBox();
@@ -554,12 +603,6 @@ namespace RekonOps.Rekon.Editor
                 }
             }
 
-            // FFmpeg 미설치 시에만 상태 섹션 표시
-            if (!FfmpegHelper.IsInstalled())
-            {
-                EditorGUILayout.Space(4f);
-                DrawFfmpegStatusSubSection();
-            }
         }
 
         /// <summary>

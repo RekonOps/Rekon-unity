@@ -115,6 +115,12 @@ namespace RekonOps.Rekon.Editor
         /// <summary>마지막 에러 메시지</summary>
         private string _webLoginErrorMessage;
 
+        // #33: 폴링 시작 시각 (남은 시간 계산용)
+        private float _pollingStartTime;
+
+        // #34: 연동 완료 배너 표시 종료 시각
+        private double _completedMessageUntil = 0;
+
         // ─── Foldout 상태 ────────────────────────────────────────────────────────
 
         private bool _foldWeb = true;
@@ -192,9 +198,21 @@ namespace RekonOps.Rekon.Editor
             _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
             DrawWebSection();
-            DrawCaptureSection();
-            DrawReportSection();
-            DrawHotkeySection();
+
+            // #31: 미연동 시 하위 섹션 비활성화
+            bool isLinked = _serializedSettings.FindProperty("isLinked").boolValue;
+            using (new EditorGUI.DisabledScope(!isLinked))
+            {
+                if (!isLinked)
+                {
+                    EditorGUILayout.HelpBox(
+                        "웹 대시보드 연동 후 아래 설정을 사용할 수 있습니다.",
+                        MessageType.Info);
+                }
+                DrawCaptureSection();
+                DrawReportSection();
+                DrawHotkeySection();
+            }
 
             // 개발자 모드일 때만 고급 섹션 표시
             // 활성화: EditorPrefs.SetBool("Rekon_DevMode", true)
@@ -207,8 +225,11 @@ namespace RekonOps.Rekon.Editor
 
             DrawFooter();
 
-            // 변경 사항 적용
-            _serializedSettings.ApplyModifiedProperties();
+            // #35: 자동 저장 — 변경 감지 시 즉시 Dirty 마킹
+            if (_serializedSettings.ApplyModifiedProperties())
+            {
+                EditorUtility.SetDirty(_settings);
+            }
         }
 
         // ─── 헤더 ───────────────────────────────────────────────────────────────
@@ -217,23 +238,12 @@ namespace RekonOps.Rekon.Editor
         {
             EditorGUILayout.Space(6f);
 
+            // #38: 헤더 왼쪽 타이틀 + 오른쪽 버전 표시
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.FlexibleSpace();
                 EditorGUILayout.LabelField("Rekon 설정", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
-            }
-
-            // 에셋 경로 표시
-            string assetPath = AssetDatabase.GetAssetPath(_settings);
-            if (!string.IsNullOrEmpty(assetPath))
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-                    EditorGUILayout.LabelField(assetPath, EditorStyles.miniLabel);
-                    GUILayout.FlexibleSpace();
-                }
+                EditorGUILayout.LabelField("v0.1.5", EditorStyles.miniLabel, GUILayout.Width(40f));
             }
 
             EditorGUILayout.Space(4f);
@@ -250,43 +260,51 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUI.indentLevel++;
 
-            // 연동 상태 표시
-            SerializedProperty isLinkedProp = _serializedSettings.FindProperty("isLinked");
+            SerializedProperty isLinkedProp      = _serializedSettings.FindProperty("isLinked");
             SerializedProperty workspaceNameProp = _serializedSettings.FindProperty("linkedWorkspaceName");
+            bool linked          = isLinkedProp.boolValue;
+            string workspaceName = workspaceNameProp.stringValue;
 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PrefixLabel("연동 상태");
-            if (isLinkedProp.boolValue)
+            // #32: 연동 상태 배지 (배경 박스)
+            DrawConnectionStatusBadge(linked, workspaceName);
+
+            EditorGUILayout.Space(4f);
+
+            // #39: 첫 실행 온보딩 배너 (미연동 시)
+            if (!linked)
             {
-                var origColor = GUI.contentColor;
-                GUI.contentColor = new Color(0.2f, 0.8f, 0.3f);
-                string displayName = string.IsNullOrEmpty(workspaceNameProp.stringValue)
-                    ? "연동됨"
-                    : $"연동됨 ({workspaceNameProp.stringValue})";
-                EditorGUILayout.LabelField($"● {displayName}");
-                GUI.contentColor = origColor;
+                EditorGUILayout.HelpBox(
+                    "시작하기: 아래 '웹 연동' 섹션에서 웹 로그인 버튼을 클릭하세요.",
+                    MessageType.Info);
             }
-            else
+
+            // #34: 연동 완료 5초 성공 배너
+            if (EditorApplication.timeSinceStartup < _completedMessageUntil)
             {
-                var origColor = GUI.contentColor;
-                GUI.contentColor = new Color(0.9f, 0.3f, 0.3f);
-                EditorGUILayout.LabelField("○ 미연동");
-                GUI.contentColor = origColor;
+                string displayName = string.IsNullOrEmpty(workspaceName) ? "워크스페이스" : workspaceName;
+                EditorGUILayout.HelpBox(
+                    $"연동 완료! '{displayName}' 워크스페이스에 연결되었습니다.",
+                    MessageType.Info);
+                Repaint();
             }
-            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4f);
 
             // 연동/해제 버튼
-            if (isLinkedProp.boolValue)
+            if (linked)
             {
                 // 연동됨 상태: 연동 해제 버튼
-                if (GUILayout.Button("연동 해제", GUILayout.Width(100f), GUILayout.Height(28f)))
+                float btnWidth = Mathf.Clamp(position.width * 0.3f, 80f, 160f); // #44
+                if (GUILayout.Button("연동 해제", GUILayout.Width(btnWidth), GUILayout.Height(28f)))
                 {
-                    if (EditorUtility.DisplayDialog(
+                    // #42: "취소"를 기본(OK), "연동 해제"를 보조(Cancel)
+                    bool cancelled = EditorUtility.DisplayDialog(
                         "웹 연동 해제",
-                        "웹 대시보드와의 연동을 해제하시겠습니까?",
-                        "해제", "취소"))
+                        "연동을 해제하면 버그 리포트가 전송되지 않습니다.\n재연동하려면 다시 웹 로그인이 필요합니다.",
+                        "취소",
+                        "연동 해제"
+                    );
+                    if (!cancelled)
                     {
                         isLinkedProp.boolValue = false;
                         workspaceNameProp.stringValue = "";
@@ -305,10 +323,20 @@ namespace RekonOps.Rekon.Editor
                 // 미연동 상태: 폴링 중인지 여부에 따라 버튼 다르게 표시
                 if (_webLoginState == WebLoginState.Polling)
                 {
-                    // 폴링 중: 대기 메시지 + 취소 버튼
+                    // #33: 폴링 중 남은 시간 + 프로그레스 바
+                    float elapsed   = (float)EditorApplication.timeSinceStartup - _pollingStartTime;
+                    float remaining = 600f - elapsed;
+                    int remainMin   = Mathf.Max(0, (int)(remaining / 60f));
+                    int remainSec   = Mathf.Max(0, (int)(remaining % 60f));
+
                     EditorGUILayout.HelpBox(
-                        "브라우저에서 로그인을 완료해주세요...",
+                        $"브라우저에서 로그인을 완료해주세요.\n남은 시간: {remainMin}분 {remainSec:00}초",
                         MessageType.Info);
+
+                    float progress = Mathf.Clamp01(elapsed / 600f);
+                    Rect barRect = EditorGUILayout.GetControlRect(false, 4f);
+                    EditorGUI.ProgressBar(barRect, progress, "");
+
                     EditorGUILayout.Space(4f);
 
                     if (GUILayout.Button("로그인 대기 중... (취소)", GUILayout.Height(28f)))
@@ -324,12 +352,16 @@ namespace RekonOps.Rekon.Editor
                 else
                 {
                     // Idle / Failed 상태: 웹 로그인 버튼
-                    if (GUILayout.Button("웹 로그인", GUILayout.Width(120f), GUILayout.Height(28f)))
+                    float btnWidth = Mathf.Clamp(position.width * 0.3f, 80f, 160f); // #44
+                    if (GUILayout.Button("웹 로그인", GUILayout.Width(btnWidth), GUILayout.Height(28f)))
                     {
                         // 이전 폴링 정리
                         _pollingCts?.Cancel();
                         _pollingCts?.Dispose();
                         _pollingCts = new CancellationTokenSource();
+
+                        // #33: 폴링 시작 시각 기록
+                        _pollingStartTime = (float)EditorApplication.timeSinceStartup;
 
                         // 비동기 로그인 플로우 시작
                         _ = StartWebLoginFlowAsync(_pollingCts.Token);
@@ -354,6 +386,28 @@ namespace RekonOps.Rekon.Editor
             DrawSeparator();
         }
 
+        /// <summary>
+        /// #32: 연동 상태를 배경 박스로 시각화합니다.
+        /// </summary>
+        private void DrawConnectionStatusBadge(bool isLinked, string workspaceName)
+        {
+            Rect rect = EditorGUILayout.GetControlRect(false, 36f);
+            Color bgColor = isLinked
+                ? new Color(0.15f, 0.35f, 0.15f, 0.5f)
+                : new Color(0.35f, 0.15f, 0.15f, 0.5f);
+            EditorGUI.DrawRect(rect, bgColor);
+
+            string label = isLinked
+                ? $"● 연동됨  |  {workspaceName}"
+                : "○ 미연동  —  웹 로그인이 필요합니다";
+
+            GUI.Label(rect, label, new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize  = 12,
+            });
+        }
+
         // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
 
         private void DrawCaptureSection()
@@ -363,6 +417,14 @@ namespace RekonOps.Rekon.Editor
             if (!_foldCapture) return;
 
             EditorGUI.indentLevel++;
+
+            // #36: FFmpeg 경고를 캡처 섹션 최상단에 표시
+            if (!FfmpegHelper.IsInstalled())
+            {
+                EditorGUILayout.HelpBox(
+                    "FFmpeg 미설치: 영상 캡처가 비활성화됩니다.",
+                    MessageType.Warning);
+            }
 
             // 영상 프리셋
             DrawVideoPresetSubSection();
@@ -620,33 +682,32 @@ namespace RekonOps.Rekon.Editor
 
             bool isMac = Application.platform == RuntimePlatform.OSXEditor;
 
-            // 현재 조합 미리보기
-            string preview = BuildHotkeyPreview(isMac);
-            EditorGUILayout.HelpBox($"현재 단축키: {preview}", MessageType.Info);
-
             // 수식키 토글
             SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
             SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
             SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
             SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
 
+            // #45: 수식키 토글 너비 동적 계산 (3등분)
+            float toggleWidth = (EditorGUIUtility.currentViewWidth - 60f) / 3f;
+
             EditorGUILayout.BeginHorizontal();
 
             EditorGUI.BeginChangeCheck();
             bool newCtrlCmd = EditorGUILayout.ToggleLeft(
-                isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(80));
+                isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 ctrlCmd.boolValue = newCtrlCmd;
 
             EditorGUI.BeginChangeCheck();
             bool newShift = EditorGUILayout.ToggleLeft(
-                isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(80));
+                isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 shift.boolValue = newShift;
 
             EditorGUI.BeginChangeCheck();
             bool newAlt = EditorGUILayout.ToggleLeft(
-                isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(80));
+                isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 alt.boolValue = newAlt;
 
@@ -669,18 +730,33 @@ namespace RekonOps.Rekon.Editor
             if (EditorGUI.EndChangeCheck())
                 hotkey.intValue = (int)keyList[newIndex];
 
+            // #41: 단축키 프리뷰를 선택 UI 아래로
+            // #46: BuildHotkeyPreview에 파라미터로 전달 (FindProperty 중복 호출 제거)
+            string preview = BuildHotkeyPreview(isMac, ctrlCmd, shift, alt, hotkey);
+            EditorGUILayout.HelpBox($"현재 단축키: {preview}", MessageType.Info);
+
+            // #40: 수식키 없음 경고
+            bool hasModifier = ctrlCmd.boolValue || shift.boolValue || alt.boolValue;
+            if (!hasModifier)
+            {
+                EditorGUILayout.HelpBox(
+                    "수식키 없이 설정하면 플레이 모드에서 오작동할 수 있습니다.",
+                    MessageType.Warning);
+            }
+
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
             DrawSeparator();
         }
 
-        private string BuildHotkeyPreview(bool isMac)
+        // #46: FindProperty 중복 호출 제거 — 프로퍼티를 파라미터로 전달
+        private static string BuildHotkeyPreview(
+            bool isMac,
+            SerializedProperty ctrlCmd,
+            SerializedProperty shift,
+            SerializedProperty alt,
+            SerializedProperty hotkey)
         {
-            SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
-            SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
-            SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
-            SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
-
             var parts = new System.Collections.Generic.List<string>();
 
             if (ctrlCmd.boolValue) parts.Add(isMac ? "⌘" : "Ctrl");
@@ -792,7 +868,8 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawFooter()
         {
-            GUILayout.FlexibleSpace();
+            // #43: GUILayout.FlexibleSpace() 제거 → 고정 여백으로 대체
+            EditorGUILayout.Space(8f);
             DrawSeparator();
             EditorGUILayout.Space(4f);
 
@@ -800,19 +877,11 @@ namespace RekonOps.Rekon.Editor
             {
                 GUILayout.FlexibleSpace();
 
-                // 되돌리기 버튼
+                // 되돌리기 버튼 (#35: 적용 버튼 제거, 자동 저장으로 대체)
                 if (GUILayout.Button("되돌리기", GUILayout.Width(80f)))
                 {
                     _serializedSettings.Update();
                     Undo.RevertAllDownToGroup(Undo.GetCurrentGroup());
-                }
-
-                GUILayout.Space(8f);
-
-                // 적용 버튼
-                if (GUILayout.Button("적용", GUILayout.Width(80f)))
-                {
-                    ApplySettings();
                 }
             }
 
@@ -967,6 +1036,9 @@ namespace RekonOps.Rekon.Editor
 
                     _webLoginState = WebLoginState.Completed;
                     _webLoginErrorMessage = null;
+
+                    // #34: 연동 완료 5초 성공 배너 타이머 시작
+                    _completedMessageUntil = EditorApplication.timeSinceStartup + 5.0;
 
                     Debug.Log("[Rekon] 웹 로그인 완료. workspace: "
                         + workspaceName + " / tenantId: " + workspaceId);
@@ -1220,10 +1292,16 @@ namespace RekonOps.Rekon.Editor
 
         /// <summary>
         /// 섹션 구분 헤더를 그립니다.
+        /// #37: 타이틀 아래 40% 너비 언더라인 표시
         /// </summary>
         private static void DrawSectionHeader(string title)
         {
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+            Rect lastRect = GUILayoutUtility.GetLastRect();
+            float lineWidth = lastRect.width * 0.4f;
+            Rect lineRect = new Rect(lastRect.x, lastRect.yMax, lineWidth, 1f);
+            EditorGUI.DrawRect(lineRect, new Color(0.5f, 0.5f, 0.5f, 0.5f));
+            GUILayout.Space(2f);
         }
 
         /// <summary>

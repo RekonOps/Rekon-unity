@@ -444,36 +444,43 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUI.indentLevel++;
 
-            // #36: FFmpeg 경고를 캡처 섹션 최상단에 표시
+            // FFmpeg 미설치 시에만 경고 표시
             if (!FfmpegHelper.IsInstalled())
             {
                 EditorGUILayout.HelpBox(
                     "FFmpeg 미설치: 영상 캡처가 비활성화됩니다.",
                     MessageType.Warning);
+                EditorGUILayout.Space(4f);
             }
 
-            // 영상 프리셋
+            // ── 영상 캡처 설정 박스 ───────────────────────────────────────────
+            BeginSectionBox();
             DrawVideoPresetSubSection();
+            EndSectionBox();
 
-            DrawSubSectionSeparator();
+            EditorGUILayout.Space(4f);
 
-            // 스크린샷 설정
-            DrawSectionHeader("스크린샷");
+            // ── 스크린샷 캡처 설정 박스 ──────────────────────────────────────
+            BeginSectionBox();
+            DrawSectionHeader("스크린샷 캡처 설정");
             SerializedProperty downscale = _serializedSettings.FindProperty("screenshotDownscale");
             EditorGUILayout.IntSlider(
                 downscale,
                 1, 4,
                 new GUIContent("다운스케일 배율", "1 = 원본 해상도, 2 = 절반, 4 = 1/4 크기"));
+            EndSectionBox();
 
-            DrawSubSectionSeparator();
+            EditorGUILayout.Space(4f);
 
-            // 로그 설정
+            // ── 로그 설정 박스 ───────────────────────────────────────────────
+            BeginSectionBox();
             DrawSectionHeader("로그");
             SerializedProperty logBufferSize = _serializedSettings.FindProperty("logBufferSize");
             EditorGUILayout.IntSlider(
                 logBufferSize,
                 100, 5000,
                 new GUIContent("로그 버퍼 크기", "링 버퍼에 보관할 최대 로그 라인 수"));
+            EndSectionBox();
 
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
@@ -482,7 +489,7 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawVideoPresetSubSection()
         {
-            DrawSectionHeader("영상");
+            DrawSectionHeader("영상 캡처 설정");
 
             SerializedProperty videoEnabled = _serializedSettings.FindProperty("videoEnabled");
             EditorGUILayout.PropertyField(
@@ -547,10 +554,12 @@ namespace RekonOps.Rekon.Editor
                 }
             }
 
-            DrawSubSectionSeparator();
-
-            // FFmpeg 상태
-            DrawFfmpegStatusSubSection();
+            // FFmpeg 미설치 시에만 상태 섹션 표시
+            if (!FfmpegHelper.IsInstalled())
+            {
+                EditorGUILayout.Space(4f);
+                DrawFfmpegStatusSubSection();
+            }
         }
 
         /// <summary>

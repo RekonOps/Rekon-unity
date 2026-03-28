@@ -161,7 +161,7 @@ namespace RekonOps.Rekon
 #elif REKON_DEV
         public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
 #else
-        public const string WEB_DASHBOARD_URL = "https://app.rekonops.dev";
+        public const string WEB_DASHBOARD_URL = "https://www.rekonops.dev";
 #endif
 
         [Header("웹 연동")]

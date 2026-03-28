@@ -104,35 +104,13 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 번들 루트 디렉토리를 반환합니다.
-        /// 구 버전 레거시 경로(BugBeacon)가 존재하면 Rekon 경로로 자동 이동하여 데이터 유실을 방지합니다.
         /// </summary>
         public static string GetBundlesRootDirectory()
         {
             if (_bundlesRootDirectory != null)
                 return _bundlesRootDirectory;
 
-            string newPath = Path.Combine(Application.persistentDataPath, "Rekon", "bundles");
-            string legacyPath = Path.Combine(Application.persistentDataPath, "BugBeacon", "bundles");
-
-            // 레거시 경로가 존재하고 새 Rekon 경로가 없는 경우 자동 이동
-            if (Directory.Exists(legacyPath) && !Directory.Exists(newPath))
-            {
-                try
-                {
-                    string rekonRoot = Path.Combine(Application.persistentDataPath, "Rekon");
-                    if (!Directory.Exists(rekonRoot))
-                        Directory.CreateDirectory(rekonRoot);
-
-                    Directory.Move(legacyPath, newPath);
-                    Debug.Log($"[Rekon] 레거시 번들 경로를 Rekon으로 마이그레이션 완료: {legacyPath} → {newPath}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[Rekon] 레거시 경로 마이그레이션 실패, 새 경로 사용: {ex.Message}");
-                }
-            }
-
-            return _bundlesRootDirectory = newPath;
+            return _bundlesRootDirectory = Path.Combine(Application.persistentDataPath, "Rekon", "bundles");
         }
 
         // ──────────────────────────────────────────────────────────────

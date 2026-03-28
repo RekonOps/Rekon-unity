@@ -121,7 +121,6 @@ namespace RekonOps.Rekon.Editor
         private bool _foldCapture = true;
         private bool _foldReport = true;
         private bool _foldHotkey = true;
-        private bool _foldCrashRecovery = true;
         private bool _foldAdvanced = false;
 
         // ─── 내부 상태 ───────────────────────────────────────────────────────────
@@ -196,7 +195,6 @@ namespace RekonOps.Rekon.Editor
             DrawCaptureSection();
             DrawReportSection();
             DrawHotkeySection();
-            // DrawCrashRecoverySection(); // 크래시 복구 설정 UI 임시 비노출 (Phase 2 예정)
 
             // 개발자 모드일 때만 고급 섹션 표시
             // 활성화: EditorPrefs.SetBool("Rekon_DevMode", true)
@@ -454,14 +452,10 @@ namespace RekonOps.Rekon.Editor
                         new GUIContent("비트레이트 (Mbps)", "목표 영상 비트레이트 (1~20Mbps)"));
 
                     SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
-                    int maxBuffer = _settings != null ? _settings.maxAllowedBufferSeconds : 120;
-                    // 현재 값이 플랜 max를 초과하면 자동 클램프
-                    if (bufferSeconds.intValue > maxBuffer)
-                        bufferSeconds.intValue = maxBuffer;
                     EditorGUILayout.IntSlider(
                         bufferSeconds,
-                        10, maxBuffer,
-                        new GUIContent("버퍼 시간 (초)", $"링 버퍼에 보관하는 영상 길이 (10~{maxBuffer}초, 플랜 제한)"));
+                        10, 180,
+                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~180초)"));
                 }
             }
 
@@ -717,63 +711,6 @@ namespace RekonOps.Rekon.Editor
                     => ((int)key - (int)KeyCode.Alpha0).ToString(),
                 _ => key.ToString(),
             };
-        }
-
-        // ─── 크래시 복구 섹션 ───────────────────────────────────────────────────
-
-        private void DrawCrashRecoverySection()
-        {
-            EditorGUILayout.Space(4f);
-            _foldCrashRecovery = EditorGUILayout.Foldout(_foldCrashRecovery, "크래시 복구", true, EditorStyles.foldoutHeader);
-            if (!_foldCrashRecovery) return;
-
-            EditorGUI.indentLevel++;
-
-            EditorGUILayout.HelpBox(
-                "플러시 간격이 짧을수록 크래시 시 데이터 손실이 줄어들지만, 디스크 I/O가 증가합니다.",
-                MessageType.Info);
-
-            EditorGUILayout.Space(4f);
-
-            DrawSectionHeader("플러시 간격");
-
-            SerializedProperty logFlush = _serializedSettings.FindProperty("logFlushInterval");
-            EditorGUILayout.Slider(
-                logFlush,
-                1f, 30f,
-                new GUIContent("로그 플러시 간격 (초)", "로그 링 버퍼를 디스크에 저장하는 주기"));
-
-            SerializedProperty stateFlush = _serializedSettings.FindProperty("stateFlushInterval");
-            EditorGUILayout.Slider(
-                stateFlush,
-                1f, 60f,
-                new GUIContent("상태 플러시 간격 (초)", "게임 상태 스냅샷을 디스크에 저장하는 주기"));
-
-            SerializedProperty videoFlush = _serializedSettings.FindProperty("videoFlushInterval");
-            EditorGUILayout.Slider(
-                videoFlush,
-                10f, 120f,
-                new GUIContent("영상 플러시 간격 (초)", "영상 링 버퍼를 디스크에 저장하는 주기"));
-
-            EditorGUILayout.Space(8f);
-
-            DrawSectionHeader("보관 정책");
-
-            SerializedProperty maxCrash = _serializedSettings.FindProperty("maxCrashBundles");
-            EditorGUILayout.IntSlider(
-                maxCrash,
-                1, 50,
-                new GUIContent("최대 크래시 번들 수", "디스크에 보관할 크래시 번들 최대 개수"));
-
-            SerializedProperty retentionDays = _serializedSettings.FindProperty("crashBundleRetentionDays");
-            EditorGUILayout.IntSlider(
-                retentionDays,
-                1, 365,
-                new GUIContent("보관 일수", "크래시 번들 보관 최대 기간 (일)"));
-
-            EditorGUI.indentLevel--;
-            EditorGUILayout.Space(4f);
-            DrawSeparator();
         }
 
         // ─── 고급 섹션 ──────────────────────────────────────────────────────────
@@ -1117,17 +1054,6 @@ namespace RekonOps.Rekon.Editor
                     // 플랜 제한값을 settings에 반영
                     _settings.maxAllowedBufferSeconds  = licenseInfo.MaxBufferSeconds;
                     _settings.maxAllowedScreenshotCount = licenseInfo.MaxScreenshotCount;
-
-                    // 현재 설정값이 플랜 max를 초과하면 클램프
-                    bool clamped = false;
-                    if (_settings.videoBufferSeconds > _settings.maxAllowedBufferSeconds)
-                    {
-                        _settings.videoBufferSeconds = _settings.maxAllowedBufferSeconds;
-                        clamped = true;
-                    }
-
-                    if (clamped)
-                        EditorUtility.SetDirty(_settings);
 
                     Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
                               $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +

@@ -133,6 +133,9 @@ namespace RekonOps.Rekon.Editor
         /// <summary>Supabase access_token 암호화 저장소</summary>
         private readonly SessionTokenStore _tokenStore = new SessionTokenStore();
 
+        /// <summary>라이선스 검증 클라이언트 (웹 로그인 완료 후 초기화)</summary>
+        private LicenseValidator _licenseValidator;
+
         // 스크롤 포지션
         private Vector2 _scrollPos;
 
@@ -151,6 +154,7 @@ namespace RekonOps.Rekon.Editor
         private void OnEnable()
         {
             LoadOrCreateSettings();
+            RestorePlanLimitsFromCache();
         }
 
         private void OnDisable()
@@ -451,10 +455,14 @@ namespace RekonOps.Rekon.Editor
                         new GUIContent("비트레이트 (Mbps)", "목표 영상 비트레이트 (1~20Mbps)"));
 
                     SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
+                    int maxBuffer = _settings != null ? _settings.maxAllowedBufferSeconds : 120;
+                    // 현재 값이 플랜 max를 초과하면 자동 클램프
+                    if (bufferSeconds.intValue > maxBuffer)
+                        bufferSeconds.intValue = maxBuffer;
                     EditorGUILayout.IntSlider(
                         bufferSeconds,
-                        10, 120,
-                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~120초)"));
+                        10, maxBuffer,
+                        new GUIContent("버퍼 시간 (초)", $"링 버퍼에 보관하는 영상 길이 (10~{maxBuffer}초, 플랜 제한)"));
                 }
             }
 
@@ -1027,6 +1035,9 @@ namespace RekonOps.Rekon.Editor
                     Debug.Log("[Rekon] 웹 로그인 완료. workspace: "
                         + workspaceName + " / tenantId: " + workspaceId);
 
+                    // 웹 로그인 완료 직후 라이선스 검증 → 플랜 제한값 적용
+                    _ = ValidateLicenseAndApplyLimitsAsync(ct);
+
                     EditorApplication.delayCall += Repaint;
                     return;
                 }
@@ -1043,6 +1054,105 @@ namespace RekonOps.Rekon.Editor
 
             // 10분 후 타임아웃
             SetWebLoginFailed("로그인 대기 시간(10분)이 초과되었습니다. 다시 시도해주세요.");
+        }
+
+        /// <summary>
+        /// 에디터 창이 열릴 때 캐시된 라이선스에서 플랜 제한값을 즉시 복원합니다.
+        /// 네트워크 없이도 이전 세션에서 검증된 값이 UI에 반영됩니다.
+        /// </summary>
+        private void RestorePlanLimitsFromCache()
+        {
+            if (_settings == null) return;
+
+            string brokerUrl = _settings.authBrokerUrl;
+            if (string.IsNullOrEmpty(brokerUrl)) return;
+
+            try
+            {
+                if (_licenseValidator == null)
+                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+
+                var cached = _licenseValidator.GetCachedLicense();
+                if (cached != null && cached.Valid)
+                {
+                    _settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
+                    _settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
+                    Debug.Log($"[Rekon] 캐시에서 플랜 제한값 복원: maxBuffer={cached.MaxBufferSeconds}초, " +
+                              $"maxScreenshot={cached.MaxScreenshotCount}개");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Rekon] 캐시 플랜 제한값 복원 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 라이선스를 검증하고 플랜 제한값을 RekonSettings에 적용합니다.
+        /// 웹 로그인 완료 후 비동기로 호출됩니다.
+        /// </summary>
+        private async Task ValidateLicenseAndApplyLimitsAsync(CancellationToken ct)
+        {
+            if (_settings == null) return;
+
+            string licenseKey = _settings.licenseKey;
+            string userId     = _settings.userId;
+
+            if (string.IsNullOrEmpty(licenseKey) || string.IsNullOrEmpty(userId))
+            {
+                Debug.LogWarning("[Rekon] 라이선스 검증 건너뜀: licenseKey 또는 userId가 비어있습니다.");
+                return;
+            }
+
+            // authBrokerUrl이 설정되어 있어야 함
+            string brokerUrl = _settings.authBrokerUrl;
+            if (string.IsNullOrEmpty(brokerUrl))
+            {
+                Debug.LogWarning("[Rekon] 라이선스 검증 건너뜀: authBrokerUrl이 비어있습니다.");
+                return;
+            }
+
+            try
+            {
+                // LicenseValidator 생성 (또는 재사용)
+                if (_licenseValidator == null)
+                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+
+                var licenseInfo = await _licenseValidator.ValidateAsync(licenseKey, userId, ct);
+
+                if (licenseInfo != null && licenseInfo.Valid)
+                {
+                    // 플랜 제한값을 settings에 반영
+                    _settings.maxAllowedBufferSeconds  = licenseInfo.MaxBufferSeconds;
+                    _settings.maxAllowedScreenshotCount = licenseInfo.MaxScreenshotCount;
+
+                    // 현재 설정값이 플랜 max를 초과하면 클램프
+                    bool clamped = false;
+                    if (_settings.videoBufferSeconds > _settings.maxAllowedBufferSeconds)
+                    {
+                        _settings.videoBufferSeconds = _settings.maxAllowedBufferSeconds;
+                        clamped = true;
+                    }
+
+                    if (clamped)
+                        EditorUtility.SetDirty(_settings);
+
+                    Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
+                              $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +
+                              $"maxScreenshot={licenseInfo.MaxScreenshotCount}개, " +
+                              $"maxSeats={licenseInfo.MaxSeats}명");
+
+                    EditorApplication.delayCall += Repaint;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 창 닫힘 등으로 취소 → 무시
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Rekon] 라이선스 검증 실패 (플랜 제한값 미적용): {ex.Message}");
+            }
         }
 
         /// <summary>

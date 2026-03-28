@@ -197,7 +197,9 @@ namespace RekonOps.Rekon.Editor
             // 전체 스크롤뷰
             _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
+            BeginSectionBox();
             DrawWebSection();
+            EndSectionBox();
 
             // #31: 미연동 시 하위 섹션 비활성화
             bool isLinked = _serializedSettings.FindProperty("isLinked").boolValue;
@@ -209,9 +211,18 @@ namespace RekonOps.Rekon.Editor
                         "웹 대시보드 연동 후 아래 설정을 사용할 수 있습니다.",
                         MessageType.Info);
                 }
+
+                BeginSectionBox();
                 DrawCaptureSection();
+                EndSectionBox();
+
+                BeginSectionBox();
                 DrawReportSection();
+                EndSectionBox();
+
+                BeginSectionBox();
                 DrawHotkeySection();
+                EndSectionBox();
             }
 
             // 개발자 모드일 때만 고급 섹션 표시
@@ -230,6 +241,23 @@ namespace RekonOps.Rekon.Editor
             {
                 EditorUtility.SetDirty(_settings);
             }
+        }
+
+        // ─── 섹션 박스 헬퍼 ─────────────────────────────────────────────────────
+
+        /// <summary>섹션 박스 시작 (helpBox 스타일로 시각적 구분)</summary>
+        private static void BeginSectionBox()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.Space(4f);
+        }
+
+        /// <summary>섹션 박스 종료</summary>
+        private static void EndSectionBox()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(6f);
         }
 
         // ─── 헤더 ───────────────────────────────────────────────────────────────
@@ -254,7 +282,6 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawWebSection()
         {
-            EditorGUILayout.Space(4f);
             _foldWeb = EditorGUILayout.Foldout(_foldWeb, "웹 연동", true, EditorStyles.foldoutHeader);
             if (!_foldWeb) return;
 
@@ -412,7 +439,6 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawCaptureSection()
         {
-            EditorGUILayout.Space(4f);
             _foldCapture = EditorGUILayout.Foldout(_foldCapture, "캡처 설정", true, EditorStyles.foldoutHeader);
             if (!_foldCapture) return;
 
@@ -629,7 +655,6 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawReportSection()
         {
-            EditorGUILayout.Space(4f);
             _foldReport = EditorGUILayout.Foldout(_foldReport, "리포트 설정", true, EditorStyles.foldoutHeader);
             if (!_foldReport) return;
 
@@ -674,7 +699,6 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawHotkeySection()
         {
-            EditorGUILayout.Space(4f);
             _foldHotkey = EditorGUILayout.Foldout(_foldHotkey, "단축키", true, EditorStyles.foldoutHeader);
             if (!_foldHotkey) return;
 

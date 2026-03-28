@@ -77,7 +77,7 @@ namespace RekonOps.Rekon
 
         [Tooltip("Video buffer duration in seconds")]
         [Range(10, 180)]
-        public int videoBufferSeconds = 90;
+        public int videoBufferSeconds = 60;
 
         [Tooltip("Target bitrate in Mbps")]
         [Range(1, 20)]

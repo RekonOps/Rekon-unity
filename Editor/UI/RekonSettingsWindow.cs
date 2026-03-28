@@ -455,7 +455,7 @@ namespace RekonOps.Rekon.Editor
             // 영상 프리셋
             DrawVideoPresetSubSection();
 
-            EditorGUILayout.Space(8f);
+            DrawSubSectionSeparator();
 
             // 스크린샷 설정
             DrawSectionHeader("스크린샷");
@@ -465,7 +465,7 @@ namespace RekonOps.Rekon.Editor
                 1, 4,
                 new GUIContent("다운스케일 배율", "1 = 원본 해상도, 2 = 절반, 4 = 1/4 크기"));
 
-            EditorGUILayout.Space(8f);
+            DrawSubSectionSeparator();
 
             // 로그 설정
             DrawSectionHeader("로그");
@@ -547,7 +547,7 @@ namespace RekonOps.Rekon.Editor
                 }
             }
 
-            EditorGUILayout.Space(8f);
+            DrawSubSectionSeparator();
 
             // FFmpeg 상태
             DrawFfmpegStatusSubSection();
@@ -1326,6 +1326,18 @@ namespace RekonOps.Rekon.Editor
             Rect lineRect = new Rect(lastRect.x, lastRect.yMax, lineWidth, 1f);
             EditorGUI.DrawRect(lineRect, new Color(0.5f, 0.5f, 0.5f, 0.5f));
             GUILayout.Space(2f);
+            EditorGUILayout.Space(4f);
+        }
+
+        /// <summary>
+        /// 캡처 설정 내 서브섹션 사이의 얇은 구분선을 그립니다.
+        /// </summary>
+        private static void DrawSubSectionSeparator()
+        {
+            EditorGUILayout.Space(6f);
+            Rect lineRect = EditorGUILayout.GetControlRect(false, 1f);
+            EditorGUI.DrawRect(lineRect, new Color(0.3f, 0.3f, 0.3f, 0.3f));
+            EditorGUILayout.Space(6f);
         }
 
         /// <summary>

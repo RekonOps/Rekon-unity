@@ -16,7 +16,6 @@ namespace RekonOps.Rekon.Editor
     ///   캡처 설정     - 영상 프리셋, 해상도/FPS/비트레이트/버퍼, 스크린샷, 로그
     ///   리포트 설정   - 제목 접두어, 타임스탬프 형식, 메타데이터 토글
     ///   단축키        - 캡처 핫키 (Mac/Windows 플랫폼별)
-    ///   크래시 복구   - 플러시 간격, 보관 정책
     ///   고급          - 디버그 로그, 팀 ID (디버그 시에만)
     ///
     /// SerializedObject 기반으로 변경 감지 및 Undo 지원.
@@ -197,7 +196,7 @@ namespace RekonOps.Rekon.Editor
             DrawCaptureSection();
             DrawReportSection();
             DrawHotkeySection();
-            DrawCrashRecoverySection();
+            // DrawCrashRecoverySection(); // 크래시 복구 설정 UI 임시 비노출 (Phase 2 예정)
 
             // 개발자 모드일 때만 고급 섹션 표시
             // 활성화: EditorPrefs.SetBool("Rekon_DevMode", true)
@@ -1095,15 +1094,6 @@ namespace RekonOps.Rekon.Editor
         {
             if (_settings == null) return;
 
-            string licenseKey = _settings.licenseKey;
-            string userId     = _settings.userId;
-
-            if (string.IsNullOrEmpty(licenseKey) || string.IsNullOrEmpty(userId))
-            {
-                Debug.LogWarning("[Rekon] 라이선스 검증 건너뜀: licenseKey 또는 userId가 비어있습니다.");
-                return;
-            }
-
             // authBrokerUrl이 설정되어 있어야 함
             string brokerUrl = _settings.authBrokerUrl;
             if (string.IsNullOrEmpty(brokerUrl))
@@ -1118,7 +1108,9 @@ namespace RekonOps.Rekon.Editor
                 if (_licenseValidator == null)
                     _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
 
-                var licenseInfo = await _licenseValidator.ValidateAsync(licenseKey, userId, ct);
+                // licenseKey/userId가 없어도 JWT(access_token)만으로 서버에서 자동 조회합니다.
+                var licenseInfo = await _licenseValidator.ValidateAsync(
+                    _settings.licenseKey, _settings.userId, ct);
 
                 if (licenseInfo != null && licenseInfo.Valid)
                 {

@@ -45,13 +45,36 @@ namespace RekonOps.Rekon
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Mac: ⌘ + Shift + S
+            screenshotHotkey           = KeyCode.S;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #else
             captureHotkey    = KeyCode.F12;
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Windows: Ctrl + Shift + F11
+            screenshotHotkey           = KeyCode.F11;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #endif
         }
+
+        [Header("Screenshot Hotkey")]
+        [Tooltip("스크린샷 캡처 핫키")]
+        public KeyCode screenshotHotkey = KeyCode.S;
+
+        [Tooltip("스크린샷 핫키: Ctrl/Cmd 필요 여부")]
+        public bool screenshotHotkeyCtrlOrCmd = true;
+
+        [Tooltip("스크린샷 핫키: Shift 필요 여부")]
+        public bool screenshotHotkeyShift = true;
+
+        [Tooltip("스크린샷 핫키: Alt 필요 여부")]
+        public bool screenshotHotkeyAlt = false;
 
         [Header("Screenshot")]
         [Tooltip("Downscale factor (1 = original resolution)")]

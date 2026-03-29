@@ -48,6 +48,9 @@ namespace RekonOps.Rekon
         {
             public bool jira_submit;
             public bool video_capture;
+            public int max_buffer_seconds;
+            public int max_screenshot_count;
+            public int max_seats;
         }
 
         // ─── 라이선스 정보 (캐시용) ───────────────────────────────────────────────
@@ -63,6 +66,15 @@ namespace RekonOps.Rekon
             public bool VideoCaptureEnabled;
             public DateTime? ExpiresAt;
             public DateTime LastCheckedAt;
+
+            /// <summary>플랜별 최대 버퍼 시간(초). 기본값: 60 (free)</summary>
+            public int MaxBufferSeconds { get; set; } = 60;
+
+            /// <summary>플랜별 최대 스크린샷 개수. 기본값: 3 (free)</summary>
+            public int MaxScreenshotCount { get; set; } = 3;
+
+            /// <summary>플랜별 최대 시트(멤버) 수. 기본값: 1 (free)</summary>
+            public int MaxSeats { get; set; } = 1;
 
             /// <summary>연동된 외부 제공자 목록 (예: ["jira"])</summary>
             public string[] ConnectedProviders;
@@ -94,6 +106,9 @@ namespace RekonOps.Rekon
             public string expires_at;
             public string last_checked_at;   // ISO 8601
             public string connected_providers_csv; // 쉼표 구분 문자열
+            public int max_buffer_seconds;
+            public int max_screenshot_count;
+            public int max_seats;
         }
 
         // ─── 상수 ─────────────────────────────────────────────────────────────────
@@ -135,8 +150,10 @@ namespace RekonOps.Rekon
         {
             if (string.IsNullOrEmpty(supabaseUrl))
                 throw new ArgumentNullException(nameof(supabaseUrl), "Supabase URL이 설정되지 않았습니다.");
-            if (string.IsNullOrEmpty(supabaseAnonKey))
-                throw new ArgumentNullException(nameof(supabaseAnonKey), "Supabase anon key가 설정되지 않았습니다.");
+            // supabaseAnonKey는 네트워크 요청 시에만 사용됨.
+            // 캐시 로드 전용으로 생성할 때는 빈 문자열 허용.
+            if (supabaseAnonKey == null)
+                supabaseAnonKey = "";
 
             _supabaseUrl = supabaseUrl.TrimEnd('/');
             _supabaseAnonKey = supabaseAnonKey;
@@ -150,24 +167,30 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 라이선스를 서버에서 검증합니다.
+        /// licenseKey / userId 는 선택적입니다. 없으면 JWT로 서버에서 자동 조회합니다.
         /// 네트워크 실패 시 Grace Period 내 캐시를 반환합니다.
         /// </summary>
-        /// <param name="licenseKey">라이선스 키 (BOT-XXXX-XXXX-XXXX-XXXX)</param>
-        /// <param name="userId">사용자 UUID</param>
+        /// <param name="licenseKey">라이선스 키 (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
+        /// <param name="userId">사용자 UUID (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
         /// <param name="ct">취소 토큰</param>
         /// <returns>검증된 라이선스 정보</returns>
-        public async Task<LicenseInfo> ValidateAsync(string licenseKey, string userId, CancellationToken ct = default)
+        public async Task<LicenseInfo> ValidateAsync(string licenseKey = null, string userId = null, CancellationToken ct = default)
         {
-            if (string.IsNullOrEmpty(licenseKey))
-                throw new ArgumentNullException(nameof(licenseKey), "라이선스 키가 필요합니다.");
-            if (string.IsNullOrEmpty(userId))
-                throw new ArgumentNullException(nameof(userId), "사용자 ID가 필요합니다.");
-
             var url = $"{_supabaseUrl}/functions/v1/validate-license";
             var pluginVersion = GetPluginVersion();
-            var body = $"{{\"license_key\":\"{EscapeJsonString(licenseKey)}\"," +
+
+            // licenseKey/userId 둘 다 있을 때만 body에 포함, 없으면 plugin_version만 전송
+            string body;
+            if (!string.IsNullOrEmpty(licenseKey) && !string.IsNullOrEmpty(userId))
+            {
+                body = $"{{\"license_key\":\"{EscapeJsonString(licenseKey)}\"," +
                        $"\"user_id\":\"{EscapeJsonString(userId)}\"," +
                        $"\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
+            }
+            else
+            {
+                body = $"{{\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
+            }
 
             try
             {
@@ -363,9 +386,13 @@ namespace RekonOps.Rekon
                     };
 
                     // 헤더 설정
+                    // validate-license는 사용자 JWT(access_token)로 인증합니다.
+                    // _supabaseAnonKey 대신 SessionTokenStore에서 저장된 access_token을 사용합니다.
+                    string accessToken = _tokenStore.LoadSupabase();
+                    string bearerToken = !string.IsNullOrEmpty(accessToken) ? accessToken : _supabaseAnonKey;
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.SetRequestHeader("Accept", "application/json");
-                    request.SetRequestHeader("Authorization", $"Bearer {_supabaseAnonKey}");
+                    request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
                     request.timeout = (int)RequestTimeoutSeconds;
 
                     // 취소 등록
@@ -476,6 +503,11 @@ namespace RekonOps.Rekon
             info.JiraSubmitEnabled = ExtractBoolField(json, "jira_submit") ?? false;
             info.VideoCaptureEnabled = ExtractBoolField(json, "video_capture") ?? false;
 
+            // 플랜별 제한값 파싱 (features 블록 내 int 필드)
+            info.MaxBufferSeconds    = ExtractIntFieldInFeatures(json, "max_buffer_seconds",    60);
+            info.MaxScreenshotCount  = ExtractIntFieldInFeatures(json, "max_screenshot_count",  3);
+            info.MaxSeats            = ExtractIntFieldInFeatures(json, "max_seats",             1);
+
             // connected_providers 배열 파싱 (예: ["jira"])
             info.ConnectedProviders = ExtractStringArray(json, "connected_providers");
 
@@ -550,7 +582,10 @@ namespace RekonOps.Rekon
                     last_checked_at = info.LastCheckedAt.ToString("o"),
                     connected_providers_csv = info.ConnectedProviders != null
                         ? string.Join(",", info.ConnectedProviders)
-                        : ""
+                        : "",
+                    max_buffer_seconds   = info.MaxBufferSeconds,
+                    max_screenshot_count = info.MaxScreenshotCount,
+                    max_seats            = info.MaxSeats
                 };
 
                 var json = JsonUtility.ToJson(cache);
@@ -589,7 +624,10 @@ namespace RekonOps.Rekon
                     VideoCaptureEnabled = cache.video_capture,
                     ConnectedProviders = !string.IsNullOrEmpty(cache.connected_providers_csv)
                         ? cache.connected_providers_csv.Split(',')
-                        : new string[0]
+                        : new string[0],
+                    MaxBufferSeconds   = cache.max_buffer_seconds   > 0 ? cache.max_buffer_seconds   : 60,
+                    MaxScreenshotCount = cache.max_screenshot_count > 0 ? cache.max_screenshot_count : 3,
+                    MaxSeats           = cache.max_seats            > 0 ? cache.max_seats            : 1
                 };
 
                 // expires_at 파싱
@@ -678,6 +716,38 @@ namespace RekonOps.Rekon
                 return false;
 
             return null;
+        }
+
+        /// <summary>
+        /// JSON 문자열의 "features" 객체 내에서 int 타입 필드를 추출합니다.
+        /// 필드가 없거나 파싱에 실패하면 defaultValue를 반환합니다.
+        /// </summary>
+        private static int ExtractIntFieldInFeatures(string json, string fieldName, int defaultValue)
+        {
+            // features 객체 범위 추출
+            string searchScope = json;
+            int featuresIdx = json.IndexOf("\"features\"", StringComparison.Ordinal);
+            if (featuresIdx >= 0)
+            {
+                int braceStart = json.IndexOf('{', featuresIdx);
+                if (braceStart >= 0)
+                {
+                    int depth = 0;
+                    int braceEnd = -1;
+                    for (int i = braceStart; i < json.Length; i++)
+                    {
+                        if (json[i] == '{') depth++;
+                        else if (json[i] == '}') { depth--; if (depth == 0) { braceEnd = i; break; } }
+                    }
+                    if (braceEnd > braceStart)
+                        searchScope = json.Substring(braceStart, braceEnd - braceStart + 1);
+                }
+            }
+
+            // "fieldName":123 패턴 매칭
+            var pattern = $"\"{fieldName}\"\\s*:\\s*(\\d+)";
+            var match = System.Text.RegularExpressions.Regex.Match(searchScope, pattern);
+            return match.Success ? int.Parse(match.Groups[1].Value) : defaultValue;
         }
 
         /// <summary>

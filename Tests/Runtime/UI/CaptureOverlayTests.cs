@@ -227,6 +227,7 @@ namespace RekonOps.Rekon.Tests
         private class FakeOrchestrator : ICaptureOrchestrator
         {
             public event System.Action<CaptureProgressEvent> OnProgress;
+            public event System.Action<CaptureResult> OnCaptureCompleted;
 
             public System.Threading.Tasks.Task<CaptureResult> StartAsync()
             {

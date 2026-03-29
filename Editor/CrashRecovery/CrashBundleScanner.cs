@@ -160,7 +160,6 @@ namespace RekonOps.Rekon.Editor
         /// 스캔을 수동으로 재실행합니다.
         /// 메뉴 항목이나 버튼에서 호출할 수 있습니다.
         /// </summary>
-        [MenuItem(RekonEditorInfo.MenuRoot + "/크래시 복구 스캔 실행")]
         public static void ManualScan()
         {
             Debug.Log("[Rekon] 수동 크래시 복구 스캔 시작...");

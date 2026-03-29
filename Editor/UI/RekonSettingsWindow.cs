@@ -16,7 +16,6 @@ namespace RekonOps.Rekon.Editor
     ///   캡처 설정     - 영상 프리셋, 해상도/FPS/비트레이트/버퍼, 스크린샷, 로그
     ///   리포트 설정   - 제목 접두어, 타임스탬프 형식, 메타데이터 토글
     ///   단축키        - 캡처 핫키 (Mac/Windows 플랫폼별)
-    ///   크래시 복구   - 플러시 간격, 보관 정책
     ///   고급          - 디버그 로그, 팀 ID (디버그 시에만)
     ///
     /// SerializedObject 기반으로 변경 감지 및 Undo 지원.
@@ -89,6 +88,26 @@ namespace RekonOps.Rekon.Editor
         // 고급 섹션은 개발자 모드일 때만 표시됩니다.
         private const string DEV_MODE_PREF_KEY = "Rekon_DevMode";
 
+        // ─── 섹션 재정렬 ─────────────────────────────────────────────────────────
+
+        /// <summary>재정렬 가능한 섹션 정의</summary>
+        private struct SectionDef
+        {
+            /// <summary>섹션 표시 이름</summary>
+            public string name;
+            /// <summary>렌더링 메서드 (▲▼ 버튼 포함)</summary>
+            public Action<int> drawAction;
+        }
+
+        /// <summary>재정렬 가능한 섹션 정의 배열 (캡처/리포트/단축키)</summary>
+        private SectionDef[] _reorderableSections;
+
+        /// <summary>현재 섹션 출력 순서 (인덱스 배열). EditorPrefs에 저장됩니다.</summary>
+        private int[] _sectionOrder;
+
+        /// <summary>섹션 순서 EditorPrefs 저장 키</summary>
+        private const string SECTION_ORDER_PREF_KEY = "Rekon_SectionOrder";
+
         // ─── 웹 로그인 플로우 상태 ───────────────────────────────────────────────
 
         /// <summary>웹 로그인 플로우 상태 열거형</summary>
@@ -116,14 +135,31 @@ namespace RekonOps.Rekon.Editor
         /// <summary>마지막 에러 메시지</summary>
         private string _webLoginErrorMessage;
 
+        // #33: 폴링 시작 시각 (남은 시간 계산용)
+        private float _pollingStartTime;
+
+        // #34: 연동 완료 배너 표시 종료 시각
+        private double _completedMessageUntil = 0;
+
         // ─── Foldout 상태 ────────────────────────────────────────────────────────
 
         private bool _foldWeb = true;
+        private bool _foldCodec = true;
         private bool _foldCapture = true;
         private bool _foldReport = true;
         private bool _foldHotkey = true;
-        private bool _foldCrashRecovery = true;
         private bool _foldAdvanced = false;
+
+        // ─── 스크린샷 핫키 SerializedProperty 캐시 ──────────────────────────────
+
+        private SerializedProperty _screenshotHotkey;
+        private SerializedProperty _screenshotHotkeyCtrlOrCmd;
+        private SerializedProperty _screenshotHotkeyShift;
+        private SerializedProperty _screenshotHotkeyAlt;
+
+        // ─── 스크린샷 미니 바 위치 SerializedProperty 캐시 ──────────────────────
+
+        private SerializedProperty _screenshotMiniBarPosition;
 
         // ─── 내부 상태 ───────────────────────────────────────────────────────────
 
@@ -132,6 +168,9 @@ namespace RekonOps.Rekon.Editor
 
         /// <summary>Supabase access_token 암호화 저장소</summary>
         private readonly SessionTokenStore _tokenStore = new SessionTokenStore();
+
+        /// <summary>라이선스 검증 클라이언트 (웹 로그인 완료 후 초기화)</summary>
+        private LicenseValidator _licenseValidator;
 
         // 스크롤 포지션
         private Vector2 _scrollPos;
@@ -151,6 +190,65 @@ namespace RekonOps.Rekon.Editor
         private void OnEnable()
         {
             LoadOrCreateSettings();
+            RestorePlanLimitsFromCache();
+            InitReorderableSections();
+        }
+
+        /// <summary>
+        /// 재정렬 가능 섹션 배열과 순서 배열을 초기화합니다.
+        /// drawAction은 루프 인덱스(i)를 받아 ▲▼ 버튼을 올바르게 렌더링합니다.
+        /// </summary>
+        private void InitReorderableSections()
+        {
+            _reorderableSections = new SectionDef[]
+            {
+                new SectionDef { name = "캡처 설정",   drawAction = DrawCaptureSectionWithButtons  },
+                new SectionDef { name = "리포트 설정", drawAction = DrawReportSectionWithButtons   },
+                new SectionDef { name = "단축키",      drawAction = DrawHotkeySectionWithButtons   },
+            };
+            _sectionOrder = LoadSectionOrder();
+        }
+
+        /// <summary>EditorPrefs에서 섹션 순서를 로드합니다. 저장값이 없거나 유효하지 않으면 기본값(0,1,2)을 반환합니다.</summary>
+        private static int[] LoadSectionOrder()
+        {
+            string saved = EditorPrefs.GetString(SECTION_ORDER_PREF_KEY, "");
+            if (!string.IsNullOrEmpty(saved))
+            {
+                string[] parts = saved.Split(',');
+                if (parts.Length == 3)
+                {
+                    int[] order = new int[3];
+                    bool valid = true;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (!int.TryParse(parts[i], out order[i]) || order[i] < 0 || order[i] > 2)
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    // 중복 인덱스 검사
+                    if (valid && order[0] != order[1] && order[1] != order[2] && order[0] != order[2])
+                        return order;
+                }
+            }
+            return new int[] { 0, 1, 2 };
+        }
+
+        /// <summary>현재 섹션 순서를 EditorPrefs에 저장합니다.</summary>
+        private void SaveSectionOrder()
+        {
+            EditorPrefs.SetString(SECTION_ORDER_PREF_KEY, string.Join(",", _sectionOrder));
+        }
+
+        /// <summary>두 섹션의 순서를 교환하고 저장합니다.</summary>
+        private void SwapSections(int a, int b)
+        {
+            int temp = _sectionOrder[a];
+            _sectionOrder[a] = _sectionOrder[b];
+            _sectionOrder[b] = temp;
+            SaveSectionOrder();
         }
 
         private void OnDisable()
@@ -189,11 +287,35 @@ namespace RekonOps.Rekon.Editor
             // 전체 스크롤뷰
             _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
 
+            BeginSectionBox();
             DrawWebSection();
-            DrawCaptureSection();
-            DrawReportSection();
-            DrawHotkeySection();
-            DrawCrashRecoverySection();
+            EndSectionBox();
+
+            BeginSectionBox();
+            DrawCodecStatusSection();
+            EndSectionBox();
+
+            // #31: 미연동 시 하위 섹션 비활성화
+            bool isLinked = _serializedSettings.FindProperty("isLinked").boolValue;
+            using (new EditorGUI.DisabledScope(!isLinked))
+            {
+                if (!isLinked)
+                {
+                    EditorGUILayout.HelpBox(
+                        "웹 대시보드 연동 후 아래 설정을 사용할 수 있습니다.",
+                        MessageType.Info);
+                }
+
+                // _sectionOrder 배열 순서대로 섹션 렌더링 (▲▼ 버튼으로 재정렬 가능)
+                if (_reorderableSections == null) InitReorderableSections();
+                for (int i = 0; i < _sectionOrder.Length; i++)
+                {
+                    int idx = _sectionOrder[i];
+                    BeginSectionBox();
+                    _reorderableSections[idx].drawAction(i);
+                    EndSectionBox();
+                }
+            }
 
             // 개발자 모드일 때만 고급 섹션 표시
             // 활성화: EditorPrefs.SetBool("Rekon_DevMode", true)
@@ -206,8 +328,67 @@ namespace RekonOps.Rekon.Editor
 
             DrawFooter();
 
-            // 변경 사항 적용
-            _serializedSettings.ApplyModifiedProperties();
+            // #35: 자동 저장 — 변경 감지 시 즉시 Dirty 마킹
+            if (_serializedSettings.ApplyModifiedProperties())
+            {
+                EditorUtility.SetDirty(_settings);
+            }
+        }
+
+        // ─── 섹션 박스 헬퍼 ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 재정렬 가능한 섹션의 Foldout 헤더를 그립니다.
+        /// 헤더 오른쪽에 ▲▼ 버튼을 배치하여 섹션 순서를 변경할 수 있습니다.
+        /// </summary>
+        /// <param name="foldout">Foldout 열림 상태 (ref)</param>
+        /// <param name="label">섹션 표시 이름</param>
+        /// <param name="loopIndex">현재 루프 인덱스 (▲▼ 버튼 비활성화 판단용)</param>
+        private void DrawReorderHeader(ref bool foldout, string label, int loopIndex)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                // Foldout을 일반 EditorGUI.Foldout으로 그려 버튼과 수평 배치
+                Rect foldoutRect = GUILayoutUtility.GetRect(
+                    GUIContent.none,
+                    EditorStyles.foldoutHeader,
+                    GUILayout.ExpandWidth(true));
+
+                // 버튼 너비(22+22+4 = 48)를 제외한 영역에 Foldout 배치
+                Rect headerRect = new Rect(foldoutRect.x, foldoutRect.y, foldoutRect.width - 52f, foldoutRect.height);
+                foldout = EditorGUI.Foldout(headerRect, foldout, label, true, EditorStyles.foldoutHeader);
+
+                // ▲ 버튼 (첫 번째 섹션은 비활성)
+                using (new EditorGUI.DisabledScope(loopIndex == 0))
+                {
+                    Rect upRect = new Rect(foldoutRect.xMax - 50f, foldoutRect.y + 1f, 22f, 18f);
+                    if (GUI.Button(upRect, "▲"))
+                        SwapSections(loopIndex, loopIndex - 1);
+                }
+
+                // ▼ 버튼 (마지막 섹션은 비활성)
+                using (new EditorGUI.DisabledScope(loopIndex == _sectionOrder.Length - 1))
+                {
+                    Rect downRect = new Rect(foldoutRect.xMax - 26f, foldoutRect.y + 1f, 22f, 18f);
+                    if (GUI.Button(downRect, "▼"))
+                        SwapSections(loopIndex, loopIndex + 1);
+                }
+            }
+        }
+
+        /// <summary>섹션 박스 시작 (helpBox 스타일로 시각적 구분)</summary>
+        private static void BeginSectionBox()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.Space(4f);
+        }
+
+        /// <summary>섹션 박스 종료</summary>
+        private static void EndSectionBox()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(6f);
         }
 
         // ─── 헤더 ───────────────────────────────────────────────────────────────
@@ -216,23 +397,12 @@ namespace RekonOps.Rekon.Editor
         {
             EditorGUILayout.Space(6f);
 
+            // #38: 헤더 왼쪽 타이틀 + 오른쪽 버전 표시
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.FlexibleSpace();
                 EditorGUILayout.LabelField("Rekon 설정", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
-            }
-
-            // 에셋 경로 표시
-            string assetPath = AssetDatabase.GetAssetPath(_settings);
-            if (!string.IsNullOrEmpty(assetPath))
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUILayout.FlexibleSpace();
-                    EditorGUILayout.LabelField(assetPath, EditorStyles.miniLabel);
-                    GUILayout.FlexibleSpace();
-                }
+                EditorGUILayout.LabelField("v0.1.5", EditorStyles.miniLabel, GUILayout.Width(40f));
             }
 
             EditorGUILayout.Space(4f);
@@ -243,49 +413,56 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawWebSection()
         {
-            EditorGUILayout.Space(4f);
             _foldWeb = EditorGUILayout.Foldout(_foldWeb, "웹 연동", true, EditorStyles.foldoutHeader);
             if (!_foldWeb) return;
 
             EditorGUI.indentLevel++;
 
-            // 연동 상태 표시
-            SerializedProperty isLinkedProp = _serializedSettings.FindProperty("isLinked");
+            SerializedProperty isLinkedProp      = _serializedSettings.FindProperty("isLinked");
             SerializedProperty workspaceNameProp = _serializedSettings.FindProperty("linkedWorkspaceName");
+            bool linked          = isLinkedProp.boolValue;
+            string workspaceName = workspaceNameProp.stringValue;
 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.PrefixLabel("연동 상태");
-            if (isLinkedProp.boolValue)
+            // #32: 연동 상태 배지 (배경 박스)
+            DrawConnectionStatusBadge(linked, workspaceName);
+
+            EditorGUILayout.Space(4f);
+
+            // #39: 첫 실행 온보딩 배너 (미연동 시)
+            if (!linked)
             {
-                var origColor = GUI.contentColor;
-                GUI.contentColor = new Color(0.2f, 0.8f, 0.3f);
-                string displayName = string.IsNullOrEmpty(workspaceNameProp.stringValue)
-                    ? "연동됨"
-                    : $"연동됨 ({workspaceNameProp.stringValue})";
-                EditorGUILayout.LabelField($"● {displayName}");
-                GUI.contentColor = origColor;
+                EditorGUILayout.HelpBox(
+                    "시작하기: 아래 '웹 연동' 섹션에서 웹 로그인 버튼을 클릭하세요.",
+                    MessageType.Info);
             }
-            else
+
+            // #34: 연동 완료 5초 성공 배너
+            if (EditorApplication.timeSinceStartup < _completedMessageUntil)
             {
-                var origColor = GUI.contentColor;
-                GUI.contentColor = new Color(0.9f, 0.3f, 0.3f);
-                EditorGUILayout.LabelField("○ 미연동");
-                GUI.contentColor = origColor;
+                string displayName = string.IsNullOrEmpty(workspaceName) ? "워크스페이스" : workspaceName;
+                EditorGUILayout.HelpBox(
+                    $"연동 완료! '{displayName}' 워크스페이스에 연결되었습니다.",
+                    MessageType.Info);
+                Repaint();
             }
-            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4f);
 
             // 연동/해제 버튼
-            if (isLinkedProp.boolValue)
+            if (linked)
             {
                 // 연동됨 상태: 연동 해제 버튼
-                if (GUILayout.Button("연동 해제", GUILayout.Width(100f), GUILayout.Height(28f)))
+                float btnWidth = Mathf.Clamp(position.width * 0.3f, 80f, 160f); // #44
+                if (GUILayout.Button("연동 해제", GUILayout.Width(btnWidth), GUILayout.Height(28f)))
                 {
-                    if (EditorUtility.DisplayDialog(
+                    // #42: "취소"를 기본(OK), "연동 해제"를 보조(Cancel)
+                    bool cancelled = EditorUtility.DisplayDialog(
                         "웹 연동 해제",
-                        "웹 대시보드와의 연동을 해제하시겠습니까?",
-                        "해제", "취소"))
+                        "연동을 해제하면 버그 리포트가 전송되지 않습니다.\n재연동하려면 다시 웹 로그인이 필요합니다.",
+                        "취소",
+                        "연동 해제"
+                    );
+                    if (!cancelled)
                     {
                         isLinkedProp.boolValue = false;
                         workspaceNameProp.stringValue = "";
@@ -304,10 +481,20 @@ namespace RekonOps.Rekon.Editor
                 // 미연동 상태: 폴링 중인지 여부에 따라 버튼 다르게 표시
                 if (_webLoginState == WebLoginState.Polling)
                 {
-                    // 폴링 중: 대기 메시지 + 취소 버튼
+                    // #33: 폴링 중 남은 시간 + 프로그레스 바
+                    float elapsed   = (float)EditorApplication.timeSinceStartup - _pollingStartTime;
+                    float remaining = 600f - elapsed;
+                    int remainMin   = Mathf.Max(0, (int)(remaining / 60f));
+                    int remainSec   = Mathf.Max(0, (int)(remaining % 60f));
+
                     EditorGUILayout.HelpBox(
-                        "브라우저에서 로그인을 완료해주세요...",
+                        $"브라우저에서 로그인을 완료해주세요.\n남은 시간: {remainMin}분 {remainSec:00}초",
                         MessageType.Info);
+
+                    float progress = Mathf.Clamp01(elapsed / 600f);
+                    Rect barRect = EditorGUILayout.GetControlRect(false, 4f);
+                    EditorGUI.ProgressBar(barRect, progress, "");
+
                     EditorGUILayout.Space(4f);
 
                     if (GUILayout.Button("로그인 대기 중... (취소)", GUILayout.Height(28f)))
@@ -323,12 +510,16 @@ namespace RekonOps.Rekon.Editor
                 else
                 {
                     // Idle / Failed 상태: 웹 로그인 버튼
-                    if (GUILayout.Button("웹 로그인", GUILayout.Width(120f), GUILayout.Height(28f)))
+                    float btnWidth = Mathf.Clamp(position.width * 0.3f, 80f, 160f); // #44
+                    if (GUILayout.Button("웹 로그인", GUILayout.Width(btnWidth), GUILayout.Height(28f)))
                     {
                         // 이전 폴링 정리
                         _pollingCts?.Cancel();
                         _pollingCts?.Dispose();
                         _pollingCts = new CancellationTokenSource();
+
+                        // #33: 폴링 시작 시각 기록
+                        _pollingStartTime = (float)EditorApplication.timeSinceStartup;
 
                         // 비동기 로그인 플로우 시작
                         _ = StartWebLoginFlowAsync(_pollingCts.Token);
@@ -353,38 +544,139 @@ namespace RekonOps.Rekon.Editor
             DrawSeparator();
         }
 
-        // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
-
-        private void DrawCaptureSection()
+        /// <summary>
+        /// #32: 연동 상태를 배경 박스로 시각화합니다.
+        /// </summary>
+        private void DrawConnectionStatusBadge(bool isLinked, string workspaceName)
         {
-            EditorGUILayout.Space(4f);
-            _foldCapture = EditorGUILayout.Foldout(_foldCapture, "캡처 설정", true, EditorStyles.foldoutHeader);
-            if (!_foldCapture) return;
+            Rect rect = EditorGUILayout.GetControlRect(false, 36f);
+            Color bgColor = isLinked
+                ? new Color(0.15f, 0.35f, 0.15f, 0.5f)
+                : new Color(0.35f, 0.15f, 0.15f, 0.5f);
+            EditorGUI.DrawRect(rect, bgColor);
+
+            string label = isLinked
+                ? $"● 연동됨  |  {workspaceName}"
+                : "○ 미연동  —  웹 로그인이 필요합니다";
+
+            GUI.Label(rect, label, new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize  = 12,
+            });
+        }
+
+        // ─── 코덱 상태 섹션 ─────────────────────────────────────────────────────
+
+        private void DrawCodecStatusSection()
+        {
+            _foldCodec = EditorGUILayout.Foldout(_foldCodec, "코덱 상태", true, EditorStyles.foldoutHeader);
+            if (!_foldCodec) return;
 
             EditorGUI.indentLevel++;
 
-            // 영상 프리셋
+            bool isInstalled = FfmpegHelper.IsInstalled();
+
+            // 상태 배지 (연동 상태 배지와 동일 스타일)
+            Rect rect = EditorGUILayout.GetControlRect(false, 36f);
+            Color bgColor = isInstalled
+                ? new Color(0.15f, 0.35f, 0.15f, 0.5f)
+                : new Color(0.35f, 0.15f, 0.15f, 0.5f);
+            EditorGUI.DrawRect(rect, bgColor);
+
+            string label = isInstalled
+                ? "● 코덱 설치됨  |  FFmpeg"
+                : "○ 코덱 미설치  —  영상 캡처 불가";
+
+            GUI.Label(rect, label, new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize  = 12,
+            });
+
+            EditorGUILayout.Space(4f);
+
+            if (isInstalled)
+            {
+                // GPU 인코더 정보 표시
+                string gpuEncoder = FfmpegHelper.GetGpuEncoder();
+                EditorGUILayout.LabelField("GPU 인코더",
+                    !string.IsNullOrEmpty(gpuEncoder) ? $"✓ {gpuEncoder}" : "없음 (libx264 CPU 사용)",
+                    EditorStyles.miniLabel);
+            }
+            else
+            {
+                // 미설치 시 버튼
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("다시 확인", GUILayout.Height(24f)))
+                        FfmpegHelper.ClearCache();
+                    if (GUILayout.Button("FFmpeg 다운로드 페이지", GUILayout.Height(24f)))
+                        Application.OpenURL("https://ffmpeg.org/download.html");
+                }
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
+
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawCaptureSectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldCapture, "캡처 설정", loopIndex);
+            if (!_foldCapture) return;
+            DrawCaptureSectionBody();
+        }
+
+        private void DrawCaptureSection()
+        {
+            _foldCapture = EditorGUILayout.Foldout(_foldCapture, "캡처 설정", true, EditorStyles.foldoutHeader);
+            if (!_foldCapture) return;
+            DrawCaptureSectionBody();
+        }
+
+        private void DrawCaptureSectionBody()
+        {
+            EditorGUI.indentLevel++;
+
+            // ── 영상 캡처 설정 박스 ───────────────────────────────────────────
+            BeginSectionBox();
             DrawVideoPresetSubSection();
+            EndSectionBox();
 
-            EditorGUILayout.Space(8f);
+            EditorGUILayout.Space(4f);
 
-            // 스크린샷 설정
-            DrawSectionHeader("스크린샷");
+            // ── 스크린샷 캡처 설정 박스 ──────────────────────────────────────
+            BeginSectionBox();
+            DrawSectionHeader("스크린샷 캡처 설정");
             SerializedProperty downscale = _serializedSettings.FindProperty("screenshotDownscale");
             EditorGUILayout.IntSlider(
                 downscale,
                 1, 4,
                 new GUIContent("다운스케일 배율", "1 = 원본 해상도, 2 = 절반, 4 = 1/4 크기"));
 
-            EditorGUILayout.Space(8f);
+            // 미니 바 위치 드롭다운
+            if (_screenshotMiniBarPosition == null)
+                _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
+            if (_screenshotMiniBarPosition != null)
+                EditorGUILayout.PropertyField(
+                    _screenshotMiniBarPosition,
+                    new GUIContent("미니 바 위치", "스크린샷 미니 바 표시 위치"));
 
-            // 로그 설정
+            EndSectionBox();
+
+            EditorGUILayout.Space(4f);
+
+            // ── 로그 설정 박스 ───────────────────────────────────────────────
+            BeginSectionBox();
             DrawSectionHeader("로그");
             SerializedProperty logBufferSize = _serializedSettings.FindProperty("logBufferSize");
             EditorGUILayout.IntSlider(
                 logBufferSize,
                 100, 5000,
                 new GUIContent("로그 버퍼 크기", "링 버퍼에 보관할 최대 로그 라인 수"));
+            EndSectionBox();
 
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
@@ -393,7 +685,7 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawVideoPresetSubSection()
         {
-            DrawSectionHeader("영상");
+            DrawSectionHeader("영상 캡처 설정");
 
             SerializedProperty videoEnabled = _serializedSettings.FindProperty("videoEnabled");
             EditorGUILayout.PropertyField(
@@ -453,15 +745,11 @@ namespace RekonOps.Rekon.Editor
                     SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
                     EditorGUILayout.IntSlider(
                         bufferSeconds,
-                        10, 120,
-                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~120초)"));
+                        10, 180,
+                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~180초)"));
                 }
             }
 
-            EditorGUILayout.Space(8f);
-
-            // FFmpeg 상태
-            DrawFfmpegStatusSubSection();
         }
 
         /// <summary>
@@ -564,12 +852,23 @@ namespace RekonOps.Rekon.Editor
 
         // ─── 리포트 설정 섹션 ───────────────────────────────────────────────────
 
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawReportSectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldReport, "리포트 설정", loopIndex);
+            if (!_foldReport) return;
+            DrawReportSectionBody();
+        }
+
         private void DrawReportSection()
         {
-            EditorGUILayout.Space(4f);
             _foldReport = EditorGUILayout.Foldout(_foldReport, "리포트 설정", true, EditorStyles.foldoutHeader);
             if (!_foldReport) return;
+            DrawReportSectionBody();
+        }
 
+        private void DrawReportSectionBody()
+        {
             EditorGUI.indentLevel++;
 
             // 접두어
@@ -609,43 +908,57 @@ namespace RekonOps.Rekon.Editor
 
         // ─── 단축키 섹션 ────────────────────────────────────────────────────────
 
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawHotkeySectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldHotkey, "단축키", loopIndex);
+            if (!_foldHotkey) return;
+            DrawHotkeySectionBody();
+        }
+
         private void DrawHotkeySection()
         {
-            EditorGUILayout.Space(4f);
             _foldHotkey = EditorGUILayout.Foldout(_foldHotkey, "단축키", true, EditorStyles.foldoutHeader);
             if (!_foldHotkey) return;
+            DrawHotkeySectionBody();
+        }
+
+        private void DrawHotkeySectionBody()
+        {
 
             EditorGUI.indentLevel++;
 
             bool isMac = Application.platform == RuntimePlatform.OSXEditor;
 
-            // 현재 조합 미리보기
-            string preview = BuildHotkeyPreview(isMac);
-            EditorGUILayout.HelpBox($"현재 단축키: {preview}", MessageType.Info);
+            // ── 영상 캡처 핫키 ─────────────────────────────────────────────────
 
-            // 수식키 토글
+            EditorGUILayout.LabelField("영상 캡처 핫키", EditorStyles.boldLabel);
+
             SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
             SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
             SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
             SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
 
+            // #45: 수식키 토글 너비 동적 계산 (3등분)
+            float toggleWidth = (EditorGUIUtility.currentViewWidth - 60f) / 3f;
+
             EditorGUILayout.BeginHorizontal();
 
             EditorGUI.BeginChangeCheck();
             bool newCtrlCmd = EditorGUILayout.ToggleLeft(
-                isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(80));
+                isMac ? "⌘ Cmd" : "Ctrl", ctrlCmd.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 ctrlCmd.boolValue = newCtrlCmd;
 
             EditorGUI.BeginChangeCheck();
             bool newShift = EditorGUILayout.ToggleLeft(
-                isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(80));
+                isMac ? "⇧ Shift" : "Shift", shift.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 shift.boolValue = newShift;
 
             EditorGUI.BeginChangeCheck();
             bool newAlt = EditorGUILayout.ToggleLeft(
-                isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(80));
+                isMac ? "⌥ Option" : "Alt", alt.boolValue, GUILayout.Width(toggleWidth));
             if (EditorGUI.EndChangeCheck())
                 alt.boolValue = newAlt;
 
@@ -662,24 +975,124 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUI.BeginChangeCheck();
             int newIndex = EditorGUILayout.Popup(
-                new GUIContent("메인 키", "버그 캡처를 트리거하는 기본 키"),
+                new GUIContent("메인 키", "영상 캡처를 트리거하는 기본 키"),
                 currentIndex,
                 displayNames);
             if (EditorGUI.EndChangeCheck())
                 hotkey.intValue = (int)keyList[newIndex];
+
+            // #41: 단축키 프리뷰를 선택 UI 아래로
+            // #46: BuildHotkeyPreview에 파라미터로 전달 (FindProperty 중복 호출 제거)
+            string videoPreview = BuildHotkeyPreview(isMac, ctrlCmd, shift, alt, hotkey);
+            EditorGUILayout.HelpBox($"현재 단축키: {videoPreview}", MessageType.Info);
+
+            // #40: 수식키 없음 경고
+            bool hasVideoModifier = ctrlCmd.boolValue || shift.boolValue || alt.boolValue;
+            if (!hasVideoModifier)
+            {
+                EditorGUILayout.HelpBox(
+                    "수식키 없이 설정하면 플레이 모드에서 오작동할 수 있습니다.",
+                    MessageType.Warning);
+            }
+
+            EditorGUILayout.Space(8f);
+
+            // ── 스크린샷 핫키 ─────────────────────────────────────────────────
+
+            EditorGUILayout.LabelField("스크린샷 핫키", EditorStyles.boldLabel);
+
+            // _screenshotHotkey* 프로퍼티가 null이면 (구버전 Settings) FindProperty 재시도
+            if (_screenshotHotkey == null)
+            {
+                _screenshotHotkey          = _serializedSettings.FindProperty("screenshotHotkey");
+                _screenshotHotkeyCtrlOrCmd = _serializedSettings.FindProperty("screenshotHotkeyCtrlOrCmd");
+                _screenshotHotkeyShift     = _serializedSettings.FindProperty("screenshotHotkeyShift");
+                _screenshotHotkeyAlt       = _serializedSettings.FindProperty("screenshotHotkeyAlt");
+            }
+
+            if (_screenshotHotkey != null)
+            {
+                EditorGUILayout.BeginHorizontal();
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsCtrlCmd = EditorGUILayout.ToggleLeft(
+                    isMac ? "⌘ Cmd" : "Ctrl", _screenshotHotkeyCtrlOrCmd.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyCtrlOrCmd.boolValue = newSsCtrlCmd;
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsShift = EditorGUILayout.ToggleLeft(
+                    isMac ? "⇧ Shift" : "Shift", _screenshotHotkeyShift.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyShift.boolValue = newSsShift;
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsAlt = EditorGUILayout.ToggleLeft(
+                    isMac ? "⌥ Option" : "Alt", _screenshotHotkeyAlt.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyAlt.boolValue = newSsAlt;
+
+                EditorGUILayout.EndHorizontal();
+
+                // 스크린샷 메인 키 드롭다운 (영상과 동일한 keyList/displayNames 재사용)
+                int ssCurrentIndex = Array.IndexOf(keyList, (KeyCode)_screenshotHotkey.intValue);
+                if (ssCurrentIndex < 0) ssCurrentIndex = 0;
+
+                EditorGUI.BeginChangeCheck();
+                int ssNewIndex = EditorGUILayout.Popup(
+                    new GUIContent("메인 키", "스크린샷 캡처를 트리거하는 기본 키"),
+                    ssCurrentIndex,
+                    displayNames);
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkey.intValue = (int)keyList[ssNewIndex];
+
+                string ssPreview = BuildHotkeyPreview(isMac, _screenshotHotkeyCtrlOrCmd, _screenshotHotkeyShift, _screenshotHotkeyAlt, _screenshotHotkey);
+                EditorGUILayout.HelpBox($"현재 단축키: {ssPreview}", MessageType.Info);
+
+                // 수식키 없음 경고 (영상과 동일 정책)
+                bool hasSsModifier = _screenshotHotkeyCtrlOrCmd.boolValue || _screenshotHotkeyShift.boolValue || _screenshotHotkeyAlt.boolValue;
+                if (!hasSsModifier)
+                {
+                    EditorGUILayout.HelpBox(
+                        "수식키 없이 설정하면 플레이 모드에서 오작동할 수 있습니다.",
+                        MessageType.Warning);
+                }
+
+                // ── 핫키 충돌 경고 ───────────────────────────────────────────
+                bool isConflict =
+                    hotkey.intValue                    == _screenshotHotkey.intValue &&
+                    ctrlCmd.boolValue                  == _screenshotHotkeyCtrlOrCmd.boolValue &&
+                    shift.boolValue                    == _screenshotHotkeyShift.boolValue &&
+                    alt.boolValue                      == _screenshotHotkeyAlt.boolValue;
+
+                if (isConflict)
+                {
+                    EditorGUILayout.HelpBox(
+                        "영상 캡처 핫키와 스크린샷 핫키가 동일합니다. 영상 핫키가 우선 실행됩니다.",
+                        MessageType.Warning);
+                }
+            }
+            else
+            {
+                // screenshotHotkey 프로퍼티가 없는 경우 (Settings 미업데이트)
+                EditorGUILayout.HelpBox(
+                    "스크린샷 핫키 설정을 사용하려면 RekonSettings 에셋을 최신 버전으로 재생성하세요.",
+                    MessageType.Info);
+            }
 
             EditorGUI.indentLevel--;
             EditorGUILayout.Space(4f);
             DrawSeparator();
         }
 
-        private string BuildHotkeyPreview(bool isMac)
+        // #46: FindProperty 중복 호출 제거 — 프로퍼티를 파라미터로 전달
+        private static string BuildHotkeyPreview(
+            bool isMac,
+            SerializedProperty ctrlCmd,
+            SerializedProperty shift,
+            SerializedProperty alt,
+            SerializedProperty hotkey)
         {
-            SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
-            SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
-            SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
-            SerializedProperty hotkey  = _serializedSettings.FindProperty("captureHotkey");
-
             var parts = new System.Collections.Generic.List<string>();
 
             if (ctrlCmd.boolValue) parts.Add(isMac ? "⌘" : "Ctrl");
@@ -710,63 +1123,6 @@ namespace RekonOps.Rekon.Editor
                     => ((int)key - (int)KeyCode.Alpha0).ToString(),
                 _ => key.ToString(),
             };
-        }
-
-        // ─── 크래시 복구 섹션 ───────────────────────────────────────────────────
-
-        private void DrawCrashRecoverySection()
-        {
-            EditorGUILayout.Space(4f);
-            _foldCrashRecovery = EditorGUILayout.Foldout(_foldCrashRecovery, "크래시 복구", true, EditorStyles.foldoutHeader);
-            if (!_foldCrashRecovery) return;
-
-            EditorGUI.indentLevel++;
-
-            EditorGUILayout.HelpBox(
-                "플러시 간격이 짧을수록 크래시 시 데이터 손실이 줄어들지만, 디스크 I/O가 증가합니다.",
-                MessageType.Info);
-
-            EditorGUILayout.Space(4f);
-
-            DrawSectionHeader("플러시 간격");
-
-            SerializedProperty logFlush = _serializedSettings.FindProperty("logFlushInterval");
-            EditorGUILayout.Slider(
-                logFlush,
-                1f, 30f,
-                new GUIContent("로그 플러시 간격 (초)", "로그 링 버퍼를 디스크에 저장하는 주기"));
-
-            SerializedProperty stateFlush = _serializedSettings.FindProperty("stateFlushInterval");
-            EditorGUILayout.Slider(
-                stateFlush,
-                1f, 60f,
-                new GUIContent("상태 플러시 간격 (초)", "게임 상태 스냅샷을 디스크에 저장하는 주기"));
-
-            SerializedProperty videoFlush = _serializedSettings.FindProperty("videoFlushInterval");
-            EditorGUILayout.Slider(
-                videoFlush,
-                10f, 120f,
-                new GUIContent("영상 플러시 간격 (초)", "영상 링 버퍼를 디스크에 저장하는 주기"));
-
-            EditorGUILayout.Space(8f);
-
-            DrawSectionHeader("보관 정책");
-
-            SerializedProperty maxCrash = _serializedSettings.FindProperty("maxCrashBundles");
-            EditorGUILayout.IntSlider(
-                maxCrash,
-                1, 50,
-                new GUIContent("최대 크래시 번들 수", "디스크에 보관할 크래시 번들 최대 개수"));
-
-            SerializedProperty retentionDays = _serializedSettings.FindProperty("crashBundleRetentionDays");
-            EditorGUILayout.IntSlider(
-                retentionDays,
-                1, 365,
-                new GUIContent("보관 일수", "크래시 번들 보관 최대 기간 (일)"));
-
-            EditorGUI.indentLevel--;
-            EditorGUILayout.Space(4f);
-            DrawSeparator();
         }
 
         // ─── 고급 섹션 ──────────────────────────────────────────────────────────
@@ -848,27 +1204,27 @@ namespace RekonOps.Rekon.Editor
 
         private void DrawFooter()
         {
-            GUILayout.FlexibleSpace();
+            // #43: GUILayout.FlexibleSpace() 제거 → 고정 여백으로 대체
+            EditorGUILayout.Space(8f);
             DrawSeparator();
             EditorGUILayout.Space(4f);
 
             using (new EditorGUILayout.HorizontalScope())
             {
+                // 섹션 순서 초기화 버튼
+                if (GUILayout.Button("섹션 순서 초기화", GUILayout.Width(120f)))
+                {
+                    _sectionOrder = new int[] { 0, 1, 2 };
+                    SaveSectionOrder();
+                }
+
                 GUILayout.FlexibleSpace();
 
-                // 되돌리기 버튼
+                // 되돌리기 버튼 (#35: 적용 버튼 제거, 자동 저장으로 대체)
                 if (GUILayout.Button("되돌리기", GUILayout.Width(80f)))
                 {
                     _serializedSettings.Update();
                     Undo.RevertAllDownToGroup(Undo.GetCurrentGroup());
-                }
-
-                GUILayout.Space(8f);
-
-                // 적용 버튼
-                if (GUILayout.Button("적용", GUILayout.Width(80f)))
-                {
-                    ApplySettings();
                 }
             }
 
@@ -1024,8 +1380,14 @@ namespace RekonOps.Rekon.Editor
                     _webLoginState = WebLoginState.Completed;
                     _webLoginErrorMessage = null;
 
+                    // #34: 연동 완료 5초 성공 배너 타이머 시작
+                    _completedMessageUntil = EditorApplication.timeSinceStartup + 5.0;
+
                     Debug.Log("[Rekon] 웹 로그인 완료. workspace: "
                         + workspaceName + " / tenantId: " + workspaceId);
+
+                    // 웹 로그인 완료 직후 라이선스 검증 → 플랜 제한값 적용
+                    _ = ValidateLicenseAndApplyLimitsAsync(ct);
 
                     EditorApplication.delayCall += Repaint;
                     return;
@@ -1043,6 +1405,87 @@ namespace RekonOps.Rekon.Editor
 
             // 10분 후 타임아웃
             SetWebLoginFailed("로그인 대기 시간(10분)이 초과되었습니다. 다시 시도해주세요.");
+        }
+
+        /// <summary>
+        /// 에디터 창이 열릴 때 캐시된 라이선스에서 플랜 제한값을 즉시 복원합니다.
+        /// 네트워크 없이도 이전 세션에서 검증된 값이 UI에 반영됩니다.
+        /// </summary>
+        private void RestorePlanLimitsFromCache()
+        {
+            if (_settings == null) return;
+
+            string brokerUrl = _settings.authBrokerUrl;
+            if (string.IsNullOrEmpty(brokerUrl)) return;
+
+            try
+            {
+                if (_licenseValidator == null)
+                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+
+                var cached = _licenseValidator.GetCachedLicense();
+                if (cached != null && cached.Valid)
+                {
+                    _settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
+                    _settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
+                    Debug.Log($"[Rekon] 캐시에서 플랜 제한값 복원: maxBuffer={cached.MaxBufferSeconds}초, " +
+                              $"maxScreenshot={cached.MaxScreenshotCount}개");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Rekon] 캐시 플랜 제한값 복원 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 라이선스를 검증하고 플랜 제한값을 RekonSettings에 적용합니다.
+        /// 웹 로그인 완료 후 비동기로 호출됩니다.
+        /// </summary>
+        private async Task ValidateLicenseAndApplyLimitsAsync(CancellationToken ct)
+        {
+            if (_settings == null) return;
+
+            // authBrokerUrl이 설정되어 있어야 함
+            string brokerUrl = _settings.authBrokerUrl;
+            if (string.IsNullOrEmpty(brokerUrl))
+            {
+                Debug.LogWarning("[Rekon] 라이선스 검증 건너뜀: authBrokerUrl이 비어있습니다.");
+                return;
+            }
+
+            try
+            {
+                // LicenseValidator 생성 (또는 재사용)
+                if (_licenseValidator == null)
+                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+
+                // licenseKey/userId가 없어도 JWT(access_token)만으로 서버에서 자동 조회합니다.
+                var licenseInfo = await _licenseValidator.ValidateAsync(
+                    _settings.licenseKey, _settings.userId, ct);
+
+                if (licenseInfo != null && licenseInfo.Valid)
+                {
+                    // 플랜 제한값을 settings에 반영
+                    _settings.maxAllowedBufferSeconds  = licenseInfo.MaxBufferSeconds;
+                    _settings.maxAllowedScreenshotCount = licenseInfo.MaxScreenshotCount;
+
+                    Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
+                              $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +
+                              $"maxScreenshot={licenseInfo.MaxScreenshotCount}개, " +
+                              $"maxSeats={licenseInfo.MaxSeats}명");
+
+                    EditorApplication.delayCall += Repaint;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 창 닫힘 등으로 취소 → 무시
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Rekon] 라이선스 검증 실패 (플랜 제한값 미적용): {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -1178,6 +1621,15 @@ namespace RekonOps.Rekon.Editor
             }
 
             _serializedSettings = new SerializedObject(_settings);
+
+            // 스크린샷 핫키 프로퍼티 캐시
+            _screenshotHotkey          = _serializedSettings.FindProperty("screenshotHotkey");
+            _screenshotHotkeyCtrlOrCmd = _serializedSettings.FindProperty("screenshotHotkeyCtrlOrCmd");
+            _screenshotHotkeyShift     = _serializedSettings.FindProperty("screenshotHotkeyShift");
+            _screenshotHotkeyAlt       = _serializedSettings.FindProperty("screenshotHotkeyAlt");
+
+            // 스크린샷 미니 바 위치 프로퍼티 캐시
+            _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
         }
 
         /// <summary>
@@ -1192,10 +1644,28 @@ namespace RekonOps.Rekon.Editor
 
         /// <summary>
         /// 섹션 구분 헤더를 그립니다.
+        /// #37: 타이틀 아래 40% 너비 언더라인 표시
         /// </summary>
         private static void DrawSectionHeader(string title)
         {
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+            Rect lastRect = GUILayoutUtility.GetLastRect();
+            float lineWidth = lastRect.width * 0.4f;
+            Rect lineRect = new Rect(lastRect.x, lastRect.yMax, lineWidth, 1f);
+            EditorGUI.DrawRect(lineRect, new Color(0.5f, 0.5f, 0.5f, 0.5f));
+            GUILayout.Space(2f);
+            EditorGUILayout.Space(4f);
+        }
+
+        /// <summary>
+        /// 캡처 설정 내 서브섹션 사이의 얇은 구분선을 그립니다.
+        /// </summary>
+        private static void DrawSubSectionSeparator()
+        {
+            EditorGUILayout.Space(6f);
+            Rect lineRect = EditorGUILayout.GetControlRect(false, 1f);
+            EditorGUI.DrawRect(lineRect, new Color(0.3f, 0.3f, 0.3f, 0.3f));
+            EditorGUILayout.Space(6f);
         }
 
         /// <summary>

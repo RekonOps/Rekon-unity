@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using RekonOps.Rekon;
 
 namespace RekonOps.Rekon.Tests.Integration
 {
@@ -213,10 +214,9 @@ namespace RekonOps.Rekon.Tests.Integration
             var cts = new CancellationTokenSource();
             cts.Cancel();
 
-            Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            {
-                await client.PostConnectJiraStartAsync(emptyTenantId, userId, cts.Token);
-            }, "취소된 토큰으로 요청 시 즉시 예외가 발생해야 합니다.");
+            Assert.Throws<OperationCanceledException>(() =>
+                client.PostConnectJiraStartAsync(emptyTenantId, userId, cts.Token).GetAwaiter().GetResult()
+            );
         }
 
         // ─── 테스트 6: OnUnauthorized 이벤트 발생 검증 ───────────────────────────
@@ -242,7 +242,7 @@ namespace RekonOps.Rekon.Tests.Integration
         // ─── 테스트 7: 5xx 서버 오류 재시도 정책 검증 ───────────────────────────
 
         [Test]
-        public void 5xx_서버_오류는_재시도_가능함을_확인()
+        public void 서버오류_5xx_는_재시도_가능함을_확인()
         {
             // 5xx는 일시적 서버 오류 → 재시도 대상
             var serverErrors = new[]

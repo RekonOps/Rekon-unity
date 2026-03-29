@@ -61,7 +61,6 @@ namespace RekonOps.Rekon.Editor
         /// <summary>
         /// 메뉴에서 창을 열거나 기존 창을 포커스합니다.
         /// </summary>
-        [MenuItem(MenuPath)]
         public static void OpenFromMenu()
         {
             OpenWindow();

@@ -94,6 +94,24 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
+        /// 지정된 키가 현재 프레임에도 계속 눌려있는지 반환합니다 (홀드 감지용).
+        /// New Input System의 Keyboard.isPressed를 사용합니다.
+        /// </summary>
+        /// <param name="key">감지할 키코드 (Legacy KeyCode 형식)</param>
+        /// <returns>현재 눌려있으면 true. 매핑이 없거나 키보드가 없으면 false</returns>
+        public bool IsHeld(KeyCode key)
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard == null)
+                return false;
+
+            if (!s_KeyMap.TryGetValue(key, out var inputKey))
+                return false;
+
+            return keyboard[inputKey].isPressed;
+        }
+
+        /// <summary>
         /// Ctrl(Windows) 또는 Cmd(Mac) 키가 현재 눌려있는지 반환합니다.
         /// </summary>
         public bool IsCtrlOrCmdHeld()

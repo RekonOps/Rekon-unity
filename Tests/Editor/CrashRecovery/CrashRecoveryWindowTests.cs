@@ -204,16 +204,16 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void SubmitAsync_NullManifest_ThrowsArgumentNullException()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(async () =>
-                await _submitter.SubmitAsync(null, "PROJ"));
+            Assert.Throws<ArgumentNullException>(
+                () => _submitter.SubmitAsync(null, "PROJ").GetAwaiter().GetResult());
         }
 
         [Test]
         public void SubmitAsync_EmptyProjectKey_ThrowsArgumentException()
         {
             var manifest = CreateSampleManifest();
-            Assert.ThrowsAsync<ArgumentException>(async () =>
-                await _submitter.SubmitAsync(manifest, ""));
+            Assert.Throws<ArgumentException>(
+                () => _submitter.SubmitAsync(manifest, "").GetAwaiter().GetResult());
         }
 
         [Test]

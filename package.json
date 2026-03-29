@@ -1,19 +1,22 @@
 {
   "name": "dev.rekonops.rekon",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "displayName": "Rekon",
-  "description": "Local-first bug reporting plugin for Unity with Jira Cloud integration",
+  "description": "Bug reporting infrastructure for Unity game dev teams. Auto-capture video/screenshots/logs → web dashboard → Jira. | Unity 게임 개발팀을 위한 버그 리포팅 인프라.",
   "unity": "2022.3",
   "unityRelease": "22f1",
   "author": {
     "name": "RekonOps",
-    "url": "https://github.com/RekonOps"
+    "email": "rekonops.dev@gmail.com",
+    "url": "https://www.rekonops.dev"
   },
-  "keywords": ["bug-report", "jira", "qa", "testing", "capture"],
-  "license": "MIT",
+  "keywords": ["bug-report", "jira", "qa", "testing", "capture", "screenshot", "video"],
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/RekonOps/Rekon-unity.git"
   },
+  "changelogUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/LICENSE",
   "dependencies": {}
 }

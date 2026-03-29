@@ -347,6 +347,13 @@ namespace RekonOps.Rekon.Tests.Integration
             return false; // 기본적으로 트리거하지 않음
         }
 
+        // E2E 테스트에서는 홀드 감지를 사용하지 않으므로 false 반환
+        public bool IsHeld(KeyCode key) => false;
+
+        public bool IsCtrlOrCmdHeld() => true;
+        public bool IsShiftHeld() => true;
+        public bool IsAltHeld() => true;
+
         public void SimulateTrigger()
         {
             OnTrigger?.Invoke();

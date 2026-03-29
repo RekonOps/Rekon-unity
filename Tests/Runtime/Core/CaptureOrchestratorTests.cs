@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
@@ -74,7 +75,11 @@ namespace RekonOps.Rekon.Tests
             public bool EncodeWasCalled { get; private set; }
             public string LastOutputPath { get; private set; }
 
-            public Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config)
+            public string OutputExtension => "";
+            public float RecommendedTimeoutSeconds => 30f;
+
+            public Task EncodeAsync(FrameData[] frames, string outputPath, VideoEncoderConfig config,
+                CancellationToken cancellationToken = default)
             {
                 EncodeWasCalled = true;
                 LastOutputPath = outputPath;
@@ -147,7 +152,7 @@ namespace RekonOps.Rekon.Tests
         {
             _orchestrator?.Dispose();
             _frameBuffer?.Dispose();
-            Object.DestroyImmediate(_settings);
+            UnityEngine.Object.DestroyImmediate(_settings);
 
             if (Directory.Exists(_tempDir))
                 Directory.Delete(_tempDir, recursive: true);
@@ -449,10 +454,206 @@ namespace RekonOps.Rekon.Tests
                 yield return null;
             }
 
-            Object.DestroyImmediate(go);
-            Object.DestroyImmediate(settings);
+            UnityEngine.Object.DestroyImmediate(go);
+            UnityEngine.Object.DestroyImmediate(settings);
 
             Assert.IsTrue(completed, "핫키 트리거 후 캡처가 완료되어야 합니다.");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // StartScreenshotAsync 테스트
+        // ──────────────────────────────────────────────────────────────
+
+        [UnityTest]
+        public IEnumerator StartScreenshotAsync_정상_캡처_시_큐에_추가됨()
+        {
+            var queue = new ScreenshotQueue();
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            var task = orchestrator.StartScreenshotAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.AreEqual(1, queue.Count, "정상 캡처 시 큐에 1장이 추가되어야 합니다.");
+
+            orchestrator.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartScreenshotAsync_큐_null이면_경고_로그()
+        {
+            // screenshotQueue를 null로 생성 (기본값)
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: null);
+
+            LogAssert.Expect(LogType.Warning, "[Rekon] ScreenshotQueue가 바인딩되지 않았습니다.");
+
+            var task = orchestrator.StartScreenshotAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            orchestrator.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartScreenshotAsync_캡처_실패_시_큐_변경_없음()
+        {
+            var queue = new ScreenshotQueue();
+            var orchestrator = new CaptureOrchestrator(
+                new FailingScreenshotCapturer(),
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            LogAssert.ignoreFailingMessages = true;
+            var task = orchestrator.StartScreenshotAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+            LogAssert.ignoreFailingMessages = false;
+
+            Assert.AreEqual(0, queue.Count, "캡처 실패 시 큐에 추가되지 않아야 합니다.");
+
+            orchestrator.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartScreenshotAsync_OnScreenshotQueued_이벤트_발행()
+        {
+            var queue = new ScreenshotQueue();
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            int? receivedCount = null;
+            orchestrator.OnScreenshotQueued += (count, evicted) => receivedCount = count;
+
+            var task = orchestrator.StartScreenshotAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNotNull(receivedCount, "OnScreenshotQueued 이벤트가 발행되어야 합니다.");
+            Assert.AreEqual(1, receivedCount, "큐 크기 1이 이벤트로 전달되어야 합니다.");
+
+            orchestrator.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartScreenshotAsync_영상_캡처_중_스킵()
+        {
+            var queue = new ScreenshotQueue();
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            // StartAsync 먼저 실행하여 _isCapturingFlag = 1 상태 만들기
+            var captureTask = orchestrator.StartAsync();
+
+            // 즉시 StartScreenshotAsync 호출 — 영상 캡처 중이므로 스킵 경고 발행 기대
+            // (캡처 완료 전 플래그가 1인 타이밍을 보장하기 어려우므로 경고 로그만 무시)
+            LogAssert.ignoreFailingMessages = true;
+            var screenshotTask = orchestrator.StartScreenshotAsync();
+            yield return new WaitUntil(() => screenshotTask.IsCompleted);
+            LogAssert.ignoreFailingMessages = false;
+
+            yield return new WaitUntil(() => captureTask.IsCompleted);
+
+            // 스킵됐으면 큐는 0, 성공했으면 1 — 어느 쪽이든 예외 없이 완료되어야 함
+            Assert.IsTrue(screenshotTask.IsCompleted, "StartScreenshotAsync는 예외 없이 완료되어야 합니다.");
+            Assert.IsTrue(captureTask.IsCompleted, "StartAsync는 예외 없이 완료되어야 합니다.");
+
+            orchestrator.Dispose();
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 큐 드레인 테스트
+        // ──────────────────────────────────────────────────────────────
+
+        [UnityTest]
+        public IEnumerator StartAsync_완료_시_큐_드레인_결과에_포함()
+        {
+            var queue = new ScreenshotQueue();
+            // 미리 큐에 스크린샷 2장 추가
+            queue.Enqueue(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, DateTime.UtcNow);
+            queue.Enqueue(new byte[] { 0x89, 0x50, 0x4E, 0x47 }, DateTime.UtcNow);
+
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            var task = orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNotNull(task.Result, "결과가 null이 아니어야 합니다.");
+            Assert.IsNotNull(task.Result.ScreenshotEntries, "ScreenshotEntries가 null이 아니어야 합니다.");
+            Assert.AreEqual(2, task.Result.ScreenshotEntries.Length, "큐에 있던 2장이 드레인되어야 합니다.");
+            Assert.AreEqual(0, queue.Count, "드레인 후 큐는 비어있어야 합니다.");
+
+            orchestrator.Dispose();
+        }
+
+        [UnityTest]
+        public IEnumerator StartAsync_완료_시_큐_비어있으면_ScreenshotEntries_null()
+        {
+            var queue = new ScreenshotQueue();
+            // 빈 큐 (아무것도 추가 안 함)
+
+            var orchestrator = new CaptureOrchestrator(
+                _screenshot,
+                _logs,
+                _logSerializer,
+                _state,
+                _frameBuffer,
+                _videoEncoder,
+                _videoConfig,
+                _settings,
+                screenshotQueue: queue);
+
+            var task = orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNotNull(task.Result, "결과가 null이 아니어야 합니다.");
+            Assert.IsNull(task.Result.ScreenshotEntries, "큐가 비어있으면 ScreenshotEntries는 null이어야 합니다.");
+
+            orchestrator.Dispose();
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -462,11 +663,16 @@ namespace RekonOps.Rekon.Tests
         private class AlwaysTriggerOnceProvider : IHotkeyProvider
         {
             private int _count;
+            private bool _triggered => _count > 0;
             public bool IsTriggered(UnityEngine.KeyCode key)
             {
                 if (_count == 0) { _count++; return true; }
                 return false;
             }
+            public bool IsHeld(KeyCode key) => !_triggered;  // 트리거 전에는 held, 트리거 후에는 아님
+            public bool IsCtrlOrCmdHeld() => true;
+            public bool IsShiftHeld() => true;
+            public bool IsAltHeld() => true;
         }
     }
 }

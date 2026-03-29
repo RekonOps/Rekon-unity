@@ -4,6 +4,21 @@ using UnityEngine;
 namespace RekonOps.Rekon
 {
     /// <summary>
+    /// 오버레이 표시 위치.
+    /// </summary>
+    public enum OverlayPosition
+    {
+        /// <summary>좌하단</summary>
+        BottomLeft  = 0,
+        /// <summary>우하단</summary>
+        BottomRight = 1,
+        /// <summary>좌상단</summary>
+        TopLeft     = 2,
+        /// <summary>우상단</summary>
+        TopRight    = 3,
+    }
+
+    /// <summary>
     /// 영상 프리셋 종류.
     /// </summary>
     public enum VideoPreset
@@ -45,18 +60,44 @@ namespace RekonOps.Rekon
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Mac: ⌘ + Shift + S
+            screenshotHotkey           = KeyCode.S;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #else
             captureHotkey    = KeyCode.F12;
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Windows: Ctrl + Shift + F11
+            screenshotHotkey           = KeyCode.F11;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #endif
         }
+
+        [Header("Screenshot Hotkey")]
+        [Tooltip("스크린샷 캡처 핫키")]
+        public KeyCode screenshotHotkey = KeyCode.S;
+
+        [Tooltip("스크린샷 핫키: Ctrl/Cmd 필요 여부")]
+        public bool screenshotHotkeyCtrlOrCmd = true;
+
+        [Tooltip("스크린샷 핫키: Shift 필요 여부")]
+        public bool screenshotHotkeyShift = true;
+
+        [Tooltip("스크린샷 핫키: Alt 필요 여부")]
+        public bool screenshotHotkeyAlt = false;
 
         [Header("Screenshot")]
         [Tooltip("Downscale factor (1 = original resolution)")]
         [Range(1, 4)]
         public int screenshotDownscale = 1;
+
+        [Tooltip("스크린샷 미니 바 표시 위치")]
+        public OverlayPosition screenshotMiniBarPosition = OverlayPosition.BottomLeft;
 
         [Header("Video")]
         [Tooltip("영상 프리셋 (권장/고화질/경량/커스텀)")]

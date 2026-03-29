@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -241,7 +242,8 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void WriteAsync_NullCaptureResult_ThrowsArgumentNullException()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(async () => await _writer.WriteAsync(null));
+            Assert.Throws<ArgumentNullException>(
+                () => _writer.WriteAsync(null).GetAwaiter().GetResult());
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -265,6 +267,130 @@ namespace RekonOps.Rekon.Tests
 
             Assert.IsNotNull(parsed, "manifest.json이 유효한 JSON이어야 합니다.");
             Assert.AreEqual(task.Result.id, parsed.id, "파싱된 ID가 원본과 일치해야 합니다.");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // TryParseScreenshotIndex 테스트 (리플렉션 기반)
+        // ──────────────────────────────────────────────────────────────
+
+        [Test]
+        public void TryParseScreenshotIndex_screenshot_0_png_반환_0()
+        {
+            var method = typeof(BundleWriter).GetMethod(
+                "TryParseScreenshotIndex",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method, "TryParseScreenshotIndex 메서드를 찾을 수 없습니다.");
+
+            object[] args = { "screenshot_0.png", 0 };
+            bool result = (bool)method.Invoke(null, args);
+
+            Assert.IsTrue(result, "screenshot_0.png 파싱에 성공해야 합니다.");
+            Assert.AreEqual(0, (int)args[1], "인덱스가 0이어야 합니다.");
+        }
+
+        [Test]
+        public void TryParseScreenshotIndex_screenshot_3_png_반환_3()
+        {
+            var method = typeof(BundleWriter).GetMethod(
+                "TryParseScreenshotIndex",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method, "TryParseScreenshotIndex 메서드를 찾을 수 없습니다.");
+
+            object[] args = { "screenshot_3.png", 0 };
+            bool result = (bool)method.Invoke(null, args);
+
+            Assert.IsTrue(result, "screenshot_3.png 파싱에 성공해야 합니다.");
+            Assert.AreEqual(3, (int)args[1], "인덱스가 3이어야 합니다.");
+        }
+
+        [Test]
+        public void TryParseScreenshotIndex_screenshot_png_실패()
+        {
+            var method = typeof(BundleWriter).GetMethod(
+                "TryParseScreenshotIndex",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method, "TryParseScreenshotIndex 메서드를 찾을 수 없습니다.");
+
+            // "screenshot_.png" — 숫자 없음
+            object[] args = { "screenshot_.png", 0 };
+            bool result = (bool)method.Invoke(null, args);
+
+            Assert.IsFalse(result, "숫자 없는 파일명은 파싱에 실패해야 합니다.");
+        }
+
+        [Test]
+        public void TryParseScreenshotIndex_잘못된_형식_실패()
+        {
+            var method = typeof(BundleWriter).GetMethod(
+                "TryParseScreenshotIndex",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method, "TryParseScreenshotIndex 메서드를 찾을 수 없습니다.");
+
+            object[] args = { "image_0.png", 0 };
+            bool result = (bool)method.Invoke(null, args);
+
+            Assert.IsFalse(result, "잘못된 접두사를 가진 파일명은 파싱에 실패해야 합니다.");
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 복수 스크린샷 WriteAsync 통합 테스트
+        // ──────────────────────────────────────────────────────────────
+
+        [UnityTest]
+        public IEnumerator WriteAsync_복수스크린샷_3개_번들에_파일_3개_생성()
+        {
+            var captureResult = CreateSampleCaptureResultWithScreenshotEntries(3);
+
+            var task = _writer.WriteAsync(captureResult);
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsFalse(task.IsFaulted, $"WriteAsync 실패: {task.Exception?.GetBaseException()?.Message}");
+
+            string bundleDir = BundleWriter.GetBundleDirectory(task.Result.id);
+
+            for (int i = 0; i < 3; i++)
+            {
+                string expectedFile = Path.Combine(bundleDir, $"screenshot_{i}.png");
+                Assert.IsTrue(File.Exists(expectedFile),
+                    $"screenshot_{i}.png 파일이 번들 디렉토리에 존재해야 합니다.");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator WriteAsync_복수스크린샷_3개_아티팩트_3개_포함()
+        {
+            var captureResult = CreateSampleCaptureResultWithScreenshotEntries(3);
+
+            var task = _writer.WriteAsync(captureResult);
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            var screenshotArtifacts = task.Result.artifacts
+                .Where(a => a.type == BundleArtifactType.Screenshot)
+                .ToList();
+
+            Assert.AreEqual(3, screenshotArtifacts.Count,
+                "스크린샷 아티팩트가 3개여야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator WriteAsync_복수스크린샷_각_아티팩트_SHA256_존재()
+        {
+            var captureResult = CreateSampleCaptureResultWithScreenshotEntries(3);
+
+            var task = _writer.WriteAsync(captureResult);
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            var screenshotArtifacts = task.Result.artifacts
+                .Where(a => a.type == BundleArtifactType.Screenshot)
+                .ToList();
+
+            foreach (var artifact in screenshotArtifacts)
+            {
+                Assert.IsNotEmpty(artifact.sha256_hash,
+                    $"{artifact.file_name} 아티팩트에 SHA-256 해시가 있어야 합니다.");
+                Assert.AreEqual(64, artifact.sha256_hash.Length,
+                    $"{artifact.file_name} SHA-256 해시는 64자(hex)여야 합니다.");
+            }
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -299,6 +425,38 @@ namespace RekonOps.Rekon.Tests
                 StatePath      = statePath,
                 VideoPath      = videoPath,
                 Timestamp      = DateTime.UtcNow,
+            };
+        }
+
+        /// <summary>
+        /// ScreenshotEntries(복수 스크린샷)를 가진 테스트용 CaptureResult를 생성합니다.
+        /// LogsPath, StatePath도 더미 파일로 채워집니다.
+        /// </summary>
+        private CaptureResult CreateSampleCaptureResultWithScreenshotEntries(int count)
+        {
+            // 로그 (ZIP 더미)
+            string logsPath = Path.Combine(_tempSourceDir, $"logs_{Guid.NewGuid():N}.zip");
+            File.WriteAllBytes(logsPath, new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x00, 0x00 });
+
+            // 상태 (JSON 더미)
+            string statePath = Path.Combine(_tempSourceDir, $"state_{Guid.NewGuid():N}.json");
+            File.WriteAllText(statePath, "{\"engine\":\"Unity\",\"engine_version\":\"2022.3.22f1\"}");
+
+            // 복수 스크린샷 엔트리 생성
+            var entries = new ScreenshotEntry[count];
+            for (int i = 0; i < count; i++)
+            {
+                // PNG 시그니처 + 인덱스 바이트로 각 항목을 구분
+                byte[] png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, (byte)i, 0x00 };
+                entries[i] = new ScreenshotEntry(png, DateTime.UtcNow);
+            }
+
+            return new CaptureResult
+            {
+                ScreenshotEntries = entries,
+                LogsPath          = logsPath,
+                StatePath         = statePath,
+                Timestamp         = DateTime.UtcNow,
             };
         }
     }

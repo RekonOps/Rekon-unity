@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using RekonOps.Rekon;
 
 namespace RekonOps.Rekon.Tests.Integration
 {
@@ -77,7 +78,7 @@ namespace RekonOps.Rekon.Tests.Integration
         // ─── 테스트 2: 401 응답 시 SessionTokenStore 클리어 ─────────────────────
 
         [Test]
-        public async Task 401_응답_수신_시_TokenStore_클리어_확인()
+        public async Task 응답_401_수신_시_TokenStore_클리어_확인()
         {
             // Arrange
             long futureExp = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();

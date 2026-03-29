@@ -40,6 +40,8 @@ namespace RekonOps.Rekon
         // 실제 사용할 토큰 스토어: 런타임 바인딩 우선, 없으면 생성자 주입 사용
         private SessionTokenStore ActiveTokenStore => _runtimeTokenStore ?? _tokenStore;
 
+        private readonly ScreenshotQueue _screenshotQueue;
+
         private HotkeyManager _hotkeyManager;
         private SilentSubmitManager _silentSubmitManager;
         private bool _disposed;
@@ -51,6 +53,15 @@ namespace RekonOps.Rekon
 
         /// <summary>캡처 완료 시 발행되는 이벤트 (CaptureResult를 인자로 받음)</summary>
         public event Action<CaptureResult> OnCaptureCompleted;
+
+        /// <summary>스크린샷 큐에 새 항목이 추가됐을 때 발행 (인자: 현재 큐 크기, eviction 발생 여부)</summary>
+        public event Action<int, bool> OnScreenshotQueued;
+
+        /// <summary>
+        /// 스크린샷 전용 발송 완료 시 발행 (인자: 성공 여부, 발송된 장수).
+        /// 성공 시 true + 장수, 큐 비었거나 실패 시 false + 0.
+        /// </summary>
+        public event Action<bool, int> OnScreenshotSubmitCompleted;
 
         /// <summary>
         /// CaptureOrchestrator를 초기화합니다.
@@ -65,6 +76,7 @@ namespace RekonOps.Rekon
             IVideoEncoder videoEncoder,
             VideoEncoderConfig videoConfig,
             RekonSettings settings,
+            ScreenshotQueue screenshotQueue = null,
             SessionTokenStore tokenStore = null)
         {
             _screenshotCapturer = screenshotCapturer ?? throw new ArgumentNullException(nameof(screenshotCapturer));
@@ -75,6 +87,7 @@ namespace RekonOps.Rekon
             _videoEncoder = videoEncoder; // null 허용
             _videoConfig = videoConfig; // null 허용
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _screenshotQueue = screenshotQueue; // null 허용 (스크린샷 큐 비활성 시)
             _tokenStore = tokenStore; // null 허용 (미연동 시 사전 체크 건너뜀)
         }
 
@@ -102,17 +115,25 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// HotkeyManager를 등록하고 OnCaptureTrigger 이벤트를 구독합니다.
+        /// HotkeyManager를 등록하고 OnCaptureTrigger / OnScreenshotTrigger / OnScreenshotLongPress 이벤트를 구독합니다.
         /// </summary>
         public void BindHotkeyManager(HotkeyManager hotkeyManager)
         {
             if (_hotkeyManager != null)
+            {
                 _hotkeyManager.OnCaptureTrigger -= OnTrigger;
+                _hotkeyManager.OnScreenshotTrigger -= OnScreenshotTrigger;
+                _hotkeyManager.OnScreenshotLongPress -= OnScreenshotLongPress;
+            }
 
             _hotkeyManager = hotkeyManager;
 
             if (_hotkeyManager != null)
+            {
                 _hotkeyManager.OnCaptureTrigger += OnTrigger;
+                _hotkeyManager.OnScreenshotTrigger += OnScreenshotTrigger;
+                _hotkeyManager.OnScreenshotLongPress += OnScreenshotLongPress;
+            }
         }
 
         /// <summary>
@@ -176,6 +197,17 @@ namespace RekonOps.Rekon
 
                 await Task.WhenAll(screenshotTask, logsTask, stateTask, videoTask);
 
+                // 스크린샷 큐 드레인 — 영상 번들에 포함
+                if (_screenshotQueue != null)
+                {
+                    var entries = _screenshotQueue.DrainAll();
+                    if (entries.Length > 0)
+                    {
+                        result.ScreenshotEntries = entries;
+                        Debug.Log($"[Rekon] 스크린샷 큐 드레인: {entries.Length}장 영상 번들에 포함");
+                    }
+                }
+
                 ReportProgress("complete", 1.0f);
                 OnCaptureCompleted?.Invoke(result);
             }
@@ -205,7 +237,11 @@ namespace RekonOps.Rekon
             _disposed = true;
 
             if (_hotkeyManager != null)
+            {
                 _hotkeyManager.OnCaptureTrigger -= OnTrigger;
+                _hotkeyManager.OnScreenshotTrigger -= OnScreenshotTrigger;
+                _hotkeyManager.OnScreenshotLongPress -= OnScreenshotLongPress;
+            }
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -219,6 +255,125 @@ namespace RekonOps.Rekon
 
             // 핫키 이벤트 → 비동기 캡처 시작 (결과는 OnCaptureCompleted 이벤트로 전달)
             _ = StartAsync();
+        }
+
+        private void OnScreenshotTrigger()
+        {
+            if (_disposed) return;
+            _ = StartScreenshotAsync();
+        }
+
+        private void OnScreenshotLongPress()
+        {
+            if (_disposed) return;
+            // 결과는 OnScreenshotSubmitCompleted 이벤트로 전달됨
+            _ = SubmitScreenshotOnlyAsync();
+        }
+
+        /// <summary>
+        /// 스크린샷 전용 캡처를 수행하여 ScreenshotQueue에 저장합니다.
+        /// 영상 파이프라인을 실행하지 않습니다.
+        /// </summary>
+        public async Task StartScreenshotAsync()
+        {
+            if (_screenshotQueue == null)
+            {
+                Debug.LogWarning("[Rekon] ScreenshotQueue가 바인딩되지 않았습니다.");
+                return;
+            }
+
+            // 영상 캡처 진행 중이면 스크린샷 캡처 스킵
+            if (Interlocked.CompareExchange(ref _isCapturingFlag, 0, 0) != 0)
+            {
+                Debug.LogWarning("[Rekon] 영상 캡처 진행 중 — 스크린샷 캡처를 건너뜁니다.");
+                return;
+            }
+
+            try
+            {
+                byte[] pngBytes = await _screenshotCapturer.CaptureAsync();
+                if (pngBytes == null || pngBytes.Length == 0)
+                {
+                    Debug.LogWarning("[Rekon] 스크린샷 캡처 실패 (빈 데이터)");
+                    return;
+                }
+
+                bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow);
+                int newCount = _screenshotQueue.Count;
+
+                Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{ScreenshotQueue.MaxCapacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
+                OnScreenshotQueued?.Invoke(newCount, evicted);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Rekon] 스크린샷 전용 캡처 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크린샷 큐를 드레인하여 스크린샷 전용 리포트를 발송합니다.
+        /// 영상/로그/상태 수집 없이 큐에 쌓인 스크린샷만 포함합니다.
+        /// 롱프레스 완료 시 호출됩니다.
+        /// </summary>
+        public async Task<bool> SubmitScreenshotOnlyAsync()
+        {
+            if (_disposed)
+                return false;
+
+            if (_screenshotQueue == null || _screenshotQueue.Count == 0)
+            {
+                Debug.LogWarning("[Rekon] 발송할 스크린샷이 없습니다.");
+                OnScreenshotSubmitCompleted?.Invoke(false, 0);
+                return false;
+            }
+
+            // 영상 캡처 중이면 발송 대기 없이 즉시 반환 (중복 방지)
+            if (Interlocked.CompareExchange(ref _isCapturingFlag, 0, 0) != 0)
+            {
+                Debug.LogWarning("[Rekon] 영상 캡처 진행 중 — 스크린샷 전용 발송을 건너뜁니다.");
+                OnScreenshotSubmitCompleted?.Invoke(false, 0);
+                return false;
+            }
+
+            // 제출 진행 중이면 차단
+            if (_silentSubmitManager != null && _silentSubmitManager.IsSubmitting)
+            {
+                Debug.LogWarning("[Rekon] 제출이 진행 중입니다. 스크린샷 전용 발송을 건너뜁니다.");
+                OnScreenshotSubmitCompleted?.Invoke(false, 0);
+                return false;
+            }
+
+            try
+            {
+                // 큐 드레인
+                var entries = _screenshotQueue.DrainAll();
+                if (entries.Length == 0)
+                {
+                    Debug.LogWarning("[Rekon] 발송할 스크린샷이 없습니다.");
+                    OnScreenshotSubmitCompleted?.Invoke(false, 0);
+                    return false;
+                }
+
+                // 스크린샷 전용 CaptureResult 생성 (영상/로그/상태 없음)
+                var result = new CaptureResult
+                {
+                    Timestamp = DateTime.UtcNow,
+                    ScreenshotEntries = entries,
+                };
+
+                Debug.Log($"[Rekon] 스크린샷 전용 리포트 발송: {entries.Length}장");
+                OnCaptureCompleted?.Invoke(result);
+                OnScreenshotSubmitCompleted?.Invoke(true, entries.Length);
+
+                await Task.CompletedTask; // async 시그니처 유지
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Rekon] 스크린샷 전용 발송 실패: {ex.Message}");
+                OnScreenshotSubmitCompleted?.Invoke(false, 0);
+                return false;
+            }
         }
 
         private async Task CaptureScreenshotAsync(string dir, CaptureResult result, CancellationToken token)

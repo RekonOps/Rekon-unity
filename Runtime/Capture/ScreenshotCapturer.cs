@@ -41,6 +41,13 @@ namespace RekonOps.Rekon
             {
                 int downscale = Mathf.Max(1, _settings.screenshotDownscale);
 
+                // 1080p 최대 해상도 캡
+                if (Screen.height > 1080 && downscale == 1)
+                {
+                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
+                    Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
+                }
+
                 // 1단계: 메인 스레드에서 화면 캡처
                 Texture2D texture = ScreenCapture.CaptureScreenshotAsTexture(downscale);
 

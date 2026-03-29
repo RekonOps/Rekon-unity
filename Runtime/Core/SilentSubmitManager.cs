@@ -258,6 +258,8 @@ namespace RekonOps.Rekon
                 // 파일 첨부 목록 구성
                 var files = new List<FileAttachment>();
 
+                // 단수 스크린샷 (레거시 경로 기반)
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
                 if (!string.IsNullOrEmpty(captureResult.ScreenshotPath) && File.Exists(captureResult.ScreenshotPath))
                 {
                     files.Add(new FileAttachment
@@ -266,6 +268,31 @@ namespace RekonOps.Rekon
                         Data = await ReadFileAsync(captureResult.ScreenshotPath),
                         FileType = "screenshot"
                     });
+                }
+#pragma warning restore CS0618
+
+                // 복수 스크린샷 (스크린샷 핫키 큐 드레인)
+                // manifest.artifacts 기반으로 순회하여 captureResult 인덱스 불일치 문제를 방지합니다.
+                // ManifestGenerator가 빈 엔트리를 건너뛰더라도 manifest에 실제 저장된 항목만 업로드합니다.
+                {
+                    string bundleDir = BundleWriter.GetBundleDirectory(manifest.id);
+                    foreach (var artifact in manifest.artifacts)
+                    {
+                        if (artifact.type == BundleArtifactType.Screenshot
+                            && artifact.file_name.StartsWith("screenshot_"))
+                        {
+                            string screenshotPath = Path.Combine(bundleDir, artifact.file_name);
+                            if (File.Exists(screenshotPath))
+                            {
+                                files.Add(new FileAttachment
+                                {
+                                    FileName = artifact.file_name,
+                                    Data = await ReadFileAsync(screenshotPath),
+                                    FileType = "screenshot"
+                                });
+                            }
+                        }
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(captureResult.LogsPath) && File.Exists(captureResult.LogsPath))

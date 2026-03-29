@@ -10,16 +10,42 @@ namespace RekonOps.Rekon
     ///   2. DontDestroyOnLoad GameObject 생성
     ///   3. 의존성 객체 생성 (LogRingBuffer, LogSerializer, ScreenshotCapturer 등)
     ///   4. 영상 녹화 활성화 시 FrameRingBuffer, VideoEncoder, FrameCapturer 초기화
-    ///   5. CaptureOrchestrator 생성 및 모든 의존성 주입
-    ///   6. HotkeyManager MonoBehaviour 생성 및 설정 주입
-    ///   7. HotkeyManager ↔ CaptureOrchestrator 바인딩
-    ///   8. CaptureOverlay 초기화 및 오케스트레이터 바인딩
-    ///   9. SilentSubmitManager 초기화
-    ///  10. SubmitToast 초기화 및 SilentSubmitManager 바인딩
+    ///   5. ScreenshotQueue 생성
+    ///   6. CaptureOrchestrator 생성 및 모든 의존성 주입
+    ///   7. HotkeyManager MonoBehaviour 생성 및 설정 주입
+    ///   8. HotkeyManager ↔ CaptureOrchestrator 바인딩
+    ///   9. CaptureOverlay 초기화 및 오케스트레이터 바인딩
+    ///  10. SilentSubmitManager 초기화
+    ///  11. SubmitToast 초기화 및 SilentSubmitManager 바인딩
     /// </summary>
     public static class RekonBootstrap
     {
         private static bool _initialized;
+        private static ScreenshotQueue _screenshotQueue;
+
+        /// <summary>
+        /// Domain Reload OFF 대응: 정적 상태 리셋.
+        /// Domain Reload가 비활성화된 환경(Enter Play Mode Options)에서
+        /// Play Mode 재진입 시 정적 필드가 초기화되지 않는 문제를 방지합니다.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            // Domain Reload OFF 대응: 정적 상태 리셋
+            _initialized = false;
+            Application.quitting -= OnApplicationQuitting;
+            _screenshotQueue?.Clear();
+            _screenshotQueue = null;
+        }
+
+        /// <summary>
+        /// Application 종료 시 ScreenshotQueue 리소스 정리.
+        /// 정적 핸들러를 사용하여 Domain Reload OFF 환경에서 람다 누적 구독을 방지합니다.
+        /// </summary>
+        private static void OnApplicationQuitting()
+        {
+            _screenshotQueue?.Clear();
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Initialize()
@@ -53,8 +79,11 @@ namespace RekonOps.Rekon
                 // 로그 직렬화기: 마스킹 활성화
                 var logSerializer = new LogSerializer(enableMasking: true);
 
-                // 스크린샷 캡처기: settings 주입
-                var screenshotCapturer = new ScreenshotCapturer(settings);
+                // 코루틴 실행용 컴포넌트 (WaitForEndOfFrame 등)
+                var coroutineRunner = root.AddComponent<RekonCoroutineRunner>();
+
+                // 스크린샷 캡처기: settings + 코루틴 러너 주입
+                var screenshotCapturer = new ScreenshotCapturer(settings, coroutineRunner);
 
                 // 커스텀 컨텍스트 레지스트리: 생성자 파라미터 없음
                 var contextRegistry = new ContextProviderRegistry();
@@ -101,7 +130,11 @@ namespace RekonOps.Rekon
                     }
                 }
 
-                // ── 5. CaptureOrchestrator 생성 ───────────────────────────────────
+                // ── 5. ScreenshotQueue 생성 ───────────────────────────────────────
+                var screenshotQueue = new ScreenshotQueue();
+                _screenshotQueue = screenshotQueue;
+
+                // ── 6. CaptureOrchestrator 생성 ───────────────────────────────────
                 var orchestrator = new CaptureOrchestrator(
                     screenshotCapturer: screenshotCapturer,
                     logCollector: logRingBuffer,
@@ -110,23 +143,30 @@ namespace RekonOps.Rekon
                     frameBuffer: frameRingBuffer,    // null 허용 (영상 비활성 시)
                     videoEncoder: videoEncoder,       // null 허용
                     videoConfig: videoConfig,         // null 허용
-                    settings: settings);
+                    settings: settings,
+                    screenshotQueue: screenshotQueue);
 
-                // ── 6. HotkeyManager 생성 및 설정 주입 ───────────────────────────
+                // ── 7. HotkeyManager 생성 및 설정 주입 ───────────────────────────
                 var hotkeyManager = root.AddComponent<HotkeyManager>();
                 hotkeyManager.SetSettings(settings);
 
-                // ── 7. HotkeyManager ↔ CaptureOrchestrator 바인딩 ────────────────
+                // ── 8. HotkeyManager ↔ CaptureOrchestrator 바인딩 ────────────────
                 orchestrator.BindHotkeyManager(hotkeyManager);
 
-                // ── 8. CaptureOverlay 초기화 ──────────────────────────────────────
+                // ── 9. CaptureOverlay 초기화 ──────────────────────────────────────
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
 
                 // CaptureOverlay: Silent 모드 활성화 (SilentSubmitManager가 사용되므로)
                 overlay.SetSilentMode(true);
 
-                // ── 9. SilentSubmitManager 초기화 ────────────────────────────────
+                overlay.BindScreenshotQueue(screenshotQueue);
+                overlay.BindSettings(settings);
+
+                // 롱프레스 UX 피드백: HotkeyManager 이벤트 구독
+                overlay.BindHotkeyManager(hotkeyManager);
+
+                // ── 10. SilentSubmitManager 초기화 ───────────────────────────────
                 var manifestGenerator = new ManifestGenerator();
                 var bundleWriter = new BundleWriter(manifestGenerator);
 
@@ -158,7 +198,12 @@ namespace RekonOps.Rekon
                 // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩
                 orchestrator.BindSilentSubmitManager(silentSubmitManager);
 
-                // ── 10. PendingUploadManager 초기화 ──────────────────────────────────
+                // ── 10. Application.quitting 시 리소스 정리 ──────────────────────
+                // 정적 핸들러 사용으로 Domain Reload OFF 환경에서 람다 누적 구독 방지
+                Application.quitting -= OnApplicationQuitting;  // 중복 방지
+                Application.quitting += OnApplicationQuitting;
+
+                // ── 11. PendingUploadManager 초기화 ──────────────────────────────────
                 var pendingUploadManager = new PendingUploadManager();
 
                 // SilentSubmitManager에 PendingUploadManager 바인딩
@@ -170,7 +215,7 @@ namespace RekonOps.Rekon
                     Debug.Log($"[Rekon] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
                 }
 
-                // ── 11. SubmitToast 초기화 ──────────────────────────────────────────
+                // ── 12. SubmitToast 초기화 ──────────────────────────────────────────
                 var submitToast = SubmitToast.EnsureInstance();
                 submitToast.BindSilentSubmitManager(silentSubmitManager);
 

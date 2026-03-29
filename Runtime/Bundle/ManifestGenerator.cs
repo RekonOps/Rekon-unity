@@ -105,7 +105,8 @@ namespace RekonOps.Rekon
         {
             var artifacts = new List<BundleArtifact>(4);
 
-            // 스크린샷 (PNG)
+            // 단수 스크린샷 (레거시 경로 기반, PNG)
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
             if (!string.IsNullOrEmpty(result.ScreenshotPath) && File.Exists(result.ScreenshotPath))
             {
                 artifacts.Add(new BundleArtifact
@@ -115,6 +116,26 @@ namespace RekonOps.Rekon
                     size_bytes  = new FileInfo(result.ScreenshotPath).Length,
                     sha256_hash = string.Empty,
                 });
+            }
+#pragma warning restore CS0618
+
+            // 복수 스크린샷 (스크린샷 핫키 큐 드레인)
+            if (result.ScreenshotEntries != null)
+            {
+                for (int i = 0; i < result.ScreenshotEntries.Length; i++)
+                {
+                    var entry = result.ScreenshotEntries[i];
+                    if (entry.PngBytes != null && entry.PngBytes.Length > 0)
+                    {
+                        artifacts.Add(new BundleArtifact
+                        {
+                            type        = BundleArtifactType.Screenshot,
+                            file_name   = $"screenshot_{i}.png",
+                            size_bytes  = entry.PngBytes.Length,
+                            sha256_hash = string.Empty,
+                        });
+                    }
+                }
             }
 
             // 로그 (ZIP)

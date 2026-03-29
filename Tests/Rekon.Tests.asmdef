@@ -3,6 +3,7 @@
   "rootNamespace": "RekonOps.Rekon.Tests",
   "references": [
     "Rekon.Runtime",
+    "Rekon.Runtime.InputSystem",
     "Rekon.Editor",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"

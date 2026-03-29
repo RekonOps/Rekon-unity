@@ -238,9 +238,8 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void WaitAndRetryAsync_NullFactory_ThrowsArgumentNullException()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(async () =>
-                await _limiter.WaitAndRetryAsync(null)
-            );
+            Assert.Throws<ArgumentNullException>(
+                () => _limiter.WaitAndRetryAsync(null).GetAwaiter().GetResult());
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -254,12 +253,12 @@ namespace RekonOps.Rekon.Tests
 
             var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
 
-            Parallel.For(0, 100, _ =>
+            Parallel.For(0, 100, i =>
             {
                 try
                 {
-                    _ = _limiter.IsRateLimited;
-                    _ = _limiter.SecondsUntilReset;
+                    bool rl = _limiter.IsRateLimited;
+                    double sr = _limiter.SecondsUntilReset;
                 }
                 catch (Exception ex)
                 {

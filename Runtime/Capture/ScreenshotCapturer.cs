@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -18,14 +19,17 @@ namespace RekonOps.Rekon
     public class ScreenshotCapturer : IScreenshotCapturer
     {
         private readonly RekonSettings _settings;
+        private readonly MonoBehaviour _coroutineRunner;
 
         /// <summary>
         /// RekonSettings를 주입하여 인스턴스를 생성합니다.
         /// </summary>
         /// <param name="settings">screenshotDownscale 등 설정이 포함된 에셋</param>
-        public ScreenshotCapturer(RekonSettings settings)
+        /// <param name="coroutineRunner">WaitForEndOfFrame 코루틴 실행용 MonoBehaviour (null이면 즉시 캡처 시도)</param>
+        public ScreenshotCapturer(RekonSettings settings, MonoBehaviour coroutineRunner = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _coroutineRunner = coroutineRunner;
         }
 
         /// <summary>
@@ -37,37 +41,68 @@ namespace RekonOps.Rekon
         /// <returns>PNG 인코딩된 바이트 배열. 실패 시 null</returns>
         public Task<byte[]> CaptureAsync()
         {
+            // WaitForEndOfFrame 코루틴 브릿지 — 렌더링 완료 후 캡처
+            if (_coroutineRunner != null)
+            {
+                var tcs = new TaskCompletionSource<byte[]>();
+                _coroutineRunner.StartCoroutine(CaptureAtEndOfFrameCoroutine(tcs));
+                return tcs.Task;
+            }
+
+            // 폴백: 즉시 캡처 (테스트 환경 등 coroutineRunner 없을 때)
+            return Task.FromResult(CaptureImmediate());
+        }
+
+        private IEnumerator CaptureAtEndOfFrameCoroutine(TaskCompletionSource<byte[]> tcs)
+        {
+            yield return new WaitForEndOfFrame();
+            try
+            {
+                byte[] result = CaptureImmediate();
+                tcs.SetResult(result);
+            }
+            catch (Exception ex)
+            {
+                tcs.SetException(ex);
+            }
+        }
+
+        private byte[] CaptureImmediate()
+        {
             try
             {
                 int downscale = Mathf.Max(1, _settings.screenshotDownscale);
 
-                // 1단계: 메인 스레드에서 화면 캡처
+                // 1080p 최대 해상도 캡
+                if (Screen.height > 1080 && downscale == 1)
+                {
+                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
+                    Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
+                }
+
                 Texture2D texture = ScreenCapture.CaptureScreenshotAsTexture(downscale);
 
                 if (texture == null)
                 {
                     Debug.LogWarning("[Rekon] CaptureScreenshotAsTexture가 null을 반환했습니다.");
-                    return Task.FromResult<byte[]>(null);
+                    return null;
                 }
 
-                // 2단계: 메인 스레드에서 PNG 인코딩 (Texture2D.EncodeToPNG는 메인 스레드 필요)
                 byte[] pngBytes = texture.EncodeToPNG();
-
-                // 텍스처 메모리 해제
                 UnityEngine.Object.Destroy(texture);
 
                 if (pngBytes == null || pngBytes.Length == 0)
                 {
                     Debug.LogWarning("[Rekon] EncodeToPNG가 빈 바이트 배열을 반환했습니다.");
-                    return Task.FromResult<byte[]>(null);
+                    return null;
                 }
 
-                return Task.FromResult(pngBytes);
+                return pngBytes;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[Rekon] 스크린샷 캡처 중 오류 발생: {ex.Message}");
-                return Task.FromResult<byte[]>(null);
+                return null;
             }
         }
 

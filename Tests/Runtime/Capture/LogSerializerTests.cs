@@ -166,8 +166,8 @@ namespace RekonOps.Rekon.Tests
         public void SaveAsync_NullPath_ThrowsArgumentNullException()
         {
             var entries = new LogEntry[0];
-            Assert.ThrowsAsync<System.ArgumentNullException>(
-                async () => await _serializer.SaveAsync(entries, null));
+            Assert.Throws<System.ArgumentNullException>(
+                () => _serializer.SaveAsync(entries, null).GetAwaiter().GetResult());
         }
 
         [UnityTest]

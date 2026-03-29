@@ -74,6 +74,9 @@ namespace RekonOps.Rekon.Editor
         private void OnEnable()
         {
             _repository = new BundleRepository();
+            // Application.persistentDataPath는 메인 스레드에서만 접근 가능하므로
+            // GetAllAsync 호출 전에 메인 스레드에서 먼저 캐시를 워밍업합니다.
+            BundleWriter.GetBundlesRootDirectory();
             _ = RefreshBundlesAsync();
         }
 
@@ -364,7 +367,7 @@ namespace RekonOps.Rekon.Editor
         /// <summary>
         /// 번들 목록을 비동기로 새로고침합니다.
         /// </summary>
-        internal async Task RefreshBundlesAsync()
+        public async Task RefreshBundlesAsync()
         {
             if (_isLoading) return;
 

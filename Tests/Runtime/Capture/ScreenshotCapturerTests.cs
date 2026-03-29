@@ -103,8 +103,8 @@ namespace RekonOps.Rekon.Tests
         public void SaveAsync_NullFilePath_ThrowsArgumentNullException()
         {
             byte[] pngBytes = CreateMinimalPngBytes();
-            Assert.ThrowsAsync<System.ArgumentNullException>(
-                async () => await _capturer.SaveAsync(pngBytes, null));
+            Assert.Throws<System.ArgumentNullException>(
+                () => _capturer.SaveAsync(pngBytes, null).GetAwaiter().GetResult());
         }
 
         // ──────────────────────────────────────────────────────────────

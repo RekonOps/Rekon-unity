@@ -13,7 +13,18 @@ namespace RekonOps.Rekon
         /// 저장된 스크린샷 파일 경로 (PNG).
         /// 캡처 실패 시 null 또는 빈 문자열.
         /// </summary>
+        /// <remarks>
+        /// ScreenshotEntries(메모리 큐)로 전환 중입니다.
+        /// 신규 코드에서는 ScreenshotEntries를 사용하세요.
+        /// </remarks>
+        [Obsolete("ScreenshotEntries 프로퍼티를 사용하세요. 이 필드는 추후 제거됩니다.")]
         public string ScreenshotPath { get; set; }
+
+        /// <summary>
+        /// 스크린샷 핫키로 캡처된 PNG 항목 배열 (메모리 큐 방식).
+        /// 캡처된 항목이 없을 경우 null 또는 빈 배열.
+        /// </summary>
+        public ScreenshotEntry[] ScreenshotEntries { get; set; }
 
         /// <summary>
         /// 저장된 로그 ZIP 파일 경로.
@@ -59,19 +70,27 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 적어도 하나의 아티팩트가 성공적으로 수집되었는지 여부.
+        /// ScreenshotEntries(메모리 큐) 또는 레거시 ScreenshotPath 중 하나라도 존재하면 충족됩니다.
         /// </summary>
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
         public bool IsPartialSuccess =>
+            (ScreenshotEntries != null && ScreenshotEntries.Length > 0) ||
             !string.IsNullOrEmpty(ScreenshotPath) ||
             !string.IsNullOrEmpty(LogsPath) ||
             !string.IsNullOrEmpty(StatePath);
+#pragma warning restore CS0618
 
         /// <summary>
         /// 모든 기본 아티팩트가 성공적으로 수집되었는지 여부.
+        /// ScreenshotEntries(메모리 큐) 또는 레거시 ScreenshotPath 중 하나라도 존재하면 스크린샷 조건을 충족합니다.
         /// </summary>
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
         public bool IsFullSuccess =>
-            !string.IsNullOrEmpty(ScreenshotPath) &&
+            ((ScreenshotEntries != null && ScreenshotEntries.Length > 0) ||
+             !string.IsNullOrEmpty(ScreenshotPath)) &&
             !string.IsNullOrEmpty(LogsPath) &&
             !string.IsNullOrEmpty(StatePath);
+#pragma warning restore CS0618
 
         public override string ToString()
         {

@@ -4,6 +4,21 @@ using UnityEngine;
 namespace RekonOps.Rekon
 {
     /// <summary>
+    /// 오버레이 표시 위치.
+    /// </summary>
+    public enum OverlayPosition
+    {
+        /// <summary>좌하단</summary>
+        BottomLeft  = 0,
+        /// <summary>우하단</summary>
+        BottomRight = 1,
+        /// <summary>좌상단</summary>
+        TopLeft     = 2,
+        /// <summary>우상단</summary>
+        TopRight    = 3,
+    }
+
+    /// <summary>
     /// 영상 프리셋 종류.
     /// </summary>
     public enum VideoPreset
@@ -45,18 +60,44 @@ namespace RekonOps.Rekon
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Mac: ⌘ + Shift + S
+            screenshotHotkey           = KeyCode.S;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #else
             captureHotkey    = KeyCode.F12;
             hotkeyCtrlOrCmd  = true;
             hotkeyShift      = true;
             hotkeyAlt        = false;
+            // Windows: Ctrl + Shift + F11
+            screenshotHotkey           = KeyCode.F11;
+            screenshotHotkeyCtrlOrCmd  = true;
+            screenshotHotkeyShift      = true;
+            screenshotHotkeyAlt        = false;
 #endif
         }
+
+        [Header("Screenshot Hotkey")]
+        [Tooltip("스크린샷 캡처 핫키")]
+        public KeyCode screenshotHotkey = KeyCode.S;
+
+        [Tooltip("스크린샷 핫키: Ctrl/Cmd 필요 여부")]
+        public bool screenshotHotkeyCtrlOrCmd = true;
+
+        [Tooltip("스크린샷 핫키: Shift 필요 여부")]
+        public bool screenshotHotkeyShift = true;
+
+        [Tooltip("스크린샷 핫키: Alt 필요 여부")]
+        public bool screenshotHotkeyAlt = false;
 
         [Header("Screenshot")]
         [Tooltip("Downscale factor (1 = original resolution)")]
         [Range(1, 4)]
         public int screenshotDownscale = 1;
+
+        [Tooltip("스크린샷 미니 바 표시 위치")]
+        public OverlayPosition screenshotMiniBarPosition = OverlayPosition.BottomLeft;
 
         [Header("Video")]
         [Tooltip("영상 프리셋 (권장/고화질/경량/커스텀)")]
@@ -76,8 +117,8 @@ namespace RekonOps.Rekon
         public int videoFps = 30;
 
         [Tooltip("Video buffer duration in seconds")]
-        [Range(10, 120)]
-        public int videoBufferSeconds = 90;
+        [Range(10, 180)]
+        public int videoBufferSeconds = 60;
 
         [Tooltip("Target bitrate in Mbps")]
         [Range(1, 20)]
@@ -161,7 +202,7 @@ namespace RekonOps.Rekon
 #elif REKON_DEV
         public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
 #else
-        public const string WEB_DASHBOARD_URL = "https://app.rekonops.dev";
+        public const string WEB_DASHBOARD_URL = "https://www.rekonops.dev";
 #endif
 
         [Header("웹 연동")]
@@ -192,6 +233,16 @@ namespace RekonOps.Rekon
         [Header("Auth Broker")]
         [Tooltip("Auth Broker base URL")]
         public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
+
+        // ─── 플랜별 동적 제한값 (런타임 적용, 직렬화 제외) ──────────────────────
+        // validate-license 응답 후 LicenseValidator가 채워줍니다.
+        // ScriptableObject에는 저장되지 않으며, 에디터 세션 동안만 유지됩니다.
+
+        /// <summary>플랜이 허용하는 최대 버퍼 시간(초). 라이선스 검증 후 갱신됩니다.</summary>
+        [NonSerialized] public int maxAllowedBufferSeconds = 180;
+
+        /// <summary>플랜이 허용하는 최대 스크린샷 개수. 라이선스 검증 후 갱신됩니다.</summary>
+        [NonSerialized] public int maxAllowedScreenshotCount = 3;
 
         /// <summary>
         /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.

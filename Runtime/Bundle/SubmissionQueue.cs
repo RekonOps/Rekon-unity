@@ -41,6 +41,22 @@ namespace RekonOps.Rekon
         public event Action<string, int, string> OnFailed;
 
         /// <summary>
+        /// OnSubmitted 이벤트를 발행합니다. 서브클래스에서 오버라이드 가능합니다.
+        /// </summary>
+        protected virtual void RaiseOnSubmitted(string bundleId, string jiraIssueKey)
+        {
+            OnSubmitted?.Invoke(bundleId, jiraIssueKey);
+        }
+
+        /// <summary>
+        /// OnFailed 이벤트를 발행합니다. 서브클래스에서 오버라이드 가능합니다.
+        /// </summary>
+        protected virtual void RaiseOnFailed(string bundleId, int retryCount, string errorMessage)
+        {
+            OnFailed?.Invoke(bundleId, retryCount, errorMessage);
+        }
+
+        /// <summary>
         /// SubmissionQueue를 초기화합니다.
         /// </summary>
         /// <param name="repository">번들 저장소.</param>
@@ -184,7 +200,7 @@ namespace RekonOps.Rekon
                 await _repository.MarkSubmittedAsync(bundleId, jiraIssueKey);
 
                 Debug.Log($"[Rekon] 번들 제출 성공: {bundleId} → Jira={jiraIssueKey}");
-                OnSubmitted?.Invoke(bundleId, jiraIssueKey);
+                RaiseOnSubmitted(bundleId, jiraIssueKey);
 
                 return true;
             }
@@ -203,7 +219,7 @@ namespace RekonOps.Rekon
                 int retryCount = await SafeIncrementRetryCountAsync(bundleId);
                 await SafeUpdateStateAsync(bundleId, BundleState.Failed);
 
-                OnFailed?.Invoke(bundleId, retryCount, ex.Message);
+                RaiseOnFailed(bundleId, retryCount, ex.Message);
 
                 return false;
             }

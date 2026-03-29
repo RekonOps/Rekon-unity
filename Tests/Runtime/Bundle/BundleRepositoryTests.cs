@@ -203,8 +203,8 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void UpdateStateAsync_NullBundleId_ThrowsArgumentNullException()
         {
-            Assert.ThrowsAsync<ArgumentNullException>(
-                async () => await _repository.UpdateStateAsync(null, BundleState.Pending));
+            Assert.Throws<ArgumentNullException>(
+                () => _repository.UpdateStateAsync(null, BundleState.Pending).GetAwaiter().GetResult());
         }
 
         [UnityTest]

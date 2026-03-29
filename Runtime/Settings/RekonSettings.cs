@@ -231,8 +231,18 @@ namespace RekonOps.Rekon
         public string licenseKey = "";
 
         [Header("Auth Broker")]
-        [Tooltip("Auth Broker base URL")]
-        public string authBrokerUrl = "https://your-project.supabase.co/functions/v1";
+        // authBrokerUrl은 Web 프록시 도입으로 더 이상 사용되지 않습니다.
+        // LicenseValidator는 WEB_DASHBOARD_URL 상수를 통해 Web API를 직접 호출합니다.
+        [Tooltip("Auth Broker base URL — Web 프록시로 대체됨")]
+        [System.Obsolete("Web 프록시로 대체됨. LicenseValidator는 RekonSettings.WEB_DASHBOARD_URL 상수를 사용합니다.")]
+        [UnityEngine.HideInInspector]
+#if REKON_LOCAL
+        public string authBrokerUrl = "https://ufhrykxtowtsectrmiut.supabase.co/functions/v1";
+#elif REKON_DEV
+        public string authBrokerUrl = "https://ufhrykxtowtsectrmiut.supabase.co/functions/v1";
+#else
+        public string authBrokerUrl = "https://gbivghfepttoaprvnrsg.supabase.co/functions/v1";
+#endif
 
         // ─── 플랜별 동적 제한값 (런타임 적용, 직렬화 제외) ──────────────────────
         // validate-license 응답 후 LicenseValidator가 채워줍니다.
@@ -243,6 +253,26 @@ namespace RekonOps.Rekon
 
         /// <summary>플랜이 허용하는 최대 스크린샷 개수. 라이선스 검증 후 갱신됩니다.</summary>
         [NonSerialized] public int maxAllowedScreenshotCount = 3;
+
+        /// <summary>
+        /// authBrokerUrl이 비어있거나 플레이스홀더면 환경별 기본값을 자동 설정합니다.
+        /// </summary>
+        /// <remarks>Web 프록시 도입으로 더 이상 호출할 필요가 없습니다.</remarks>
+        [System.Obsolete("Web 프록시로 대체됨. 이 메서드는 더 이상 호출할 필요가 없습니다.")]
+        public void EnsureAuthBrokerUrl()
+        {
+            if (string.IsNullOrEmpty(authBrokerUrl) || authBrokerUrl.Contains("your-project.supabase.co"))
+            {
+#if REKON_LOCAL || REKON_DEV
+                authBrokerUrl = "https://ufhrykxtowtsectrmiut.supabase.co/functions/v1";
+#else
+                authBrokerUrl = "https://gbivghfepttoaprvnrsg.supabase.co/functions/v1";
+#endif
+#if UNITY_EDITOR
+                UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            }
+        }
 
         /// <summary>
         /// tenantId와 userId가 비어있을 경우 UUID를 자동 생성합니다.

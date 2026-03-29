@@ -4,6 +4,21 @@ using UnityEngine;
 namespace RekonOps.Rekon
 {
     /// <summary>
+    /// 오버레이 표시 위치.
+    /// </summary>
+    public enum OverlayPosition
+    {
+        /// <summary>좌하단</summary>
+        BottomLeft  = 0,
+        /// <summary>우하단</summary>
+        BottomRight = 1,
+        /// <summary>좌상단</summary>
+        TopLeft     = 2,
+        /// <summary>우상단</summary>
+        TopRight    = 3,
+    }
+
+    /// <summary>
     /// 영상 프리셋 종류.
     /// </summary>
     public enum VideoPreset
@@ -80,6 +95,9 @@ namespace RekonOps.Rekon
         [Tooltip("Downscale factor (1 = original resolution)")]
         [Range(1, 4)]
         public int screenshotDownscale = 1;
+
+        [Tooltip("스크린샷 미니 바 표시 위치")]
+        public OverlayPosition screenshotMiniBarPosition = OverlayPosition.BottomLeft;
 
         [Header("Video")]
         [Tooltip("영상 프리셋 (권장/고화질/경량/커스텀)")]

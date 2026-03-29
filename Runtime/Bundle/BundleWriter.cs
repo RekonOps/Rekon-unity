@@ -127,7 +127,22 @@ namespace RekonOps.Rekon
                 switch (artifact.type)
                 {
                     case BundleArtifactType.Screenshot:
-                        await CopyFileArtifactAsync(source.ScreenshotPath, bundleDir, artifact);
+                        // 단수 스크린샷 (screenshot.png) — 레거시 경로 기반
+                        if (artifact.file_name == "screenshot.png")
+                        {
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
+                            await CopyFileArtifactAsync(source.ScreenshotPath, bundleDir, artifact);
+#pragma warning restore CS0618
+                        }
+                        // 복수 스크린샷 (screenshot_N.png) — 큐 드레인 데이터
+                        else if (artifact.file_name.StartsWith("screenshot_") && source.ScreenshotEntries != null)
+                        {
+                            if (TryParseScreenshotIndex(artifact.file_name, out int idx) && idx < source.ScreenshotEntries.Length)
+                            {
+                                var entry = source.ScreenshotEntries[idx];
+                                await SaveBytesArtifactAsync(entry.PngBytes, bundleDir, artifact);
+                            }
+                        }
                         break;
 
                     case BundleArtifactType.Log:
@@ -268,6 +283,33 @@ namespace RekonOps.Rekon
         // ──────────────────────────────────────────────────────────────
         // 파일 시스템 헬퍼
         // ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// "screenshot_N.png" 형식의 파일명에서 인덱스를 파싱합니다.
+        /// </summary>
+        private static bool TryParseScreenshotIndex(string fileName, out int index)
+        {
+            index = -1;
+            // "screenshot_0.png" → "0"
+            if (!fileName.StartsWith("screenshot_") || !fileName.EndsWith(".png")) return false;
+            var numStr = fileName.Substring("screenshot_".Length, fileName.Length - "screenshot_".Length - ".png".Length);
+            return int.TryParse(numStr, out index) && index >= 0;
+        }
+
+        /// <summary>
+        /// 바이트 배열을 번들 디렉토리에 파일로 저장합니다.
+        /// 저장 완료 후 아티팩트의 size_bytes 및 sha256_hash를 갱신합니다.
+        /// </summary>
+        private static async Task SaveBytesArtifactAsync(byte[] data, string bundleDir, BundleArtifact artifact)
+        {
+            if (data == null || data.Length == 0) return;
+            string destPath = Path.Combine(bundleDir, artifact.file_name);
+            await Task.Run(() => File.WriteAllBytes(destPath, data));
+            artifact.size_bytes = data.LongLength;
+            // 저장된 바이트 배열로 SHA-256 해시 계산
+            artifact.sha256_hash = SHA256HashUtility.ComputeHash(data);
+            Debug.Log($"[Rekon] 스크린샷 저장 완료: {artifact.file_name} ({artifact.size_bytes}B, sha256={artifact.sha256_hash[..8]}...)");
+        }
 
         /// <summary>
         /// 디렉토리를 재귀적으로 복사합니다.

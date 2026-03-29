@@ -88,6 +88,26 @@ namespace RekonOps.Rekon.Editor
         // 고급 섹션은 개발자 모드일 때만 표시됩니다.
         private const string DEV_MODE_PREF_KEY = "Rekon_DevMode";
 
+        // ─── 섹션 재정렬 ─────────────────────────────────────────────────────────
+
+        /// <summary>재정렬 가능한 섹션 정의</summary>
+        private struct SectionDef
+        {
+            /// <summary>섹션 표시 이름</summary>
+            public string name;
+            /// <summary>렌더링 메서드 (▲▼ 버튼 포함)</summary>
+            public Action<int> drawAction;
+        }
+
+        /// <summary>재정렬 가능한 섹션 정의 배열 (캡처/리포트/단축키)</summary>
+        private SectionDef[] _reorderableSections;
+
+        /// <summary>현재 섹션 출력 순서 (인덱스 배열). EditorPrefs에 저장됩니다.</summary>
+        private int[] _sectionOrder;
+
+        /// <summary>섹션 순서 EditorPrefs 저장 키</summary>
+        private const string SECTION_ORDER_PREF_KEY = "Rekon_SectionOrder";
+
         // ─── 웹 로그인 플로우 상태 ───────────────────────────────────────────────
 
         /// <summary>웹 로그인 플로우 상태 열거형</summary>
@@ -130,6 +150,17 @@ namespace RekonOps.Rekon.Editor
         private bool _foldHotkey = true;
         private bool _foldAdvanced = false;
 
+        // ─── 스크린샷 핫키 SerializedProperty 캐시 ──────────────────────────────
+
+        private SerializedProperty _screenshotHotkey;
+        private SerializedProperty _screenshotHotkeyCtrlOrCmd;
+        private SerializedProperty _screenshotHotkeyShift;
+        private SerializedProperty _screenshotHotkeyAlt;
+
+        // ─── 스크린샷 미니 바 위치 SerializedProperty 캐시 ──────────────────────
+
+        private SerializedProperty _screenshotMiniBarPosition;
+
         // ─── 내부 상태 ───────────────────────────────────────────────────────────
 
         private RekonSettings _settings;
@@ -160,6 +191,64 @@ namespace RekonOps.Rekon.Editor
         {
             LoadOrCreateSettings();
             RestorePlanLimitsFromCache();
+            InitReorderableSections();
+        }
+
+        /// <summary>
+        /// 재정렬 가능 섹션 배열과 순서 배열을 초기화합니다.
+        /// drawAction은 루프 인덱스(i)를 받아 ▲▼ 버튼을 올바르게 렌더링합니다.
+        /// </summary>
+        private void InitReorderableSections()
+        {
+            _reorderableSections = new SectionDef[]
+            {
+                new SectionDef { name = "캡처 설정",   drawAction = DrawCaptureSectionWithButtons  },
+                new SectionDef { name = "리포트 설정", drawAction = DrawReportSectionWithButtons   },
+                new SectionDef { name = "단축키",      drawAction = DrawHotkeySectionWithButtons   },
+            };
+            _sectionOrder = LoadSectionOrder();
+        }
+
+        /// <summary>EditorPrefs에서 섹션 순서를 로드합니다. 저장값이 없거나 유효하지 않으면 기본값(0,1,2)을 반환합니다.</summary>
+        private static int[] LoadSectionOrder()
+        {
+            string saved = EditorPrefs.GetString(SECTION_ORDER_PREF_KEY, "");
+            if (!string.IsNullOrEmpty(saved))
+            {
+                string[] parts = saved.Split(',');
+                if (parts.Length == 3)
+                {
+                    int[] order = new int[3];
+                    bool valid = true;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (!int.TryParse(parts[i], out order[i]) || order[i] < 0 || order[i] > 2)
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    // 중복 인덱스 검사
+                    if (valid && order[0] != order[1] && order[1] != order[2] && order[0] != order[2])
+                        return order;
+                }
+            }
+            return new int[] { 0, 1, 2 };
+        }
+
+        /// <summary>현재 섹션 순서를 EditorPrefs에 저장합니다.</summary>
+        private void SaveSectionOrder()
+        {
+            EditorPrefs.SetString(SECTION_ORDER_PREF_KEY, string.Join(",", _sectionOrder));
+        }
+
+        /// <summary>두 섹션의 순서를 교환하고 저장합니다.</summary>
+        private void SwapSections(int a, int b)
+        {
+            int temp = _sectionOrder[a];
+            _sectionOrder[a] = _sectionOrder[b];
+            _sectionOrder[b] = temp;
+            SaveSectionOrder();
         }
 
         private void OnDisable()
@@ -217,17 +306,15 @@ namespace RekonOps.Rekon.Editor
                         MessageType.Info);
                 }
 
-                BeginSectionBox();
-                DrawCaptureSection();
-                EndSectionBox();
-
-                BeginSectionBox();
-                DrawReportSection();
-                EndSectionBox();
-
-                BeginSectionBox();
-                DrawHotkeySection();
-                EndSectionBox();
+                // _sectionOrder 배열 순서대로 섹션 렌더링 (▲▼ 버튼으로 재정렬 가능)
+                if (_reorderableSections == null) InitReorderableSections();
+                for (int i = 0; i < _sectionOrder.Length; i++)
+                {
+                    int idx = _sectionOrder[i];
+                    BeginSectionBox();
+                    _reorderableSections[idx].drawAction(i);
+                    EndSectionBox();
+                }
             }
 
             // 개발자 모드일 때만 고급 섹션 표시
@@ -249,6 +336,45 @@ namespace RekonOps.Rekon.Editor
         }
 
         // ─── 섹션 박스 헬퍼 ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 재정렬 가능한 섹션의 Foldout 헤더를 그립니다.
+        /// 헤더 오른쪽에 ▲▼ 버튼을 배치하여 섹션 순서를 변경할 수 있습니다.
+        /// </summary>
+        /// <param name="foldout">Foldout 열림 상태 (ref)</param>
+        /// <param name="label">섹션 표시 이름</param>
+        /// <param name="loopIndex">현재 루프 인덱스 (▲▼ 버튼 비활성화 판단용)</param>
+        private void DrawReorderHeader(ref bool foldout, string label, int loopIndex)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                // Foldout을 일반 EditorGUI.Foldout으로 그려 버튼과 수평 배치
+                Rect foldoutRect = GUILayoutUtility.GetRect(
+                    GUIContent.none,
+                    EditorStyles.foldoutHeader,
+                    GUILayout.ExpandWidth(true));
+
+                // 버튼 너비(22+22+4 = 48)를 제외한 영역에 Foldout 배치
+                Rect headerRect = new Rect(foldoutRect.x, foldoutRect.y, foldoutRect.width - 52f, foldoutRect.height);
+                foldout = EditorGUI.Foldout(headerRect, foldout, label, true, EditorStyles.foldoutHeader);
+
+                // ▲ 버튼 (첫 번째 섹션은 비활성)
+                using (new EditorGUI.DisabledScope(loopIndex == 0))
+                {
+                    Rect upRect = new Rect(foldoutRect.xMax - 50f, foldoutRect.y + 1f, 22f, 18f);
+                    if (GUI.Button(upRect, "▲"))
+                        SwapSections(loopIndex, loopIndex - 1);
+                }
+
+                // ▼ 버튼 (마지막 섹션은 비활성)
+                using (new EditorGUI.DisabledScope(loopIndex == _sectionOrder.Length - 1))
+                {
+                    Rect downRect = new Rect(foldoutRect.xMax - 26f, foldoutRect.y + 1f, 22f, 18f);
+                    if (GUI.Button(downRect, "▼"))
+                        SwapSections(loopIndex, loopIndex + 1);
+                }
+            }
+        }
 
         /// <summary>섹션 박스 시작 (helpBox 스타일로 시각적 구분)</summary>
         private static void BeginSectionBox()
@@ -495,11 +621,23 @@ namespace RekonOps.Rekon.Editor
 
         // ─── 캡처 설정 섹션 ─────────────────────────────────────────────────────
 
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawCaptureSectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldCapture, "캡처 설정", loopIndex);
+            if (!_foldCapture) return;
+            DrawCaptureSectionBody();
+        }
+
         private void DrawCaptureSection()
         {
             _foldCapture = EditorGUILayout.Foldout(_foldCapture, "캡처 설정", true, EditorStyles.foldoutHeader);
             if (!_foldCapture) return;
+            DrawCaptureSectionBody();
+        }
 
+        private void DrawCaptureSectionBody()
+        {
             EditorGUI.indentLevel++;
 
             // ── 영상 캡처 설정 박스 ───────────────────────────────────────────
@@ -517,6 +655,15 @@ namespace RekonOps.Rekon.Editor
                 downscale,
                 1, 4,
                 new GUIContent("다운스케일 배율", "1 = 원본 해상도, 2 = 절반, 4 = 1/4 크기"));
+
+            // 미니 바 위치 드롭다운
+            if (_screenshotMiniBarPosition == null)
+                _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
+            if (_screenshotMiniBarPosition != null)
+                EditorGUILayout.PropertyField(
+                    _screenshotMiniBarPosition,
+                    new GUIContent("미니 바 위치", "스크린샷 미니 바 표시 위치"));
+
             EndSectionBox();
 
             EditorGUILayout.Space(4f);
@@ -705,11 +852,23 @@ namespace RekonOps.Rekon.Editor
 
         // ─── 리포트 설정 섹션 ───────────────────────────────────────────────────
 
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawReportSectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldReport, "리포트 설정", loopIndex);
+            if (!_foldReport) return;
+            DrawReportSectionBody();
+        }
+
         private void DrawReportSection()
         {
             _foldReport = EditorGUILayout.Foldout(_foldReport, "리포트 설정", true, EditorStyles.foldoutHeader);
             if (!_foldReport) return;
+            DrawReportSectionBody();
+        }
 
+        private void DrawReportSectionBody()
+        {
             EditorGUI.indentLevel++;
 
             // 접두어
@@ -749,16 +908,32 @@ namespace RekonOps.Rekon.Editor
 
         // ─── 단축키 섹션 ────────────────────────────────────────────────────────
 
+        /// <summary>재정렬 루프에서 호출되는 래퍼 — 순서 인덱스(loopIndex)를 받아 ▲▼ 버튼을 렌더링합니다.</summary>
+        private void DrawHotkeySectionWithButtons(int loopIndex)
+        {
+            DrawReorderHeader(ref _foldHotkey, "단축키", loopIndex);
+            if (!_foldHotkey) return;
+            DrawHotkeySectionBody();
+        }
+
         private void DrawHotkeySection()
         {
             _foldHotkey = EditorGUILayout.Foldout(_foldHotkey, "단축키", true, EditorStyles.foldoutHeader);
             if (!_foldHotkey) return;
+            DrawHotkeySectionBody();
+        }
+
+        private void DrawHotkeySectionBody()
+        {
 
             EditorGUI.indentLevel++;
 
             bool isMac = Application.platform == RuntimePlatform.OSXEditor;
 
-            // 수식키 토글
+            // ── 영상 캡처 핫키 ─────────────────────────────────────────────────
+
+            EditorGUILayout.LabelField("영상 캡처 핫키", EditorStyles.boldLabel);
+
             SerializedProperty ctrlCmd = _serializedSettings.FindProperty("hotkeyCtrlOrCmd");
             SerializedProperty shift   = _serializedSettings.FindProperty("hotkeyShift");
             SerializedProperty alt     = _serializedSettings.FindProperty("hotkeyAlt");
@@ -800,7 +975,7 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUI.BeginChangeCheck();
             int newIndex = EditorGUILayout.Popup(
-                new GUIContent("메인 키", "버그 캡처를 트리거하는 기본 키"),
+                new GUIContent("메인 키", "영상 캡처를 트리거하는 기본 키"),
                 currentIndex,
                 displayNames);
             if (EditorGUI.EndChangeCheck())
@@ -808,16 +983,101 @@ namespace RekonOps.Rekon.Editor
 
             // #41: 단축키 프리뷰를 선택 UI 아래로
             // #46: BuildHotkeyPreview에 파라미터로 전달 (FindProperty 중복 호출 제거)
-            string preview = BuildHotkeyPreview(isMac, ctrlCmd, shift, alt, hotkey);
-            EditorGUILayout.HelpBox($"현재 단축키: {preview}", MessageType.Info);
+            string videoPreview = BuildHotkeyPreview(isMac, ctrlCmd, shift, alt, hotkey);
+            EditorGUILayout.HelpBox($"현재 단축키: {videoPreview}", MessageType.Info);
 
             // #40: 수식키 없음 경고
-            bool hasModifier = ctrlCmd.boolValue || shift.boolValue || alt.boolValue;
-            if (!hasModifier)
+            bool hasVideoModifier = ctrlCmd.boolValue || shift.boolValue || alt.boolValue;
+            if (!hasVideoModifier)
             {
                 EditorGUILayout.HelpBox(
                     "수식키 없이 설정하면 플레이 모드에서 오작동할 수 있습니다.",
                     MessageType.Warning);
+            }
+
+            EditorGUILayout.Space(8f);
+
+            // ── 스크린샷 핫키 ─────────────────────────────────────────────────
+
+            EditorGUILayout.LabelField("스크린샷 핫키", EditorStyles.boldLabel);
+
+            // _screenshotHotkey* 프로퍼티가 null이면 (구버전 Settings) FindProperty 재시도
+            if (_screenshotHotkey == null)
+            {
+                _screenshotHotkey          = _serializedSettings.FindProperty("screenshotHotkey");
+                _screenshotHotkeyCtrlOrCmd = _serializedSettings.FindProperty("screenshotHotkeyCtrlOrCmd");
+                _screenshotHotkeyShift     = _serializedSettings.FindProperty("screenshotHotkeyShift");
+                _screenshotHotkeyAlt       = _serializedSettings.FindProperty("screenshotHotkeyAlt");
+            }
+
+            if (_screenshotHotkey != null)
+            {
+                EditorGUILayout.BeginHorizontal();
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsCtrlCmd = EditorGUILayout.ToggleLeft(
+                    isMac ? "⌘ Cmd" : "Ctrl", _screenshotHotkeyCtrlOrCmd.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyCtrlOrCmd.boolValue = newSsCtrlCmd;
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsShift = EditorGUILayout.ToggleLeft(
+                    isMac ? "⇧ Shift" : "Shift", _screenshotHotkeyShift.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyShift.boolValue = newSsShift;
+
+                EditorGUI.BeginChangeCheck();
+                bool newSsAlt = EditorGUILayout.ToggleLeft(
+                    isMac ? "⌥ Option" : "Alt", _screenshotHotkeyAlt.boolValue, GUILayout.Width(toggleWidth));
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkeyAlt.boolValue = newSsAlt;
+
+                EditorGUILayout.EndHorizontal();
+
+                // 스크린샷 메인 키 드롭다운 (영상과 동일한 keyList/displayNames 재사용)
+                int ssCurrentIndex = Array.IndexOf(keyList, (KeyCode)_screenshotHotkey.intValue);
+                if (ssCurrentIndex < 0) ssCurrentIndex = 0;
+
+                EditorGUI.BeginChangeCheck();
+                int ssNewIndex = EditorGUILayout.Popup(
+                    new GUIContent("메인 키", "스크린샷 캡처를 트리거하는 기본 키"),
+                    ssCurrentIndex,
+                    displayNames);
+                if (EditorGUI.EndChangeCheck())
+                    _screenshotHotkey.intValue = (int)keyList[ssNewIndex];
+
+                string ssPreview = BuildHotkeyPreview(isMac, _screenshotHotkeyCtrlOrCmd, _screenshotHotkeyShift, _screenshotHotkeyAlt, _screenshotHotkey);
+                EditorGUILayout.HelpBox($"현재 단축키: {ssPreview}", MessageType.Info);
+
+                // 수식키 없음 경고 (영상과 동일 정책)
+                bool hasSsModifier = _screenshotHotkeyCtrlOrCmd.boolValue || _screenshotHotkeyShift.boolValue || _screenshotHotkeyAlt.boolValue;
+                if (!hasSsModifier)
+                {
+                    EditorGUILayout.HelpBox(
+                        "수식키 없이 설정하면 플레이 모드에서 오작동할 수 있습니다.",
+                        MessageType.Warning);
+                }
+
+                // ── 핫키 충돌 경고 ───────────────────────────────────────────
+                bool isConflict =
+                    hotkey.intValue                    == _screenshotHotkey.intValue &&
+                    ctrlCmd.boolValue                  == _screenshotHotkeyCtrlOrCmd.boolValue &&
+                    shift.boolValue                    == _screenshotHotkeyShift.boolValue &&
+                    alt.boolValue                      == _screenshotHotkeyAlt.boolValue;
+
+                if (isConflict)
+                {
+                    EditorGUILayout.HelpBox(
+                        "영상 캡처 핫키와 스크린샷 핫키가 동일합니다. 영상 핫키가 우선 실행됩니다.",
+                        MessageType.Warning);
+                }
+            }
+            else
+            {
+                // screenshotHotkey 프로퍼티가 없는 경우 (Settings 미업데이트)
+                EditorGUILayout.HelpBox(
+                    "스크린샷 핫키 설정을 사용하려면 RekonSettings 에셋을 최신 버전으로 재생성하세요.",
+                    MessageType.Info);
             }
 
             EditorGUI.indentLevel--;
@@ -951,6 +1211,13 @@ namespace RekonOps.Rekon.Editor
 
             using (new EditorGUILayout.HorizontalScope())
             {
+                // 섹션 순서 초기화 버튼
+                if (GUILayout.Button("섹션 순서 초기화", GUILayout.Width(120f)))
+                {
+                    _sectionOrder = new int[] { 0, 1, 2 };
+                    SaveSectionOrder();
+                }
+
                 GUILayout.FlexibleSpace();
 
                 // 되돌리기 버튼 (#35: 적용 버튼 제거, 자동 저장으로 대체)
@@ -1354,6 +1621,15 @@ namespace RekonOps.Rekon.Editor
             }
 
             _serializedSettings = new SerializedObject(_settings);
+
+            // 스크린샷 핫키 프로퍼티 캐시
+            _screenshotHotkey          = _serializedSettings.FindProperty("screenshotHotkey");
+            _screenshotHotkeyCtrlOrCmd = _serializedSettings.FindProperty("screenshotHotkeyCtrlOrCmd");
+            _screenshotHotkeyShift     = _serializedSettings.FindProperty("screenshotHotkeyShift");
+            _screenshotHotkeyAlt       = _serializedSettings.FindProperty("screenshotHotkeyAlt");
+
+            // 스크린샷 미니 바 위치 프로퍼티 캐시
+            _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEngine;
+using RekonOps.Rekon;
 
 namespace RekonOps.Rekon.Tests.Integration
 {
@@ -168,7 +169,7 @@ namespace RekonOps.Rekon.Tests.Integration
         // ─── 테스트 4: 100프레임 평균 안정화 검증 ────────────────────────────────
 
         [Test]
-        public void 100프레임_FrameRingBuffer_Add_평균_및_표준편차_검증()
+        public void 프레임_100개_FrameRingBuffer_Add_평균_및_표준편차_검증()
         {
             // Arrange
             var ringBuffer = new FrameRingBuffer(MeasurementFrameCount * 2);

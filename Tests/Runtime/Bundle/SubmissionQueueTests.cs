@@ -277,7 +277,8 @@ namespace RekonOps.Rekon.Tests
         public void SubmitWithRetryAsync_NullBundleId_ThrowsArgumentNullException()
         {
             var queue = CreateQueue(successKey: "BUG-1");
-            Assert.ThrowsAsync<ArgumentNullException>(async () => await queue.SubmitWithRetryAsync(null));
+            Assert.Throws<ArgumentNullException>(
+                () => queue.SubmitWithRetryAsync(null).GetAwaiter().GetResult());
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -401,7 +402,7 @@ namespace RekonOps.Rekon.Tests
                             throw new InvalidOperationException("빈 Jira 키 반환");
 
                         await _repo.MarkSubmittedAsync(manifest.id, key);
-                        OnSubmitted?.Invoke(manifest.id, key);
+                        RaiseOnSubmitted(manifest.id, key);
                         successCount++;
                     }
                     catch (OperationCanceledException)
@@ -413,7 +414,7 @@ namespace RekonOps.Rekon.Tests
                     {
                         int retryCount = await SafeIncrement(manifest.id);
                         await SafeUpdateState(manifest.id, BundleState.Failed);
-                        OnFailed?.Invoke(manifest.id, retryCount, ex.Message);
+                        RaiseOnFailed(manifest.id, retryCount, ex.Message);
                     }
                 }
 

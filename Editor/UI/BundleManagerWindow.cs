@@ -367,7 +367,7 @@ namespace RekonOps.Rekon.Editor
         /// <summary>
         /// 번들 목록을 비동기로 새로고침합니다.
         /// </summary>
-        internal async Task RefreshBundlesAsync()
+        public async Task RefreshBundlesAsync()
         {
             if (_isLoading) return;
 

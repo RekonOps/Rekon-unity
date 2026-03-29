@@ -82,11 +82,15 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 모든 기본 아티팩트가 성공적으로 수집되었는지 여부.
+        /// ScreenshotEntries(메모리 큐) 또는 레거시 ScreenshotPath 중 하나라도 존재하면 스크린샷 조건을 충족합니다.
         /// </summary>
+#pragma warning disable CS0618 // Obsolete 멤버 사용 (하위 호환 유지)
         public bool IsFullSuccess =>
-            !string.IsNullOrEmpty(ScreenshotPath) &&
+            ((ScreenshotEntries != null && ScreenshotEntries.Length > 0) ||
+             !string.IsNullOrEmpty(ScreenshotPath)) &&
             !string.IsNullOrEmpty(LogsPath) &&
             !string.IsNullOrEmpty(StatePath);
+#pragma warning restore CS0618
 
         public override string ToString()
         {

@@ -19,6 +19,16 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
+        /// 지정된 키가 현재 프레임에도 계속 눌려있는지 반환합니다 (홀드 감지용).
+        /// </summary>
+        /// <param name="key">감지할 키코드</param>
+        /// <returns>현재 눌려있으면 true</returns>
+        public bool IsHeld(KeyCode key)
+        {
+            return Input.GetKey(key);
+        }
+
+        /// <summary>
         /// Ctrl(Windows) 또는 Cmd(Mac) 키가 현재 눌려있는지 반환합니다.
         /// </summary>
         public bool IsCtrlOrCmdHeld()

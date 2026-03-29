@@ -30,15 +30,20 @@ namespace RekonOps.Rekon
         /// <summary>현재 큐 크기 (0~5)</summary>
         public int Count { get { lock(_lock) { return _entries.Count; } } }
 
-        /// <summary>큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목 삭제.</summary>
-        public void Enqueue(byte[] pngBytes, DateTime timestamp)
+        /// <summary>
+        /// 큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
+        /// </summary>
+        /// <returns>eviction이 발생하면 true, 그렇지 않으면 false</returns>
+        public bool Enqueue(byte[] pngBytes, DateTime timestamp)
         {
-            if (pngBytes == null || pngBytes.Length == 0) return;
+            if (pngBytes == null || pngBytes.Length == 0) return false;
             lock (_lock)
             {
-                if (_entries.Count >= MaxCapacity)
+                bool evicted = _entries.Count >= MaxCapacity;
+                if (evicted)
                     _entries.RemoveAt(0);
                 _entries.Add(new ScreenshotEntry(pngBytes, timestamp));
+                return evicted;
             }
         }
 

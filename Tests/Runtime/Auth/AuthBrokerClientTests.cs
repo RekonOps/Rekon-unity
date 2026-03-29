@@ -162,10 +162,8 @@ namespace RekonOps.Rekon.Tests
             cts.Cancel(); // 이미 취소된 상태
 
             // Act & Assert
-            Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            {
-                await client.PostConnectJiraStartAsync("tenant-id", "user-id", cts.Token);
-            });
+            Assert.Throws<OperationCanceledException>(
+                () => client.PostConnectJiraStartAsync("tenant-id", "user-id", cts.Token).GetAwaiter().GetResult());
 
             await Task.CompletedTask;
         }

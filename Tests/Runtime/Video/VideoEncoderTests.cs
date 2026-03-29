@@ -46,16 +46,16 @@ namespace RekonOps.Rekon.Tests
         public void EncodeAsync_NullOutputPath_ThrowsArgumentNullException()
         {
             var frames = new[] { MakeFrame(1.0) };
-            Assert.ThrowsAsync<System.ArgumentNullException>(
-                async () => await _encoder.EncodeAsync(frames, null, _config));
+            Assert.Throws<System.ArgumentNullException>(
+                () => _encoder.EncodeAsync(frames, null, _config).GetAwaiter().GetResult());
         }
 
         [Test]
         public void EncodeAsync_NullConfig_ThrowsArgumentNullException()
         {
             var frames = new[] { MakeFrame(1.0) };
-            Assert.ThrowsAsync<System.ArgumentNullException>(
-                async () => await _encoder.EncodeAsync(frames, _tempDir, null));
+            Assert.Throws<System.ArgumentNullException>(
+                () => _encoder.EncodeAsync(frames, _tempDir, null).GetAwaiter().GetResult());
         }
 
         [UnityTest]

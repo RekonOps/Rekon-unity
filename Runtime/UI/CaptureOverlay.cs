@@ -703,7 +703,10 @@ namespace RekonOps.Rekon
         {
             if (_toastTimer <= 0f || string.IsNullOrEmpty(_toastText)) return;
 
-            float toastWidth  = 200f;
+            // 텍스트 길이에 따라 너비를 동적으로 계산 (잘림 방지)
+            GUIStyle boxStyle = GUI.skin.box;
+            Vector2 textSize = boxStyle.CalcSize(new GUIContent(_toastText));
+            float toastWidth  = Mathf.Max(200f, textSize.x + 32f);
             float toastHeight = 30f;
             float x = (Screen.width  - toastWidth)  / 2f;
             float y =  Screen.height - toastHeight   - 60f;

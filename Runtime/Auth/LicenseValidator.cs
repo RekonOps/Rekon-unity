@@ -133,8 +133,7 @@ namespace RekonOps.Rekon
 
         // ─── 내부 상태 ─────────────────────────────────────────────────────────────
 
-        private readonly string _supabaseUrl;
-        private readonly string _supabaseAnonKey;
+        private readonly string _baseUrl;
         private readonly SessionTokenStore _tokenStore;
         private LicenseInfo _cachedLicense;
 
@@ -143,20 +142,14 @@ namespace RekonOps.Rekon
         /// <summary>
         /// LicenseValidator를 초기화합니다.
         /// </summary>
-        /// <param name="supabaseUrl">Supabase 프로젝트 URL</param>
-        /// <param name="supabaseAnonKey">Supabase anon key</param>
+        /// <param name="baseUrl">웹 대시보드 기본 URL (WEB_DASHBOARD_URL 기반)</param>
         /// <param name="tokenStore">세션 토큰 저장소 (Prefs 추상화 참조용)</param>
-        public LicenseValidator(string supabaseUrl, string supabaseAnonKey, SessionTokenStore tokenStore)
+        public LicenseValidator(string baseUrl, SessionTokenStore tokenStore)
         {
-            if (string.IsNullOrEmpty(supabaseUrl))
-                throw new ArgumentNullException(nameof(supabaseUrl), "Supabase URL이 설정되지 않았습니다.");
-            // supabaseAnonKey는 네트워크 요청 시에만 사용됨.
-            // 캐시 로드 전용으로 생성할 때는 빈 문자열 허용.
-            if (supabaseAnonKey == null)
-                supabaseAnonKey = "";
+            if (string.IsNullOrEmpty(baseUrl))
+                throw new ArgumentNullException(nameof(baseUrl), "웹 대시보드 URL이 설정되지 않았습니다.");
 
-            _supabaseUrl = supabaseUrl.TrimEnd('/');
-            _supabaseAnonKey = supabaseAnonKey;
+            _baseUrl = baseUrl.TrimEnd('/');
             _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
 
             // 저장된 캐시 로드
@@ -176,7 +169,7 @@ namespace RekonOps.Rekon
         /// <returns>검증된 라이선스 정보</returns>
         public async Task<LicenseInfo> ValidateAsync(string licenseKey = null, string userId = null, CancellationToken ct = default)
         {
-            var url = $"{_supabaseUrl}/functions/v1/validate-license";
+            var url = $"{_baseUrl}/api/unity/validate-license";
             var pluginVersion = GetPluginVersion();
 
             // licenseKey/userId 둘 다 있을 때만 body에 포함, 없으면 plugin_version만 전송
@@ -387,12 +380,16 @@ namespace RekonOps.Rekon
 
                     // 헤더 설정
                     // validate-license는 사용자 JWT(access_token)로 인증합니다.
-                    // _supabaseAnonKey 대신 SessionTokenStore에서 저장된 access_token을 사용합니다.
+                    // apikey는 웹 프록시 서버 사이드에서 처리되므로 전송하지 않습니다.
                     string accessToken = _tokenStore.LoadSupabase();
-                    string bearerToken = !string.IsNullOrEmpty(accessToken) ? accessToken : _supabaseAnonKey;
+                    if (string.IsNullOrEmpty(accessToken))
+                    {
+                        tcs.TrySetException(new NetworkException("access_token이 없습니다. 웹 연동을 먼저 진행하세요."));
+                        return;
+                    }
                     request.SetRequestHeader("Content-Type", "application/json");
                     request.SetRequestHeader("Accept", "application/json");
-                    request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
+                    request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
                     request.timeout = (int)RequestTimeoutSeconds;
 
                     // 취소 등록

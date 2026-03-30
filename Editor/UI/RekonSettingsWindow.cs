@@ -1415,13 +1415,10 @@ namespace RekonOps.Rekon.Editor
         {
             if (_settings == null) return;
 
-            string brokerUrl = _settings.authBrokerUrl;
-            if (string.IsNullOrEmpty(brokerUrl)) return;
-
             try
             {
                 if (_licenseValidator == null)
-                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+                    _licenseValidator = new LicenseValidator(RekonSettings.WEB_DASHBOARD_URL, _tokenStore);
 
                 var cached = _licenseValidator.GetCachedLicense();
                 if (cached != null && cached.Valid)
@@ -1446,19 +1443,11 @@ namespace RekonOps.Rekon.Editor
         {
             if (_settings == null) return;
 
-            // authBrokerUrl이 설정되어 있어야 함
-            string brokerUrl = _settings.authBrokerUrl;
-            if (string.IsNullOrEmpty(brokerUrl))
-            {
-                Debug.LogWarning("[Rekon] 라이선스 검증 건너뜀: authBrokerUrl이 비어있습니다.");
-                return;
-            }
-
             try
             {
                 // LicenseValidator 생성 (또는 재사용)
                 if (_licenseValidator == null)
-                    _licenseValidator = new LicenseValidator(brokerUrl, "", _tokenStore);
+                    _licenseValidator = new LicenseValidator(RekonSettings.WEB_DASHBOARD_URL, _tokenStore);
 
                 // licenseKey/userId가 없어도 JWT(access_token)만으로 서버에서 자동 조회합니다.
                 var licenseInfo = await _licenseValidator.ValidateAsync(
@@ -1630,6 +1619,7 @@ namespace RekonOps.Rekon.Editor
 
             // 스크린샷 미니 바 위치 프로퍼티 캐시
             _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
+
         }
 
         /// <summary>

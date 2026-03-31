@@ -1,8 +1,6 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -99,8 +97,8 @@ namespace RekonOps.Rekon
 
             await prevFlush;
 
-            // TakeFrames(): 소유권 이전 — 내부 슬롯이 null로 비워지고 DoFlushAsync가 byte[] 반환 책임을 가집니다.
-            var frames = _ringBuffer.TakeFrames();
+            // GetFrames(): 사전 할당 방식 — 소유권 이전 없이 현재 버퍼 스냅샷을 읽어옵니다.
+            var frames = _ringBuffer.GetFrames();
             if (frames.Length == 0)
                 return;
 
@@ -159,16 +157,8 @@ namespace RekonOps.Rekon
             {
                 Debug.LogError($"[Rekon] 세그먼트 플러시 실패: {ex.Message}");
             }
-            finally
-            {
-                // TakeFrames()로 소유권을 이전받았으므로, 인코딩 완료(또는 실패) 후 여기서 반환합니다.
-                var pool = ArrayPool<byte>.Shared;
-                foreach (var f in frames)
-                {
-                    if (f.Data != null)
-                        pool.Return(f.Data);
-                }
-            }
+            // 사전 할당 방식: 인코딩 후 ArrayPool.Return 불필요
+            // 링버퍼가 슬롯을 계속 소유하며 재사용합니다.
         }
 
         private static void TryDeleteDirectory(string path)

@@ -48,12 +48,16 @@ namespace RekonOps.Rekon.Tests
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public void Initialize_NullRingBuffer_ThrowsArgumentNullException()
+        public void Initialize_NullRingBufferAndNullRecorder_StartCapturing_LogsError()
         {
+            // ringBuffer와 streamingRecorder 모두 null이면 StartCapturing() 시 오류
+            // Initialize 자체는 성공하고, StartCapturing()에서 검증함
             var go = new GameObject("TestCapturerNull");
             var capturer = go.AddComponent<FrameCapturer>();
-            Assert.Throws<System.ArgumentNullException>(
-                () => capturer.Initialize(null, _config));
+            capturer.Initialize(null, _config, null);
+            // StartCapturing() 호출 시 Unity 오류 로그 발생 (테스트 환경에서 예외 대신 LogError)
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("FrameCapturer가 초기화되지 않았습니다"));
+            capturer.StartCapturing();
             Object.DestroyImmediate(go);
         }
 

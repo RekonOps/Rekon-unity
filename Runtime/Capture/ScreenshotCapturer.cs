@@ -90,9 +90,10 @@ namespace RekonOps.Rekon
                 // 2단계: 백그라운드 스레드 — PNG 인코딩 (CPU 집약적, ~10~50ms)
                 Task.Run(() =>
                 {
+                    NativeArray<byte> nativeArray = default;
                     try
                     {
-                        using var nativeArray = new NativeArray<byte>(rawBytes, Allocator.Temp);
+                        nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                         byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
                             nativeArray, format, (uint)width, (uint)height).ToArray();
 
@@ -106,6 +107,10 @@ namespace RekonOps.Rekon
                     catch (Exception ex)
                     {
                         tcs.SetException(ex);
+                    }
+                    finally
+                    {
+                        if (nativeArray.IsCreated) nativeArray.Dispose();
                     }
                 });
             }

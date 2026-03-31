@@ -2,17 +2,20 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Threading.Tasks;
+using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 
 namespace RekonOps.Rekon
 {
     /// <summary>
     /// Unity ScreenCapture API 기반 스크린샷 캡처 구현체.
     ///
-    /// 캡처 흐름:
-    ///   1. ScreenCapture.CaptureScreenshotAsTexture(downscale) → Texture2D (메인 스레드)
-    ///   2. texture.EncodeToPNG() → byte[] (메인 스레드에서 PNG 인코딩)
-    ///   3. File.WriteAllBytes → ThreadPool에서 비동기 파일 저장
+    /// 캡처 흐름 (스터터링 최소화):
+    ///   1. ScreenCapture.CaptureScreenshotAsTexture(downscale) → Texture2D (메인 스레드, 빠름)
+    ///   2. texture.GetRawTextureData() → NativeArray 복사 (메인 스레드, 빠름)
+    ///   3. Texture2D.Destroy (메인 스레드, 즉시 해제)
+    ///   4. ImageConversion.EncodeNativeArrayToPNG → byte[] (백그라운드 스레드, CPU 집약적)
     ///
     /// 주의: CaptureAsync()는 반드시 Unity 메인 스레드에서 호출해야 합니다.
     /// </summary>
@@ -58,8 +61,53 @@ namespace RekonOps.Rekon
             yield return new WaitForEndOfFrame();
             try
             {
-                byte[] result = CaptureImmediate();
-                tcs.SetResult(result);
+                int downscale = Mathf.Max(1, _settings.screenshotDownscale);
+
+                // 1080p 최대 해상도 캡
+                if (Screen.height > 1080 && downscale == 1)
+                {
+                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
+                    Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
+                }
+
+                // 1단계: 메인 스레드 — 화면 캡처 + raw 바이트 복사 (빠름, ~1ms)
+                Texture2D texture = ScreenCapture.CaptureScreenshotAsTexture(downscale);
+
+                if (texture == null)
+                {
+                    Debug.LogWarning("[Rekon] CaptureScreenshotAsTexture가 null을 반환했습니다.");
+                    tcs.SetResult(null);
+                    yield break;
+                }
+
+                int width = texture.width;
+                int height = texture.height;
+                var format = texture.graphicsFormat;
+                // raw 바이트를 관리 배열로 복사 (NativeArray → byte[])
+                byte[] rawBytes = texture.GetRawTextureData<byte>().ToArray();
+                UnityEngine.Object.Destroy(texture); // 텍스처 즉시 해제 — 메인 스레드 부담 최소화
+
+                // 2단계: 백그라운드 스레드 — PNG 인코딩 (CPU 집약적, ~10~50ms)
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        using var nativeArray = new NativeArray<byte>(rawBytes, Allocator.Temp);
+                        byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
+                            nativeArray, format, (uint)width, (uint)height).ToArray();
+
+                        if (pngBytes == null || pngBytes.Length == 0)
+                        {
+                            tcs.SetResult(null);
+                            return;
+                        }
+                        tcs.SetResult(pngBytes);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                });
             }
             catch (Exception ex)
             {

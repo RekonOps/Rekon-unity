@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -98,7 +99,8 @@ namespace RekonOps.Rekon
 
             await prevFlush;
 
-            var frames = _ringBuffer.GetFrames();
+            // TakeFrames(): 소유권 이전 — 내부 슬롯이 null로 비워지고 DoFlushAsync가 byte[] 반환 책임을 가집니다.
+            var frames = _ringBuffer.TakeFrames();
             if (frames.Length == 0)
                 return;
 
@@ -156,6 +158,16 @@ namespace RekonOps.Rekon
             catch (Exception ex)
             {
                 Debug.LogError($"[Rekon] 세그먼트 플러시 실패: {ex.Message}");
+            }
+            finally
+            {
+                // TakeFrames()로 소유권을 이전받았으므로, 인코딩 완료(또는 실패) 후 여기서 반환합니다.
+                var pool = ArrayPool<byte>.Shared;
+                foreach (var f in frames)
+                {
+                    if (f.Data != null)
+                        pool.Return(f.Data);
+                }
             }
         }
 

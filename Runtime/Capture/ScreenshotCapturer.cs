@@ -67,106 +67,98 @@ namespace RekonOps.Rekon
         {
             yield return new WaitForEndOfFrame();
 
-            try
+            // downscale 계산 (try 밖 — yield와 공존 불가)
+            int downscale = Mathf.Max(1, _settings.screenshotDownscale);
+            if (Screen.height > 1080 && downscale == 1)
             {
-                // downscale 계산
-                int downscale = Mathf.Max(1, _settings.screenshotDownscale);
-                if (Screen.height > 1080 && downscale == 1)
-                {
-                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
-                    Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
-                }
-
-                int targetW = Screen.width / downscale;
-                int targetH = Screen.height / downscale;
-
-                // RT 재사용 (크기 변경 시에만 재생성)
-                EnsureRenderTexture(targetW, targetH);
-
-                // 1단계: 화면을 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
-                ScreenCapture.CaptureScreenshotIntoRenderTexture(_cachedRenderTexture);
-
-                // 2단계: 비동기 GPU→CPU 읽기 요청 (즉시 반환, 2~3프레임 후 콜백)
-                if (SystemInfo.supportsAsyncGPUReadback)
-                {
-                    var capturedWidth = targetW;
-                    var capturedHeight = targetH;
-
-                    AsyncGPUReadback.Request(_cachedRenderTexture, 0, TextureFormat.RGBA32,
-                        request =>
-                        {
-                            if (request.hasError)
-                            {
-                                Debug.LogWarning("[Rekon] AsyncGPUReadback 오류.");
-                                tcs.TrySetResult(null);
-                                return;
-                            }
-
-                            // NativeArray 데이터 확보 (콜백은 메인 스레드에서 호출됨)
-                            var data = request.GetData<byte>();
-                            byte[] rawBytes = data.ToArray(); // 복사 (콜백 수명 이후에도 유효해야 함)
-
-                            // 3단계: 백그라운드 PNG 인코딩
-                            Task.Run(() =>
-                            {
-                                NativeArray<byte> nativeArray = default;
-                                try
-                                {
-                                    nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
-                                    byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
-                                        nativeArray,
-                                        GraphicsFormat.R8G8B8A8_SRGB,
-                                        (uint)capturedWidth,
-                                        (uint)capturedHeight
-                                    ).ToArray();
-                                    tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
-                                }
-                                catch (Exception ex)
-                                {
-                                    tcs.TrySetException(ex);
-                                }
-                                finally
-                                {
-                                    if (nativeArray.IsCreated) nativeArray.Dispose();
-                                }
-                            });
-                        });
-                }
-                else
-                {
-                    // AsyncGPUReadback 미지원 환경 폴백 (구형 모바일 등)
-                    Debug.LogWarning("[Rekon] AsyncGPUReadback 미지원, 동기 폴백 사용");
-                    yield return null; // CaptureScreenshotIntoRenderTexture 반영 대기 1프레임
-
-                    var prev = RenderTexture.active;
-                    RenderTexture.active = _cachedRenderTexture;
-                    var fallback = new Texture2D(targetW, targetH, TextureFormat.RGBA32, false);
-                    fallback.ReadPixels(new Rect(0, 0, targetW, targetH), 0, 0, false);
-                    fallback.Apply();
-                    RenderTexture.active = prev;
-
-                    var format = fallback.graphicsFormat;
-                    byte[] rawBytes = fallback.GetRawTextureData<byte>().ToArray();
-                    UnityEngine.Object.Destroy(fallback);
-
-                    Task.Run(() =>
-                    {
-                        NativeArray<byte> nativeArray = default;
-                        try
-                        {
-                            nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
-                            byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
-                                nativeArray, format, (uint)targetW, (uint)targetH).ToArray();
-                            tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
-                        }
-                        catch (Exception ex) { tcs.TrySetException(ex); }
-                        finally { if (nativeArray.IsCreated) nativeArray.Dispose(); }
-                    });
-                }
+                downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
+                Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
             }
-            catch (Exception ex)
+
+            int targetW = Screen.width / downscale;
+            int targetH = Screen.height / downscale;
+
+            // RT 재사용 (크기 변경 시에만 재생성)
+            EnsureRenderTexture(targetW, targetH);
+
+            // 1단계: 화면을 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
+            ScreenCapture.CaptureScreenshotIntoRenderTexture(_cachedRenderTexture);
+
+            // 2단계: 비동기 GPU→CPU 읽기 요청
+            if (SystemInfo.supportsAsyncGPUReadback)
             {
-                tcs.TrySetException(ex);
+                var capturedWidth = targetW;
+                var capturedHeight = targetH;
+
+                AsyncGPUReadback.Request(_cachedRenderTexture, 0, TextureFormat.RGBA32,
+                    request =>
+                    {
+                        if (request.hasError)
+                        {
+                            Debug.LogWarning("[Rekon] AsyncGPUReadback 오류.");
+                            tcs.TrySetResult(null);
+                            return;
+                        }
+
+                        var data = request.GetData<byte>();
+                        byte[] rawBytes = data.ToArray();
+
+                        // 3단계: 백그라운드 PNG 인코딩
+                        Task.Run(() =>
+                        {
+                            NativeArray<byte> nativeArray = default;
+                            try
+                            {
+                                nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
+                                byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
+                                    nativeArray,
+                                    GraphicsFormat.R8G8B8A8_SRGB,
+                                    (uint)capturedWidth,
+                                    (uint)capturedHeight
+                                ).ToArray();
+                                tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
+                            }
+                            catch (Exception ex)
+                            {
+                                tcs.TrySetException(ex);
+                            }
+                            finally
+                            {
+                                if (nativeArray.IsCreated) nativeArray.Dispose();
+                            }
+                        });
+                    });
+            }
+            else
+            {
+                // AsyncGPUReadback 미지원 환경 폴백
+                Debug.LogWarning("[Rekon] AsyncGPUReadback 미지원, 동기 폴백 사용");
+                yield return null; // RT 반영 대기 1프레임
+
+                var prev = RenderTexture.active;
+                RenderTexture.active = _cachedRenderTexture;
+                var fallback = new Texture2D(targetW, targetH, TextureFormat.RGBA32, false);
+                fallback.ReadPixels(new Rect(0, 0, targetW, targetH), 0, 0, false);
+                fallback.Apply();
+                RenderTexture.active = prev;
+
+                var format = fallback.graphicsFormat;
+                byte[] rawBytes = fallback.GetRawTextureData<byte>().ToArray();
+                UnityEngine.Object.Destroy(fallback);
+
+                Task.Run(() =>
+                {
+                    NativeArray<byte> nativeArray = default;
+                    try
+                    {
+                        nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
+                        byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
+                            nativeArray, format, (uint)targetW, (uint)targetH).ToArray();
+                        tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
+                    }
+                    catch (Exception ex) { tcs.TrySetException(ex); }
+                    finally { if (nativeArray.IsCreated) nativeArray.Dispose(); }
+                });
             }
         }
 

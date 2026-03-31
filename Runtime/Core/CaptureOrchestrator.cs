@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -461,8 +460,8 @@ namespace RekonOps.Rekon
                     return;
                 }
 
-                // TakeFrames(): 소유권 이전 — 내부 슬롯이 null로 비워지고 호출자가 byte[] 반환 책임을 가집니다.
-                FrameData[] frames = _frameBuffer.TakeFrames();
+                // GetFrames(): 사전 할당 방식 — 소유권 이전 없이 현재 버퍼 스냅샷을 읽어옵니다.
+                FrameData[] frames = _frameBuffer.GetFrames();
                 if (frames.Length > 0)
                 {
                     // 인코더의 OutputExtension을 사용하여 출력 경로 결정 (OCP 적용)
@@ -474,97 +473,85 @@ namespace RekonOps.Rekon
                     // 첨부파일 크기 제한은 웹 대시보드에서 관리됨 (ADR-047)
                     var activeConfig = _videoConfig;
 
-                    try
+                    await _videoEncoder.EncodeAsync(frames, videoPath, activeConfig, token);
+
+                    // 파일 크기 초과 시 CRF를 올려 최대 2회 재인코딩 (무한 루프 방지)
+                    if (activeConfig.TargetMaxSizeBytes > 0 && File.Exists(videoPath))
                     {
-                        await _videoEncoder.EncodeAsync(frames, videoPath, activeConfig, token);
-
-                        // 파일 크기 초과 시 CRF를 올려 최대 2회 재인코딩 (무한 루프 방지)
-                        if (activeConfig.TargetMaxSizeBytes > 0 && File.Exists(videoPath))
+                        // CRF 단계: 23 → 28 → 33
+                        int[] crfSteps = { 28, 33 };
+                        long currentSize = new FileInfo(videoPath).Length;
+                        for (int attempt = 0; attempt < crfSteps.Length; attempt++)
                         {
-                            // CRF 단계: 23 → 28 → 33
-                            int[] crfSteps = { 28, 33 };
-                            long currentSize = new FileInfo(videoPath).Length;
-                            for (int attempt = 0; attempt < crfSteps.Length; attempt++)
-                            {
-                                if (currentSize <= activeConfig.TargetMaxSizeBytes)
-                                    break; // 크기 제한 이내 → 재인코딩 불필요
+                            if (currentSize <= activeConfig.TargetMaxSizeBytes)
+                                break; // 크기 제한 이내 → 재인코딩 불필요
 
-                                int nextCrf = crfSteps[attempt];
+                            int nextCrf = crfSteps[attempt];
+                            Debug.LogWarning(
+                                $"[Rekon] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
+                                $"CRF {nextCrf}으로 재인코딩합니다. (시도 {attempt + 1}/2)");
+
+                            var reencodeConfig = new VideoEncoderConfig
+                            {
+                                Width             = activeConfig.Width,
+                                Height            = activeConfig.Height,
+                                Fps               = activeConfig.Fps,
+                                BitrateMbps       = activeConfig.BitrateMbps,
+                                Crf               = nextCrf,
+                                TargetMaxSizeBytes = activeConfig.TargetMaxSizeBytes,
+                            };
+
+                            // 원본 파일 보호를 위해 임시 경로에 인코딩 후 성공 시 교체
+                            string tempPath = videoPath + ".tmp";
+                            try
+                            {
+                                await _videoEncoder.EncodeAsync(frames, tempPath, reencodeConfig, token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                                throw;
+                            }
+                            catch (Exception)
+                            {
+                                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                                throw;
+                            }
+                            if (File.Exists(tempPath))
+                            {
+                                long newSize = new FileInfo(tempPath).Length;
+                                if (newSize > 0 && newSize < currentSize)
+                                {
+                                    File.Delete(videoPath);
+                                    File.Move(tempPath, videoPath);
+                                    currentSize = newSize; // 다음 반복 비교용으로 업데이트
+                                }
+                                else
+                                {
+                                    File.Delete(tempPath); // 더 커지거나 0이면 원본 유지
+                                    break; // 더 이상 재인코딩 무의미
+                                }
+                            }
+                        }
+
+                        // 최종 크기 확인 로그
+                        if (File.Exists(videoPath))
+                        {
+                            long finalSize = new FileInfo(videoPath).Length;
+                            if (finalSize > activeConfig.TargetMaxSizeBytes)
+                            {
                                 Debug.LogWarning(
-                                    $"[Rekon] 영상 파일 크기({currentSize / 1024.0 / 1024.0:F1} MB)가 " +
+                                    $"[Rekon] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
                                     $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
-                                    $"CRF {nextCrf}으로 재인코딩합니다. (시도 {attempt + 1}/2)");
-
-                                var reencodeConfig = new VideoEncoderConfig
-                                {
-                                    Width             = activeConfig.Width,
-                                    Height            = activeConfig.Height,
-                                    Fps               = activeConfig.Fps,
-                                    BitrateMbps       = activeConfig.BitrateMbps,
-                                    Crf               = nextCrf,
-                                    TargetMaxSizeBytes = activeConfig.TargetMaxSizeBytes,
-                                };
-
-                                // 원본 파일 보호를 위해 임시 경로에 인코딩 후 성공 시 교체
-                                string tempPath = videoPath + ".tmp";
-                                try
-                                {
-                                    await _videoEncoder.EncodeAsync(frames, tempPath, reencodeConfig, token);
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-                                    throw;
-                                }
-                                catch (Exception)
-                                {
-                                    try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
-                                    throw;
-                                }
-                                if (File.Exists(tempPath))
-                                {
-                                    long newSize = new FileInfo(tempPath).Length;
-                                    if (newSize > 0 && newSize < currentSize)
-                                    {
-                                        File.Delete(videoPath);
-                                        File.Move(tempPath, videoPath);
-                                        currentSize = newSize; // 다음 반복 비교용으로 업데이트
-                                    }
-                                    else
-                                    {
-                                        File.Delete(tempPath); // 더 커지거나 0이면 원본 유지
-                                        break; // 더 이상 재인코딩 무의미
-                                    }
-                                }
-                            }
-
-                            // 최종 크기 확인 로그
-                            if (File.Exists(videoPath))
-                            {
-                                long finalSize = new FileInfo(videoPath).Length;
-                                if (finalSize > activeConfig.TargetMaxSizeBytes)
-                                {
-                                    Debug.LogWarning(
-                                        $"[Rekon] 재인코딩 후에도 영상 파일 크기({finalSize / 1024.0 / 1024.0:F1} MB)가 " +
-                                        $"첨부파일 제한({activeConfig.TargetMaxSizeBytes / 1024.0 / 1024.0:F0} MB)을 초과합니다. " +
-                                        "Jira 업로드 시 거부될 수 있습니다.");
-                                }
+                                    "Jira 업로드 시 거부될 수 있습니다.");
                             }
                         }
+                    }
 
-                        result.VideoPath = videoPath;
-                    }
-                    finally
-                    {
-                        // TakeFrames()로 소유권을 이전받았으므로, 인코딩 완료 후 여기서 반환합니다.
-                        // 링버퍼 내부 슬롯은 이미 null 처리되어 이중 반환이 발생하지 않습니다.
-                        var pool = ArrayPool<byte>.Shared;
-                        foreach (var f in frames)
-                        {
-                            if (f.Data != null)
-                                pool.Return(f.Data);
-                        }
-                    }
+                    // 사전 할당 방식: 인코딩 후 ArrayPool.Return 불필요
+                    // 링버퍼가 슬롯을 계속 소유하며 재사용합니다.
+                    result.VideoPath = videoPath;
                 }
 
                 ReportProgress("video", 1.0f);

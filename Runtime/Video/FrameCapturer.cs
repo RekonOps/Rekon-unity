@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -17,6 +16,11 @@ namespace RekonOps.Rekon
     /// GPU 읽기:
     ///   1. AsyncGPUReadback.Request() 지원 시 비동기 GPU 읽기 (성능 우선)
     ///   2. 미지원 시 ReadPixels 폴백 (동기, 메인 스레드 블로킹)
+    ///
+    /// GC 최적화:
+    ///   FrameRingBuffer.AddFromNativeArray() / AddFromManagedArray()를 사용하여
+    ///   사전 할당된 슬롯에 직접 복사합니다.
+    ///   AsyncGPUReadback 콜백 이후 new byte[] 할당이 전혀 없습니다.
     ///
     /// UI 포함:
     ///   ScreenCapture는 UI를 포함한 최종 화면을 캡처합니다.
@@ -37,7 +41,6 @@ namespace RekonOps.Rekon
         private int _currentWidth;
         private int _currentHeight;
         private readonly WaitForEndOfFrame _waitForEndOfFrame = new WaitForEndOfFrame();
-        private readonly ArrayPool<byte> _arrayPool = ArrayPool<byte>.Shared;
 
         public bool IsCapturing => _isCapturing;
 
@@ -158,21 +161,18 @@ namespace RekonOps.Rekon
 
         private void EnqueueAsyncReadback(double timestamp)
         {
+            // width/height를 콜백 시점에서도 유효하도록 지역 변수로 캡처
+            int captureWidth = _currentWidth;
+            int captureHeight = _currentHeight;
+
             AsyncGPUReadback.Request(_renderTexture, 0, TextureFormat.RGBA32, request =>
             {
                 if (request.hasError) return;
                 if (_config == null || _ringBuffer == null) return;
 
+                // GC 할당 제거: NativeArray를 사전 할당 슬롯에 직접 복사
                 var data = request.GetData<byte>();
-                int dataLength = data.Length;
-
-                // GC 할당 제거: new byte[] 대신 ArrayPool에서 대여
-                // ArrayPool.Rent()는 dataLength 이상의 배열을 반환할 수 있으므로
-                // FrameData에 실제 길이(dataLength)를 별도 저장합니다.
-                byte[] bytes = _arrayPool.Rent(dataLength);
-                data.CopyTo(bytes);
-
-                _ringBuffer.Add(new FrameData(bytes, dataLength, _currentWidth, _currentHeight, timestamp));
+                _ringBuffer.AddFromNativeArray(data, captureWidth, captureHeight, timestamp);
             });
         }
 
@@ -185,15 +185,9 @@ namespace RekonOps.Rekon
                 // _fallbackTexture를 재사용하여 매 프레임 new/Destroy로 인한 GC 부담 방지
                 _fallbackTexture.ReadPixels(new Rect(0, 0, _currentWidth, _currentHeight), 0, 0, false);
                 _fallbackTexture.Apply();
-                // GetRawTextureData()는 내부 버퍼 참조를 반환하므로 반드시 복사해야 함
-                // _fallbackTexture 재사용 시 이전 프레임 데이터가 덮어씌워지는 것을 방지
+                // GetRawTextureData()는 내부 버퍼 참조를 반환하므로 직접 슬롯에 복사
                 byte[] raw = _fallbackTexture.GetRawTextureData();
-                int dataLength = raw.Length;
-
-                // GC 할당 제거: new byte[] 대신 ArrayPool에서 대여
-                byte[] bytes = _arrayPool.Rent(dataLength);
-                Buffer.BlockCopy(raw, 0, bytes, 0, dataLength);
-                _ringBuffer?.Add(new FrameData(bytes, dataLength, _currentWidth, _currentHeight, timestamp));
+                _ringBuffer?.AddFromManagedArray(raw, raw.Length, _currentWidth, _currentHeight, timestamp);
             }
             finally
             {

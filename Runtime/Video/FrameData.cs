@@ -4,20 +4,21 @@ namespace RekonOps.Rekon
     /// 단일 비디오 프레임의 픽셀 데이터와 메타 정보를 담는 구조체.
     /// FrameRingBuffer에 저장되고 VideoEncoder로 전달됩니다.
     ///
-    /// 풀링 주의:
-    ///   Data는 System.Buffers.ArrayPool&lt;byte&gt;.Shared에서 대여한 배열일 수 있습니다.
-    ///   ArrayPool.Rent()는 요청 크기 이상의 배열을 반환할 수 있으므로,
-    ///   실제 유효 픽셀 길이는 Data.Length가 아닌 DataLength를 사용해야 합니다.
+    /// 사전 할당 주의:
+    ///   Data는 FrameRingBuffer가 사전 할당한 슬롯 배열을 가리킵니다.
+    ///   슬롯 배열은 링버퍼가 소유하며 재사용되므로 외부에서 반환하거나 수정하지 마세요.
+    ///   실제 유효 픽셀 바이트 수는 Data.Length가 아닌 DataLength를 사용해야 합니다.
     ///   Mp4VideoEncoder는 frame.Data를 stdin에 쓸 때 반드시 DataLength만큼만 write해야 합니다.
     /// </summary>
     public readonly struct FrameData
     {
         /// <summary>RGBA32 형식의 픽셀 데이터 (행 단위, 위에서 아래 순서).
-        /// ArrayPool 대여 배열일 수 있으므로 Data.Length 대신 DataLength를 사용하세요.</summary>
+        /// 링버퍼의 사전 할당 슬롯이므로 Data.Length 대신 DataLength를 사용하세요.
+        /// 외부에서 반환하거나 수정하지 마세요.</summary>
         public readonly byte[] Data;
 
         /// <summary>Data 배열에서 실제 유효한 픽셀 데이터의 바이트 수.
-        /// ArrayPool.Rent()는 요청 크기 이상을 반환할 수 있으므로 이 값을 사용해야 합니다.</summary>
+        /// 슬롯 크기(Data.Length)와 다를 수 있으므로 항상 이 값을 사용해야 합니다.</summary>
         public readonly int DataLength;
 
         /// <summary>프레임 너비(픽셀)</summary>
@@ -47,11 +48,11 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// FrameData를 초기화합니다 (ArrayPool 대여 배열용).
-        /// ArrayPool.Rent()는 dataLength 이상의 배열을 반환할 수 있으므로
+        /// FrameData를 초기화합니다 (실제 유효 길이 별도 지정).
+        /// 사전 할당 슬롯은 frameSize 이상일 수 있으므로
         /// 실제 유효 길이를 dataLength로 별도 지정합니다.
         /// </summary>
-        /// <param name="data">RGBA32 픽셀 바이트 배열 (ArrayPool 대여 배열)</param>
+        /// <param name="data">RGBA32 픽셀 바이트 배열 (링버퍼 사전 할당 슬롯)</param>
         /// <param name="dataLength">실제 유효 픽셀 데이터 바이트 수</param>
         /// <param name="width">프레임 너비</param>
         /// <param name="height">프레임 높이</param>

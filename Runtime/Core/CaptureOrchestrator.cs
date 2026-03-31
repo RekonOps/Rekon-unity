@@ -32,6 +32,7 @@ namespace RekonOps.Rekon
         private readonly IVideoEncoder _videoEncoder;
         private readonly VideoEncoderConfig _videoConfig;
         private readonly RekonSettings _settings;
+        private readonly StreamingVideoRecorder _streamingRecorder;
         // 생성자 주입 토큰 스토어 (null 허용)
         private readonly SessionTokenStore _tokenStore;
         // 런타임 바인딩 토큰 스토어 — BindTokenStore() 호출 시 설정되며, _tokenStore보다 우선합니다.
@@ -77,7 +78,8 @@ namespace RekonOps.Rekon
             VideoEncoderConfig videoConfig,
             RekonSettings settings,
             ScreenshotQueue screenshotQueue = null,
-            SessionTokenStore tokenStore = null)
+            SessionTokenStore tokenStore = null,
+            StreamingVideoRecorder streamingRecorder = null)
         {
             _screenshotCapturer = screenshotCapturer ?? throw new ArgumentNullException(nameof(screenshotCapturer));
             _logCollector = logCollector ?? throw new ArgumentNullException(nameof(logCollector));
@@ -89,6 +91,7 @@ namespace RekonOps.Rekon
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _screenshotQueue = screenshotQueue; // null 허용 (스크린샷 큐 비활성 시)
             _tokenStore = tokenStore; // null 허용 (미연동 시 사전 체크 건너뜀)
+            _streamingRecorder = streamingRecorder; // null 허용 (스트리밍 모드 비활성 시)
         }
 
         /// <summary>
@@ -454,7 +457,37 @@ namespace RekonOps.Rekon
                 token.ThrowIfCancellationRequested();
 
                 // 영상 캡처가 비활성화된 경우 건너뜀
-                if (!_settings.videoEnabled || _frameBuffer == null || _videoEncoder == null)
+                if (!_settings.videoEnabled)
+                {
+                    ReportProgress("video", 1.0f);
+                    return;
+                }
+
+                // ── 스트리밍 모드 ──────────────────────────────────────────────────
+                if (_streamingRecorder != null && _streamingRecorder.IsRecording)
+                {
+                    int bufferSeconds = _settings != null ? _settings.videoBufferSeconds : 60;
+                    string videoPath = await _streamingRecorder.StopAndExtractAsync(bufferSeconds);
+
+                    if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
+                    {
+                        result.VideoPath = videoPath;
+                        Debug.Log($"[Rekon] 스트리밍 영상 추출 완료: {videoPath}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Rekon] 스트리밍 영상 추출 실패 또는 파일 없음");
+                    }
+
+                    // 다음 캡처를 위해 녹화 재시작
+                    _streamingRecorder.Restart();
+
+                    ReportProgress("video", 1.0f);
+                    return;
+                }
+
+                // ── 레거시 링버퍼 모드 ───────────────────────────────────────────
+                if (_frameBuffer == null || _videoEncoder == null)
                 {
                     ReportProgress("video", 1.0f);
                     return;

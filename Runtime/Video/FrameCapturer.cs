@@ -42,12 +42,16 @@ namespace RekonOps.Rekon
         private int _currentHeight;
         private readonly WaitForEndOfFrame _waitForEndOfFrame = new WaitForEndOfFrame();
 
+        // 스트리밍 녹화기 (null이면 레거시 링버퍼 모드)
+        private StreamingVideoRecorder _streamingRecorder;
+
         public bool IsCapturing => _isCapturing;
 
-        public void Initialize(FrameRingBuffer ringBuffer, VideoEncoderConfig config)
+        public void Initialize(FrameRingBuffer ringBuffer, VideoEncoderConfig config, StreamingVideoRecorder streamingRecorder = null)
         {
-            _ringBuffer = ringBuffer ?? throw new ArgumentNullException(nameof(ringBuffer));
+            _ringBuffer = ringBuffer; // 스트리밍 모드에서는 null 허용
             _config = config ?? throw new ArgumentNullException(nameof(config));
+            _streamingRecorder = streamingRecorder;
 
             _captureInterval = 1f / Mathf.Max(1, _config.Fps);
             _asyncGpuReadbackSupported = SystemInfo.supportsAsyncGPUReadback;
@@ -74,7 +78,7 @@ namespace RekonOps.Rekon
 
         public void StartCapturing()
         {
-            if (_ringBuffer == null)
+            if (_ringBuffer == null && _streamingRecorder == null)
             {
                 Debug.LogError("[Rekon] FrameCapturer가 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
                 return;
@@ -83,6 +87,11 @@ namespace RekonOps.Rekon
 
             _isCapturing = true;
             _lastCaptureTime = Time.unscaledTime;
+
+            // 스트리밍 녹화기 시작
+            if (_streamingRecorder != null)
+                _streamingRecorder.Start(_currentWidth, _currentHeight);
+
             _captureCoroutine = StartCoroutine(CaptureLoopCoroutine());
         }
 
@@ -161,6 +170,14 @@ namespace RekonOps.Rekon
                     _currentHeight = sh;
                     CreateRenderResources(sw, sh);
                     Debug.Log($"[Rekon] 화면 크기 변경 감지: {sw}x{sh}, RT 재생성");
+
+                    // 스트리밍 녹화기도 재시작 (해상도 변경)
+                    if (_streamingRecorder != null && _streamingRecorder.IsRecording)
+                    {
+                        // fire-and-forget: 기존 rolling 파일 버리고 즉시 재시작
+                        _ = _streamingRecorder.StopAndExtractAsync(0);
+                        _streamingRecorder.Start(sw, sh);
+                    }
                 }
 
                 // 현재 화면을 RenderTexture에 캡처 (렌더링 완료 후, 추가 렌더링 없음)
@@ -187,11 +204,24 @@ namespace RekonOps.Rekon
             AsyncGPUReadback.Request(_renderTexture, 0, TextureFormat.RGBA32, request =>
             {
                 if (request.hasError) return;
-                if (_config == null || _ringBuffer == null) return;
+                if (_config == null) return;
 
-                // GC 할당 제거: NativeArray를 사전 할당 슬롯에 직접 복사
                 var data = request.GetData<byte>();
-                _ringBuffer.AddFromNativeArray(data, captureWidth, captureHeight, timestamp);
+
+                if (_streamingRecorder != null && _streamingRecorder.IsRecording)
+                {
+                    // 스트리밍 모드: NativeArray → managed array 복사 후 큐에 추가
+                    // ConcurrentQueue에 최대 8프레임만 활성 → ~30MB, Gen0 GC에서 수거됨
+                    int dataLength = data.Length;
+                    byte[] bytes = new byte[dataLength];
+                    data.CopyTo(bytes);
+                    _streamingRecorder.EnqueueFrame(bytes, dataLength);
+                }
+                else if (_ringBuffer != null)
+                {
+                    // 레거시 모드: GC 할당 제거 — NativeArray를 사전 할당 슬롯에 직접 복사
+                    _ringBuffer.AddFromNativeArray(data, captureWidth, captureHeight, timestamp);
+                }
             });
         }
 
@@ -204,9 +234,21 @@ namespace RekonOps.Rekon
                 // _fallbackTexture를 재사용하여 매 프레임 new/Destroy로 인한 GC 부담 방지
                 _fallbackTexture.ReadPixels(new Rect(0, 0, _currentWidth, _currentHeight), 0, 0, false);
                 _fallbackTexture.Apply();
-                // GetRawTextureData()는 내부 버퍼 참조를 반환하므로 직접 슬롯에 복사
+                // GetRawTextureData()는 내부 버퍼 참조를 반환
                 byte[] raw = _fallbackTexture.GetRawTextureData();
-                _ringBuffer?.AddFromManagedArray(raw, raw.Length, _currentWidth, _currentHeight, timestamp);
+
+                if (_streamingRecorder != null && _streamingRecorder.IsRecording)
+                {
+                    // 스트리밍 모드: 복사본을 큐에 추가 (raw는 내부 버퍼 참조이므로 반드시 복사)
+                    byte[] copy = new byte[raw.Length];
+                    Buffer.BlockCopy(raw, 0, copy, 0, raw.Length);
+                    _streamingRecorder.EnqueueFrame(copy, copy.Length);
+                }
+                else
+                {
+                    // 레거시 모드: 직접 슬롯에 복사
+                    _ringBuffer?.AddFromManagedArray(raw, raw.Length, _currentWidth, _currentHeight, timestamp);
+                }
             }
             finally
             {

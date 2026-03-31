@@ -31,8 +31,8 @@ namespace RekonOps.Rekon
     /// </summary>
     public class FrameRingBuffer : IDisposable
     {
-        private readonly FrameData[] _frames;
-        private readonly int _capacity;
+        private FrameData[] _frames;
+        private int _capacity;
         private readonly FramePool _pool;
         private int _head;
         private int _count;

@@ -86,31 +86,21 @@ namespace RekonOps.Rekon
             if (frameSize <= 0)
                 return;
 
-            if (_preallocatedBuffers != null && _bufferSize >= frameSize)
-                return;
+            // 슬롯 배열만 준비 (개별 byte[]는 AddFromNativeArray/AddFromManagedArray 시 지연 할당)
+            if (_preallocatedBuffers == null)
+                _preallocatedBuffers = new byte[_capacity][];
 
-            // 메모리 상한 체크: 총 할당이 MaxMemoryMB를 초과하면 capacity 자동 축소
-            const long MaxMemoryBytes = 1536L * 1024 * 1024; // 1.5GB 상한
-            long totalBytes = (long)_capacity * frameSize;
-            int effectiveCapacity = _capacity;
-            if (totalBytes > MaxMemoryBytes)
+            // 해상도 변경: 기존 버퍼 크기가 부족하면 모두 해제 (다음 Add 시 재할당)
+            if (_bufferSize > 0 && _bufferSize != frameSize)
             {
-                effectiveCapacity = (int)(MaxMemoryBytes / frameSize);
-                if (effectiveCapacity < 30) effectiveCapacity = 30; // 최소 1초분(30fps)
-                Debug.LogWarning($"[Rekon] 메모리 상한({MaxMemoryBytes / 1024 / 1024}MB) 초과 → 버퍼 용량 자동 축소: {_capacity} → {effectiveCapacity}프레임");
-                _capacity = effectiveCapacity;
-                _frames = new FrameData[_capacity];
-                _head = 0;
+                for (int i = 0; i < _preallocatedBuffers.Length; i++)
+                    _preallocatedBuffers[i] = null;
                 _count = 0;
+                _head = 0;
+                Debug.Log($"[Rekon] 영상 해상도 변경 감지: {_bufferSize} → {frameSize} bytes. 버퍼 초기화.");
             }
 
-            // 해상도 변경 또는 최초 할당: 슬롯 전체 재할당
-            _preallocatedBuffers = new byte[_capacity][];
-            for (int i = 0; i < _capacity; i++)
-                _preallocatedBuffers[i] = new byte[frameSize];
             _bufferSize = frameSize;
-
-            Debug.Log($"[Rekon] FrameRingBuffer 버퍼 사전 할당 완료: {_capacity}슬롯 × {frameSize / 1024.0 / 1024.0:F2}MB = {_capacity * (long)frameSize / 1024.0 / 1024.0:F0}MB");
         }
 
         /// <summary>
@@ -136,7 +126,10 @@ namespace RekonOps.Rekon
 
             lock (_lock)
             {
-                // 사전 할당된 슬롯에 직접 복사 (new byte[] 없음)
+                // 슬롯이 비어있으면 할당, 있으면 재사용 (가득 찬 후에는 GC 0)
+                if (_preallocatedBuffers[_head] == null || _preallocatedBuffers[_head].Length < dataLength)
+                    _preallocatedBuffers[_head] = new byte[dataLength];
+
                 source.CopyTo(_preallocatedBuffers[_head]);
                 _frames[_head] = new FrameData(_preallocatedBuffers[_head], dataLength, width, height, timestamp);
                 _head = (_head + 1) % _capacity;
@@ -167,7 +160,10 @@ namespace RekonOps.Rekon
 
             lock (_lock)
             {
-                // 사전 할당된 슬롯에 직접 복사 (new byte[] 없음)
+                // 슬롯이 비어있으면 할당, 있으면 재사용 (가득 찬 후에는 GC 0)
+                if (_preallocatedBuffers[_head] == null || _preallocatedBuffers[_head].Length < dataLength)
+                    _preallocatedBuffers[_head] = new byte[dataLength];
+
                 Buffer.BlockCopy(source, 0, _preallocatedBuffers[_head], 0, dataLength);
                 _frames[_head] = new FrameData(_preallocatedBuffers[_head], dataLength, width, height, timestamp);
                 _head = (_head + 1) % _capacity;

@@ -61,8 +61,8 @@ desktop.ini
 .env.development
 .env.production
 .env.staging
-supabase/.branches
-supabase/.temp
+supabase~/.branches
+supabase~/.temp
 
 # ============================================================
 # 기타

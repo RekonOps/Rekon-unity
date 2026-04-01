@@ -22,5 +22,14 @@ namespace RekonOps.Rekon
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Domain Reload OFF 환경에서 Play Mode 재진입 시 캐시를 초기화합니다.
+        /// RekonBootstrap.ResetStaticState()에서 호출됩니다.
+        /// </summary>
+        public static void ResetCache()
+        {
+            _instance = null;
+        }
     }
 }

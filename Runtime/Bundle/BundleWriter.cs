@@ -113,6 +113,15 @@ namespace RekonOps.Rekon
             return _bundlesRootDirectory = Path.Combine(Application.persistentDataPath, "Rekon", "bundles");
         }
 
+        /// <summary>
+        /// Domain Reload OFF 환경에서 Play Mode 재진입 시 정적 캐시를 초기화합니다.
+        /// RekonBootstrap.ResetStaticState()에서 호출됩니다.
+        /// </summary>
+        public static void ResetStaticCache()
+        {
+            _bundlesRootDirectory = null;
+        }
+
         // ──────────────────────────────────────────────────────────────
         // 아티팩트 복사
         // ──────────────────────────────────────────────────────────────

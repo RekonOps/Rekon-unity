@@ -96,12 +96,26 @@ namespace RekonOps.Rekon
                         var data = request.GetData<byte>();
                         byte[] rawBytes = data.ToArray();
 
-                        // 3단계: 백그라운드 PNG 인코딩
+                        // 3단계: 백그라운드 Y축 플립 + PNG 인코딩
                         Task.Run(() =>
                         {
                             NativeArray<byte> nativeArray = default;
                             try
                             {
+                                // RenderTexture는 Y축 반전(bottom-up) → PNG는 top-down → 행 단위 플립
+                                int stride = capturedWidth * 4; // RGBA32 = 4 bytes/pixel
+                                for (int y = 0; y < capturedHeight / 2; y++)
+                                {
+                                    int topOffset = y * stride;
+                                    int bottomOffset = (capturedHeight - 1 - y) * stride;
+                                    for (int x = 0; x < stride; x++)
+                                    {
+                                        byte tmp = rawBytes[topOffset + x];
+                                        rawBytes[topOffset + x] = rawBytes[bottomOffset + x];
+                                        rawBytes[bottomOffset + x] = tmp;
+                                    }
+                                }
+
                                 nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                                 byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
                                     nativeArray,
@@ -144,6 +158,20 @@ namespace RekonOps.Rekon
                     NativeArray<byte> nativeArray = default;
                     try
                     {
+                        // Y축 플립 (RenderTexture bottom-up → PNG top-down)
+                        int stride = captureW * 4;
+                        for (int y = 0; y < captureH / 2; y++)
+                        {
+                            int topOffset = y * stride;
+                            int bottomOffset = (captureH - 1 - y) * stride;
+                            for (int x = 0; x < stride; x++)
+                            {
+                                byte tmp = rawBytes[topOffset + x];
+                                rawBytes[topOffset + x] = rawBytes[bottomOffset + x];
+                                rawBytes[bottomOffset + x] = tmp;
+                            }
+                        }
+
                         nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                         byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
                             nativeArray, format, (uint)captureW, (uint)captureH).ToArray();

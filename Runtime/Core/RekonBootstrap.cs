@@ -22,6 +22,7 @@ namespace RekonOps.Rekon
     {
         private static bool _initialized;
         private static ScreenshotQueue _screenshotQueue;
+        private static StreamingVideoRecorder _streamingRecorder;
 
         /// <summary>
         /// Domain Reload OFF 대응: 정적 상태 리셋.
@@ -36,15 +37,21 @@ namespace RekonOps.Rekon
             Application.quitting -= OnApplicationQuitting;
             _screenshotQueue?.Clear();
             _screenshotQueue = null;
+            // 스트리밍 녹화기 정리
+            _streamingRecorder?.Dispose();
+            _streamingRecorder = null;
         }
 
         /// <summary>
-        /// Application 종료 시 ScreenshotQueue 리소스 정리.
+        /// Application 종료 시 리소스 정리.
         /// 정적 핸들러를 사용하여 Domain Reload OFF 환경에서 람다 누적 구독을 방지합니다.
         /// </summary>
         private static void OnApplicationQuitting()
         {
             _screenshotQueue?.Clear();
+            // FFmpeg 프로세스 정리 (Play Mode 종료 시 고아 프로세스 방지)
+            _streamingRecorder?.Dispose();
+            _streamingRecorder = null;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -96,6 +103,7 @@ namespace RekonOps.Rekon
                 IVideoEncoder videoEncoder = null;
                 VideoEncoderConfig videoConfig = null;
                 FrameCapturer frameCapturer = null;
+                StreamingVideoRecorder streamingRecorder = null;
 
                 if (settings.videoEnabled)
                 {
@@ -111,22 +119,28 @@ namespace RekonOps.Rekon
                     {
                         Debug.LogWarning("[Rekon] FFmpeg 미설치로 영상 녹화가 비활성화됩니다. " +
                                          "스크린샷과 로그 캡처는 정상 동작합니다.");
-                        // frameRingBuffer, videoEncoder, videoConfig, frameCapturer 모두 null 유지
+                        // frameRingBuffer, videoEncoder, videoConfig, frameCapturer, streamingRecorder 모두 null 유지
                     }
                     else
                     {
-                        // FFmpeg 확인 후 MP4 인코더 초기화
+                        videoConfig = VideoEncoderConfig.FromSettings(settings);
+
+                        // ── 스트리밍 녹화기 생성 (FFmpeg 실시간 인코딩) ──────────────
+                        string gpuEncoder = FfmpegHelper.GetGpuEncoder();
+                        streamingRecorder = new StreamingVideoRecorder(settings.videoFps, gpuEncoder);
+                        _streamingRecorder = streamingRecorder;
+
+                        // 레거시 링버퍼 경로는 유지 (streamingRecorder가 null일 때 폴백)
                         int frameCapacity = settings.videoFps * settings.videoBufferSeconds;
                         frameRingBuffer = new FrameRingBuffer(frameCapacity);
                         videoEncoder = new Mp4VideoEncoder();
-                        videoConfig = VideoEncoderConfig.FromSettings(settings);
 
                         // FrameCapturer는 MonoBehaviour이므로 root에 AddComponent
                         frameCapturer = root.AddComponent<FrameCapturer>();
-                        frameCapturer.Initialize(frameRingBuffer, videoConfig);
+                        frameCapturer.Initialize(frameRingBuffer, videoConfig, streamingRecorder);
                         frameCapturer.StartCapturing();
 
-                        Debug.Log($"[Rekon] 영상 녹화 활성화: {videoConfig}");
+                        Debug.Log($"[Rekon] 스트리밍 영상 녹화 활성화: {videoConfig}, GPU인코더={gpuEncoder ?? "libx264(CPU)"}");
                     }
                 }
 
@@ -140,11 +154,12 @@ namespace RekonOps.Rekon
                     logCollector: logRingBuffer,
                     logSerializer: logSerializer,
                     stateCollector: stateCollector,
-                    frameBuffer: frameRingBuffer,    // null 허용 (영상 비활성 시)
-                    videoEncoder: videoEncoder,       // null 허용
-                    videoConfig: videoConfig,         // null 허용
+                    frameBuffer: frameRingBuffer,         // null 허용 (영상 비활성 시)
+                    videoEncoder: videoEncoder,            // null 허용
+                    videoConfig: videoConfig,              // null 허용
                     settings: settings,
-                    screenshotQueue: screenshotQueue);
+                    screenshotQueue: screenshotQueue,
+                    streamingRecorder: streamingRecorder); // null 허용 (FFmpeg 미설치 시)
 
                 // ── 7. HotkeyManager 생성 및 설정 주입 ───────────────────────────
                 var hotkeyManager = root.AddComponent<HotkeyManager>();

@@ -98,9 +98,11 @@ namespace RekonOps.Rekon
                 string filePath = Path.Combine(outputPath, fileName);
 
                 // 유효한 프레임만 저장
+                // frame.DataLength를 사용하여 ArrayPool 대여 배열의 실제 유효 바이트만 기록합니다.
                 if (frame.IsValid)
                 {
-                    File.WriteAllBytes(filePath, frame.Data);
+                    using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write);
+                    fs.Write(frame.Data, 0, frame.DataLength);
                 }
 
                 string comma = (i < frames.Length - 1) ? "," : "";

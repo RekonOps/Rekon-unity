@@ -67,28 +67,21 @@ namespace RekonOps.Rekon
         {
             yield return new WaitForEndOfFrame();
 
-            // downscale 계산 (try 밖 — yield와 공존 불가)
-            int downscale = Mathf.Max(1, _settings.screenshotDownscale);
-            if (Screen.height > 1080 && downscale == 1)
-            {
-                downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
-                Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
-            }
-
-            int targetW = Screen.width / downscale;
-            int targetH = Screen.height / downscale;
+            // RT는 원본 해상도로 생성 (CaptureScreenshotIntoRenderTexture는 RT 크기로 잘라서 캡처)
+            int captureW = Screen.width;
+            int captureH = Screen.height;
 
             // RT 재사용 (크기 변경 시에만 재생성)
-            EnsureRenderTexture(targetW, targetH);
+            EnsureRenderTexture(captureW, captureH);
 
-            // 1단계: 화면을 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
+            // 1단계: 화면 전체를 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
             ScreenCapture.CaptureScreenshotIntoRenderTexture(_cachedRenderTexture);
 
-            // 2단계: 비동기 GPU→CPU 읽기 요청
+            // 2단계: 비동기 GPU→CPU 읽기 요청 (원본 해상도)
             if (SystemInfo.supportsAsyncGPUReadback)
             {
-                var capturedWidth = targetW;
-                var capturedHeight = targetH;
+                var capturedWidth = captureW;
+                var capturedHeight = captureH;
 
                 AsyncGPUReadback.Request(_cachedRenderTexture, 0, TextureFormat.RGBA32,
                     request =>
@@ -103,12 +96,26 @@ namespace RekonOps.Rekon
                         var data = request.GetData<byte>();
                         byte[] rawBytes = data.ToArray();
 
-                        // 3단계: 백그라운드 PNG 인코딩
+                        // 3단계: 백그라운드 Y축 플립 + PNG 인코딩
                         Task.Run(() =>
                         {
                             NativeArray<byte> nativeArray = default;
                             try
                             {
+                                // RenderTexture는 Y축 반전(bottom-up) → PNG는 top-down → 행 단위 플립
+                                int stride = capturedWidth * 4; // RGBA32 = 4 bytes/pixel
+                                for (int y = 0; y < capturedHeight / 2; y++)
+                                {
+                                    int topOffset = y * stride;
+                                    int bottomOffset = (capturedHeight - 1 - y) * stride;
+                                    for (int x = 0; x < stride; x++)
+                                    {
+                                        byte tmp = rawBytes[topOffset + x];
+                                        rawBytes[topOffset + x] = rawBytes[bottomOffset + x];
+                                        rawBytes[bottomOffset + x] = tmp;
+                                    }
+                                }
+
                                 nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                                 byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
                                     nativeArray,
@@ -137,8 +144,8 @@ namespace RekonOps.Rekon
 
                 var prev = RenderTexture.active;
                 RenderTexture.active = _cachedRenderTexture;
-                var fallback = new Texture2D(targetW, targetH, TextureFormat.RGBA32, false);
-                fallback.ReadPixels(new Rect(0, 0, targetW, targetH), 0, 0, false);
+                var fallback = new Texture2D(captureW, captureH, TextureFormat.RGBA32, false);
+                fallback.ReadPixels(new Rect(0, 0, captureW, captureH), 0, 0, false);
                 fallback.Apply();
                 RenderTexture.active = prev;
 
@@ -151,9 +158,23 @@ namespace RekonOps.Rekon
                     NativeArray<byte> nativeArray = default;
                     try
                     {
+                        // Y축 플립 (RenderTexture bottom-up → PNG top-down)
+                        int stride = captureW * 4;
+                        for (int y = 0; y < captureH / 2; y++)
+                        {
+                            int topOffset = y * stride;
+                            int bottomOffset = (captureH - 1 - y) * stride;
+                            for (int x = 0; x < stride; x++)
+                            {
+                                byte tmp = rawBytes[topOffset + x];
+                                rawBytes[topOffset + x] = rawBytes[bottomOffset + x];
+                                rawBytes[bottomOffset + x] = tmp;
+                            }
+                        }
+
                         nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                         byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
-                            nativeArray, format, (uint)targetW, (uint)targetH).ToArray();
+                            nativeArray, format, (uint)captureW, (uint)captureH).ToArray();
                         tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
                     }
                     catch (Exception ex) { tcs.TrySetException(ex); }
@@ -184,16 +205,10 @@ namespace RekonOps.Rekon
 
         private byte[] CaptureImmediate()
         {
-            // 테스트/폴백용 동기 캡처 (기존 로직 유지)
+            // 테스트/폴백용 동기 캡처 (원본 해상도)
             try
             {
-                int downscale = Mathf.Max(1, _settings.screenshotDownscale);
-                if (Screen.height > 1080 && downscale == 1)
-                {
-                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
-                }
-
-                var texture = ScreenCapture.CaptureScreenshotAsTexture(downscale);
+                var texture = ScreenCapture.CaptureScreenshotAsTexture(1);
                 if (texture == null) return null;
                 var pngBytes = texture.EncodeToPNG();
                 UnityEngine.Object.Destroy(texture);

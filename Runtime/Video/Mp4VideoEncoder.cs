@@ -337,9 +337,10 @@ namespace RekonOps.Rekon
                 _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
             };
 
-            // ScreenCapture API는 백버퍼를 정방향으로 캡처하므로 vflip 불필요
+            // RenderTexture는 Y축 반전(bottom-up) → vflip 적용
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
+                   $"-vf vflip " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

@@ -218,7 +218,10 @@ namespace RekonOps.Rekon
 
                             try
                             {
-                                stdin.Write(frame.Data, 0, frame.Data.Length);
+                                // frame.DataLength를 사용해야 합니다.
+                                // ArrayPool.Rent()는 요청 크기 이상의 배열을 반환할 수 있으므로
+                                // Data.Length가 아닌 DataLength(실제 유효 픽셀 바이트 수)로 write합니다.
+                                stdin.Write(frame.Data, 0, frame.DataLength);
                                 writtenFrames++;
                             }
                             catch (IOException ioEx)

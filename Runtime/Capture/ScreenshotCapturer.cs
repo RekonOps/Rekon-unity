@@ -67,28 +67,21 @@ namespace RekonOps.Rekon
         {
             yield return new WaitForEndOfFrame();
 
-            // downscale 계산 (try 밖 — yield와 공존 불가)
-            int downscale = Mathf.Max(1, _settings.screenshotDownscale);
-            if (Screen.height > 1080 && downscale == 1)
-            {
-                downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
-                Debug.Log($"[Rekon] 스크린샷 자동 다운스케일: {downscale}x (화면 높이 {Screen.height}px > 1080px)");
-            }
-
-            int targetW = Screen.width / downscale;
-            int targetH = Screen.height / downscale;
+            // RT는 원본 해상도로 생성 (CaptureScreenshotIntoRenderTexture는 RT 크기로 잘라서 캡처)
+            int captureW = Screen.width;
+            int captureH = Screen.height;
 
             // RT 재사용 (크기 변경 시에만 재생성)
-            EnsureRenderTexture(targetW, targetH);
+            EnsureRenderTexture(captureW, captureH);
 
-            // 1단계: 화면을 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
+            // 1단계: 화면 전체를 RT에 복사 (빠름, ~0.1ms, 메인 스레드 비블로킹)
             ScreenCapture.CaptureScreenshotIntoRenderTexture(_cachedRenderTexture);
 
-            // 2단계: 비동기 GPU→CPU 읽기 요청
+            // 2단계: 비동기 GPU→CPU 읽기 요청 (원본 해상도)
             if (SystemInfo.supportsAsyncGPUReadback)
             {
-                var capturedWidth = targetW;
-                var capturedHeight = targetH;
+                var capturedWidth = captureW;
+                var capturedHeight = captureH;
 
                 AsyncGPUReadback.Request(_cachedRenderTexture, 0, TextureFormat.RGBA32,
                     request =>

@@ -130,8 +130,8 @@ namespace RekonOps.Rekon
 
                 var prev = RenderTexture.active;
                 RenderTexture.active = _cachedRenderTexture;
-                var fallback = new Texture2D(targetW, targetH, TextureFormat.RGBA32, false);
-                fallback.ReadPixels(new Rect(0, 0, targetW, targetH), 0, 0, false);
+                var fallback = new Texture2D(captureW, captureH, TextureFormat.RGBA32, false);
+                fallback.ReadPixels(new Rect(0, 0, captureW, captureH), 0, 0, false);
                 fallback.Apply();
                 RenderTexture.active = prev;
 
@@ -146,7 +146,7 @@ namespace RekonOps.Rekon
                     {
                         nativeArray = new NativeArray<byte>(rawBytes, Allocator.Persistent);
                         byte[] pngBytes = ImageConversion.EncodeNativeArrayToPNG(
-                            nativeArray, format, (uint)targetW, (uint)targetH).ToArray();
+                            nativeArray, format, (uint)captureW, (uint)captureH).ToArray();
                         tcs.TrySetResult(pngBytes?.Length > 0 ? pngBytes : null);
                     }
                     catch (Exception ex) { tcs.TrySetException(ex); }
@@ -177,16 +177,10 @@ namespace RekonOps.Rekon
 
         private byte[] CaptureImmediate()
         {
-            // 테스트/폴백용 동기 캡처 (기존 로직 유지)
+            // 테스트/폴백용 동기 캡처 (원본 해상도)
             try
             {
-                int downscale = Mathf.Max(1, _settings.screenshotDownscale);
-                if (Screen.height > 1080 && downscale == 1)
-                {
-                    downscale = Mathf.CeilToInt((float)Screen.height / 1080f);
-                }
-
-                var texture = ScreenCapture.CaptureScreenshotAsTexture(downscale);
+                var texture = ScreenCapture.CaptureScreenshotAsTexture(1);
                 if (texture == null) return null;
                 var pngBytes = texture.EncodeToPNG();
                 UnityEngine.Object.Destroy(texture);

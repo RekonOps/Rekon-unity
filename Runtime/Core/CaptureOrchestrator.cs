@@ -193,7 +193,10 @@ namespace RekonOps.Rekon
             try
             {
                 // 병렬 수집
-                var screenshotTask = CaptureScreenshotAsync(captureDir, result, cts.Token);
+                // 영상 캡처 트리거 시에는 스크린샷을 캡처하지 않음 (별도 스크린샷 트리거 사용)
+                var screenshotTask = _settings.videoEnabled
+                    ? Task.CompletedTask
+                    : CaptureScreenshotAsync(captureDir, result, cts.Token);
                 var logsTask = CaptureLogsAsync(captureDir, result, cts.Token);
                 var stateTask = CaptureStateAsync(captureDir, result, cts.Token);
                 var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);

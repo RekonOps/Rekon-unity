@@ -337,10 +337,10 @@ namespace RekonOps.Rekon
                 _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
             };
 
-            // RenderTexture는 Y축 반전(bottom-up) → vflip 적용
+            // RenderTexture Y축 반전은 FrameCapturer에서 row swap으로 사전 보정됨
+            // (-vf vflip은 하드웨어 인코더에서 무시되므로 제거)
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-vf vflip " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

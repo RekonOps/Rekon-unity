@@ -32,6 +32,10 @@ namespace RekonOps.Rekon
         private const int MaxQueueSize = 8;
         private volatile int _queueCount;
 
+        // 프레임 버퍼 풀 (ConcurrentBag)
+        private ConcurrentBag<byte[]> _frameBufferPool;
+        private int _frameBufferSize;
+
         // 쓰기 스레드
         private Thread _writerThread;
         private volatile bool _isRecording;
@@ -59,6 +63,24 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
+        /// FFmpeg stdin용 버퍼를 대여합니다.
+        /// </summary>
+        /// <param name="requiredLength">필요한 byte 수</param>
+        /// <param name="buffer">대여한 버퍼</param>
+        /// <returns>대여 성공 여부</returns>
+        public bool TryRentFrameBuffer(int requiredLength, out byte[] buffer)
+        {
+            buffer = null;
+            if (_disposed || !_isRecording || _frameBufferPool == null)
+                return false;
+
+            if (requiredLength <= 0 || _frameBufferSize != requiredLength)
+                return false;
+
+            return _frameBufferPool.TryTake(out buffer);
+        }
+
+        /// <summary>
         /// FFmpeg 프로세스를 시작하고 녹화를 시작합니다.
         /// </summary>
         public bool Start(int width, int height)
@@ -67,6 +89,9 @@ namespace RekonOps.Rekon
 
             _width = width;
             _height = height;
+
+            int frameBufferSize = _width * _height * 4;
+            InitializeFrameBufferPool(frameBufferSize);
 
             // 임시 파일 경로
             _rollingFilePath = Path.Combine(
@@ -95,19 +120,38 @@ namespace RekonOps.Rekon
         /// 프레임을 큐에 추가합니다. 큐가 가득 차면 드랍 (게임 프레임 보호).
         /// 메인 스레드에서 호출됩니다.
         /// </summary>
-        public void EnqueueFrame(byte[] data, int length)
+        public bool EnqueueFrame(byte[] data, int length)
         {
-            if (!_isRecording || _disposed) return;
+            if (_disposed || !_isRecording)
+            {
+                TryReturnFrameBuffer(data);
+                return false;
+            }
+
+            if (data == null || length <= 0 || _frameBufferPool == null || _frameBufferSize <= 0)
+            {
+                TryReturnFrameBuffer(data);
+                return false;
+            }
+
+            // 잘못된 길이/크기 데이터는 누수 방지를 위해 즉시 반환
+            if (length > data.Length || _frameBufferSize != data.Length)
+            {
+                TryReturnFrameBuffer(data);
+                return false;
+            }
 
             // 큐 가득 차면 드랍 (게임 프레임 보호 > 녹화 프레임 보존)
             if (_queueCount >= MaxQueueSize)
             {
                 Interlocked.Increment(ref _framesDropped);
-                return;
+                TryReturnFrameBuffer(data);
+                return false;
             }
 
             _frameQueue.Enqueue(new FramePacket { Data = data, Length = length });
             Interlocked.Increment(ref _queueCount);
+            return true;
         }
 
         /// <summary>
@@ -129,6 +173,9 @@ namespace RekonOps.Rekon
                     Debug.LogWarning("[Rekon] 쓰기 스레드 종료 타임아웃 (5초). 강제 진행.");
                 _writerThread = null;
             }
+
+            // 종료되지 못한 큐는 모두 반납
+            ReturnQueuedFrameBuffers();
 
             // FFmpeg 종료 대기
             if (_ffmpegProcess != null)
@@ -169,9 +216,13 @@ namespace RekonOps.Rekon
         /// </summary>
         public bool Restart()
         {
-            // 기존 큐 비우기
-            while (_frameQueue.TryDequeue(out _))
+            // 기존 큐 비우기 (비우는 과정에서 풀 반환)
+            while (_frameQueue.TryDequeue(out var droppedPacket))
+            {
+                TryReturnFrameBuffer(droppedPacket.Data);
                 Interlocked.Decrement(ref _queueCount);
+            }
+            Interlocked.Exchange(ref _queueCount, 0);
 
             return Start(_width, _height);
         }
@@ -229,12 +280,52 @@ namespace RekonOps.Rekon
             // 하드웨어 인코더별 최적 설정
             switch (encoder)
             {
-                case "h264_nvenc":        return "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -pix_fmt yuv420p";
-                case "h264_amf":          return "-c:v h264_amf -quality speed -rc cqp -qp_i 23 -qp_p 23 -pix_fmt yuv420p";
+                case "h264_nvenc": return "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -pix_fmt yuv420p";
+                case "h264_amf": return "-c:v h264_amf -quality speed -rc cqp -qp_i 23 -qp_p 23 -pix_fmt yuv420p";
                 case "h264_videotoolbox": return "-c:v h264_videotoolbox -q:v 65 -pix_fmt yuv420p";
-                case "h264_qsv":          return "-c:v h264_qsv -preset veryfast -global_quality 23 -pix_fmt yuv420p";
-                default:                  return "-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p";
+                case "h264_qsv": return "-c:v h264_qsv -preset veryfast -global_quality 23 -pix_fmt yuv420p";
+                default: return "-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p";
             }
+        }
+
+        private void InitializeFrameBufferPool(int frameBufferSize)
+        {
+            if (frameBufferSize <= 0)
+                return;
+
+            if (_frameBufferPool != null && _frameBufferSize == frameBufferSize)
+                return;
+
+            _frameBufferSize = frameBufferSize;
+            _frameBufferPool = new ConcurrentBag<byte[]>();
+            for (int i = 0; i < MaxQueueSize; i++)
+            {
+                _frameBufferPool.Add(new byte[frameBufferSize]);
+            }
+        }
+
+        private void TryReturnFrameBuffer(byte[] buffer)
+        {
+            if (_disposed || _frameBufferPool == null || buffer == null)
+                return;
+
+            if (_frameBufferSize != buffer.Length)
+                return;
+
+            if (_frameBufferPool.Count < MaxQueueSize)
+            {
+                _frameBufferPool.Add(buffer);
+            }
+        }
+
+        private void ReturnQueuedFrameBuffers()
+        {
+            while (_frameQueue.TryDequeue(out var packet))
+            {
+                TryReturnFrameBuffer(packet.Data);
+            }
+
+            Interlocked.Exchange(ref _queueCount, 0);
         }
 
         private void WriterLoop()
@@ -249,8 +340,12 @@ namespace RekonOps.Rekon
                     {
                         if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
                         {
-                            _stdin.Write(packet.Data, 0, packet.Length);
-                            Interlocked.Increment(ref _framesWritten);
+                            if (packet.Data != null && packet.Length > 0)
+                            {
+                                int bytesToWrite = Math.Min(packet.Length, packet.Data.Length);
+                                _stdin.Write(packet.Data, 0, bytesToWrite);
+                                Interlocked.Increment(ref _framesWritten);
+                            }
                         }
                     }
                     catch (IOException)
@@ -262,6 +357,10 @@ namespace RekonOps.Rekon
                     {
                         Debug.LogError($"[Rekon] FFmpeg 쓰기 오류: {ex.Message}");
                         break;
+                    }
+                    finally
+                    {
+                        TryReturnFrameBuffer(packet.Data);
                     }
                 }
                 else
@@ -319,11 +418,18 @@ namespace RekonOps.Rekon
 
             try { _stdin?.Close(); } catch { }
             try { _writerThread?.Join(3000); } catch { }
+
+            // 종료되지 못한 큐 반환
+            ReturnQueuedFrameBuffers();
+
             try { if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) _ffmpegProcess.Kill(); } catch { }
             try { _ffmpegProcess?.Dispose(); } catch { }
 
             // rolling 파일 정리
             try { if (!string.IsNullOrEmpty(_rollingFilePath) && File.Exists(_rollingFilePath)) File.Delete(_rollingFilePath); } catch { }
+
+            _frameBufferPool = null;
+            _frameBufferSize = 0;
         }
     }
 }

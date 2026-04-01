@@ -244,6 +244,7 @@ namespace RekonOps.Rekon
 
             string args = $"-y -f rawvideo -pix_fmt rgba -video_size {_width}x{_height} " +
                           $"-framerate {_fps} -i pipe:0 " +
+                          $"-vf vflip " +
                           $"{encoderArgs} " +
                           $"-movflags +faststart \"{_rollingFilePath}\"";
 

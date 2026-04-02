@@ -50,8 +50,6 @@ namespace RekonOps.Rekon
         private readonly Queue<string> _stderrLines = new Queue<string>();
         private const int StderrTailLines = 10;
 
-        // Y축 반전 플래그 (videotoolbox 이외의 인코더에서 bottom-up → top-down 변환)
-        private bool _needsVFlip;
 
         // 프레임 패킷 (byte[] 재사용을 위해 구조체 사용)
         private struct FramePacket
@@ -302,10 +300,6 @@ namespace RekonOps.Rekon
             string encoder = !string.IsNullOrEmpty(_gpuEncoder) ? _gpuEncoder : "libx264";
             string encoderArgs = GetEncoderArgs(encoder);
 
-            // videotoolbox(Mac): 인코더가 내부적으로 Y축 보정 → WriterThread에서 그대로 전달
-            // 그 외(Windows/Linux): bottom-up 데이터 → WriterThread에서 행 역순 전달로 보정
-            _needsVFlip = (encoder != "h264_videotoolbox");
-
             string args = $"-y -f rawvideo -pix_fmt rgba -video_size {_width}x{_height} " +
                           $"-framerate {_fps} -i pipe:0 " +
                           $"-pix_fmt yuv420p " +
@@ -344,7 +338,7 @@ namespace RekonOps.Rekon
                 // stderr 비동기 읽기 (데드락 방지)
                 _ffmpegProcess.BeginErrorReadLine();
 
-                Debug.Log($"[Rekon] FFmpeg 시작: encoder={encoder}, {_width}x{_height}@{_fps}fps");
+                Debug.Log($"[Rekon] FFmpeg 시작: encoder={encoder}, {_width}x{_height}@{_fps}fps, vflip={_needsVFlip}");
                 return true;
             }
             catch (Exception ex)
@@ -421,19 +415,10 @@ namespace RekonOps.Rekon
                         {
                             if (packet.Data != null && packet.Length > 0)
                             {
-                                if (_needsVFlip)
-                                {
-                                    // bottom-up → top-down: 행을 역순으로 FFmpeg에 전달
-                                    // 원본 버퍼를 수정하지 않고 전달 순서만 변경
-                                    int stride = _width * 4; // RGBA32
-                                    for (int y = _height - 1; y >= 0; y--)
-                                        _stdin.Write(packet.Data, y * stride, stride);
-                                }
-                                else
-                                {
-                                    int bytesToWrite = Math.Min(packet.Length, packet.Data.Length);
-                                    _stdin.Write(packet.Data, 0, bytesToWrite);
-                                }
+                                // AsyncGPUReadback 데이터는 플랫폼 무관하게 top-down
+                                // → 변환 없이 그대로 FFmpeg에 전달
+                                int bytesToWrite = Math.Min(packet.Length, packet.Data.Length);
+                                _stdin.Write(packet.Data, 0, bytesToWrite);
                                 Interlocked.Increment(ref _framesWritten);
                             }
                         }

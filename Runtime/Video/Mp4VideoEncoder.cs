@@ -337,11 +337,16 @@ namespace RekonOps.Rekon
                 _                   => $"-vcodec libx264 -preset ultrafast -crf {config.Crf}",
             };
 
+            // 입력이 1080p 초과 시 다운스케일 (원본 비율 유지, 2의 배수 보장)
+            string scaleFilter = (height > 1080)
+                ? "-vf scale=-2:1080"
+                : "";
+
             // Y축 반전은 호출 측에서 데이터를 역순 전달하여 처리
             // (Mp4VideoEncoder는 레거시 링버퍼 경로이며, FrameRingBuffer.GetFrames()에서 처리)
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-pix_fmt yuv420p " +
+                   $"{scaleFilter} -pix_fmt yuv420p " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

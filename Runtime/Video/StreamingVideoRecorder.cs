@@ -300,9 +300,14 @@ namespace RekonOps.Rekon
             string encoder = !string.IsNullOrEmpty(_gpuEncoder) ? _gpuEncoder : "libx264";
             string encoderArgs = GetEncoderArgs(encoder);
 
+            // 입력이 1080p 초과 시 다운스케일 (원본 비율 유지, 2의 배수 보장)
+            string scaleFilter = (_height > 1080)
+                ? "-vf scale=-2:1080"
+                : "";
+
             string args = $"-y -f rawvideo -pix_fmt rgba -video_size {_width}x{_height} " +
                           $"-framerate {_fps} -i pipe:0 " +
-                          $"-pix_fmt yuv420p " +
+                          $"{scaleFilter} -pix_fmt yuv420p " +
                           $"{encoderArgs} " +
                           $"-movflags +faststart \"{_rollingFilePath}\"";
 

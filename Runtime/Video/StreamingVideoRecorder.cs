@@ -338,7 +338,7 @@ namespace RekonOps.Rekon
                 // stderr 비동기 읽기 (데드락 방지)
                 _ffmpegProcess.BeginErrorReadLine();
 
-                Debug.Log($"[Rekon] FFmpeg 시작: encoder={encoder}, {_width}x{_height}@{_fps}fps, vflip={_needsVFlip}");
+                Debug.Log($"[Rekon] FFmpeg 시작: encoder={encoder}, {_width}x{_height}@{_fps}fps");
                 return true;
             }
             catch (Exception ex)

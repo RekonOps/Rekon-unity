@@ -326,21 +326,22 @@ namespace RekonOps.Rekon
             string encoderArgs = encoderName switch
             {
                 // NVIDIA NVENC: 가변 비트레이트 + CQ 품질 제어
-                "h264_nvenc"        => $"-vcodec h264_nvenc -pix_fmt yuv420p -preset p4 -rc vbr -cq {config.Crf}",
+                "h264_nvenc"        => $"-vcodec h264_nvenc -preset p4 -rc vbr -cq {config.Crf}",
                 // AMD AMF: CQP 고정 품질 모드
-                "h264_amf"          => $"-vcodec h264_amf -pix_fmt yuv420p -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
-                // Apple VideoToolbox: 비트레이트 기반 품질 제어 (FFmpeg 8.x 호환)
-                "h264_videotoolbox" => $"-vcodec h264_videotoolbox -pix_fmt yuv420p -b:v {config.BitrateMbps}M",
+                "h264_amf"          => $"-vcodec h264_amf -quality speed -rc cqp -qp_i {config.Crf} -qp_p {config.Crf}",
+                // Apple VideoToolbox: 기본 품질 사용 (-b:v, -q:v 제거 — FFmpeg 최신 버전 호환)
+                "h264_videotoolbox" => $"-vcodec h264_videotoolbox",
                 // Intel Quick Sync: global_quality로 품질 제어
-                "h264_qsv"          => $"-vcodec h264_qsv -pix_fmt yuv420p -preset veryfast -global_quality {config.Crf}",
+                "h264_qsv"          => $"-vcodec h264_qsv -preset veryfast -global_quality {config.Crf}",
                 // CPU fallback (libx264): 기존 동작과 동일
-                _                   => $"-vcodec libx264 -pix_fmt yuv420p -preset ultrafast -crf {config.Crf}",
+                _                   => $"-vcodec libx264 -preset ultrafast -crf {config.Crf}",
             };
 
-            // RenderTexture Y축 반전은 FrameCapturer에서 row swap으로 사전 보정됨
-            // (-vf vflip은 하드웨어 인코더에서 무시되므로 제거)
+            // -vf vflip: RenderTexture Y축 반전(bottom-up) 보정
+            // format=yuv420p: 필터 체인 안에서 포맷 변환 → 하드웨어 인코더도 반드시 필터 실행
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
+                   $"-vf vflip,format=yuv420p " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

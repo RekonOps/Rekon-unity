@@ -1,6 +1,6 @@
 {
   "name": "dev.rekonops.rekon",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "displayName": "Rekon",
   "description": "Bug reporting infrastructure for Unity game dev teams. Auto-capture video/screenshots/logs → web dashboard → Jira. | Unity 게임 개발팀을 위한 버그 리포팅 인프라.",
   "unity": "2022.3",

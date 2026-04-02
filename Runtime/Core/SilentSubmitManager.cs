@@ -373,10 +373,30 @@ namespace RekonOps.Rekon
                     return;
                 }
 
+                // WorkspaceId(tenantId) 검증 — 비어있으면 pending 큐에 등록 후 중단
+                // 원인: 에셋 미저장 상태로 Play Mode 진입 시 tenantId가 빈 문자열일 수 있음
+                string workspaceId = _settings.tenantId;
+                if (string.IsNullOrEmpty(workspaceId))
+                {
+                    Debug.LogWarning("[Rekon] SilentSubmit: WorkspaceId(tenantId)가 비어있습니다. " +
+                                     "Settings에 워크스페이스가 연동되어 있는지 확인하세요. pending 큐에 등록합니다.");
+
+                    if (_pendingUploadManager != null)
+                    {
+                        await _pendingUploadManager.EnqueueAsync(manifest);
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (WorkspaceId 없음): {manifest.id}");
+                    }
+                    else
+                    {
+                        OnSubmitCompleted?.Invoke(true, $"로컬 저장 완료 (WorkspaceId 없음): {manifest.id}");
+                    }
+                    return;
+                }
+
                 var request = new ReportSubmitRequest
                 {
                     AccessToken = accessToken,
-                    WorkspaceId = _settings.tenantId,
+                    WorkspaceId = workspaceId,
                     Title = manifest.title,
                     Description = BuildDescription(manifest),
                     Files = files

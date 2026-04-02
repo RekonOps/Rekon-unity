@@ -299,9 +299,15 @@ namespace RekonOps.Rekon
             string encoder = !string.IsNullOrEmpty(_gpuEncoder) ? _gpuEncoder : "libx264";
             string encoderArgs = GetEncoderArgs(encoder);
 
+            // videotoolbox(Mac/Metal): 데이터가 이미 top-down → vflip 불필요
+            // nvenc/amf/qsv/libx264(Windows/Linux): 데이터가 bottom-up → vflip 필요
+            string vfFilter = (encoder == "h264_videotoolbox")
+                ? "-pix_fmt yuv420p"
+                : "-vf vflip,format=yuv420p";
+
             string args = $"-y -f rawvideo -pix_fmt rgba -video_size {_width}x{_height} " +
                           $"-framerate {_fps} -i pipe:0 " +
-                          $"-vf vflip,format=yuv420p " +
+                          $"{vfFilter} " +
                           $"{encoderArgs} " +
                           $"-movflags +faststart \"{_rollingFilePath}\"";
 

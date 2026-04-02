@@ -40,6 +40,10 @@ namespace RekonOps.Rekon
             // 스트리밍 녹화기 정리
             _streamingRecorder?.Dispose();
             _streamingRecorder = null;
+            // RekonSettingsProvider 캐시 리셋 — Play Mode 재진입 시 최신 에셋을 다시 로드합니다
+            RekonSettingsProvider.ResetCache();
+            // BundleWriter 정적 경로 캐시 리셋
+            BundleWriter.ResetStaticCache();
         }
 
         /// <summary>

@@ -223,21 +223,6 @@ namespace RekonOps.Rekon
                             }
                         }
 
-                        // RenderTexture는 Y축 반전(bottom-up) → row swap으로 상하반전 보정
-                        // (-vf vflip은 하드웨어 인코더에서 무시되므로 CPU에서 직접 처리)
-                        int stride = captureWidth * 4; // RGBA32 = 4 bytes/pixel
-                        for (int y = 0; y < captureHeight / 2; y++)
-                        {
-                            int topOffset = y * stride;
-                            int bottomOffset = (captureHeight - 1 - y) * stride;
-                            for (int x = 0; x < stride; x++)
-                            {
-                                byte tmp = bytes[topOffset + x];
-                                bytes[topOffset + x] = bytes[bottomOffset + x];
-                                bytes[bottomOffset + x] = tmp;
-                            }
-                        }
-
                         _streamingRecorder.EnqueueFrame(bytes, dataLength);
                     }
                 }
@@ -267,22 +252,6 @@ namespace RekonOps.Rekon
                     if (raw != null && _streamingRecorder.TryRentFrameBuffer(raw.Length, out var copy))
                     {
                         Buffer.BlockCopy(raw, 0, copy, 0, raw.Length);
-
-                        // RenderTexture는 Y축 반전(bottom-up) → row swap으로 상하반전 보정
-                        // (-vf vflip은 하드웨어 인코더에서 무시되므로 CPU에서 직접 처리)
-                        int stride = _currentWidth * 4; // RGBA32 = 4 bytes/pixel
-                        for (int y = 0; y < _currentHeight / 2; y++)
-                        {
-                            int topOffset = y * stride;
-                            int bottomOffset = (_currentHeight - 1 - y) * stride;
-                            for (int x = 0; x < stride; x++)
-                            {
-                                byte tmp = copy[topOffset + x];
-                                copy[topOffset + x] = copy[bottomOffset + x];
-                                copy[bottomOffset + x] = tmp;
-                            }
-                        }
-
                         _streamingRecorder.EnqueueFrame(copy, copy.Length);
                     }
                 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -18,7 +19,7 @@ namespace RekonOps.Rekon
     {
         // 설정
         private readonly int _fps;
-        private readonly string _gpuEncoder;
+        private string _gpuEncoder;
         private int _width;
         private int _height;
 
@@ -44,6 +45,10 @@ namespace RekonOps.Rekon
         // 통계
         private long _framesWritten;
         private long _framesDropped;
+
+        // FFmpeg stderr 수집 (디버깅용)
+        private readonly Queue<string> _stderrLines = new Queue<string>();
+        private const int StderrTailLines = 10;
 
         // 프레임 패킷 (byte[] 재사용을 위해 구조체 사용)
         private struct FramePacket
@@ -90,6 +95,9 @@ namespace RekonOps.Rekon
             _width = width;
             _height = height;
 
+            // 이전 세션의 stderr 로그 초기화
+            lock (_stderrLines) { _stderrLines.Clear(); }
+
             int frameBufferSize = _width * _height * 4;
             InitializeFrameBufferPool(frameBufferSize);
 
@@ -103,7 +111,38 @@ namespace RekonOps.Rekon
             if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
 
             // FFmpeg 프로세스 시작
-            if (!StartFfmpegProcess()) return false;
+            if (!StartFfmpegProcess())
+            {
+                // GPU 인코더 실패 시 libx264로 폴백 (1회만)
+                if (!string.IsNullOrEmpty(_gpuEncoder))
+                {
+                    string stderrFallback;
+                    lock (_stderrLines) { stderrFallback = string.Join("\n", _stderrLines); }
+                    Debug.LogWarning($"[Rekon] {_gpuEncoder} 인코딩 시작 실패, libx264로 폴백. stderr:\n{stderrFallback}");
+
+                    // 실패한 프로세스 정리 (종료 완료 대기 후 해제)
+                    try
+                    {
+                        if (_ffmpegProcess != null && !_ffmpegProcess.HasExited)
+                        {
+                            _ffmpegProcess.Kill();
+                            _ffmpegProcess.WaitForExit(3000);
+                        }
+                    }
+                    catch { }
+                    try { _ffmpegProcess?.Dispose(); } catch { }
+                    _ffmpegProcess = null;
+                    _stdin = null;
+
+                    _gpuEncoder = null; // 이번 세션에서 libx264 사용
+                    lock (_stderrLines) { _stderrLines.Clear(); }
+                    if (!StartFfmpegProcess()) return false;
+                }
+                else
+                {
+                    return false;
+                }
+            }
 
             // 쓰기 스레드 시작
             _isRecording = true;
@@ -182,6 +221,15 @@ namespace RekonOps.Rekon
             {
                 if (!_ffmpegProcess.HasExited && !_ffmpegProcess.WaitForExit(10000))
                     try { _ffmpegProcess.Kill(); } catch { }
+
+                // FFmpeg 비정상 종료 시 stderr 출력
+                if (_ffmpegProcess.HasExited && _ffmpegProcess.ExitCode != 0)
+                {
+                    string stderrExit;
+                    lock (_stderrLines) { stderrExit = string.Join("\n", _stderrLines); }
+                    Debug.LogWarning($"[Rekon] FFmpeg 비정상 종료 (code={_ffmpegProcess.ExitCode}). stderr:\n{stderrExit}");
+                }
+
                 try { _ffmpegProcess.Dispose(); } catch { }
                 _ffmpegProcess = null;
             }
@@ -189,7 +237,16 @@ namespace RekonOps.Rekon
             Debug.Log($"[Rekon] 스트리밍 녹화 종료: {_framesWritten}프레임 기록, {_framesDropped}프레임 드랍");
 
             // rolling.mp4에서 마지막 N초 추출 (stream copy, 매우 빠름)
-            if (!File.Exists(_rollingFilePath)) return null;
+            if (!File.Exists(_rollingFilePath))
+            {
+                string stderrMissing;
+                lock (_stderrLines) { stderrMissing = string.Join("\n", _stderrLines); }
+                if (!string.IsNullOrEmpty(stderrMissing))
+                    Debug.LogWarning($"[Rekon] FFmpeg 영상 파일 미생성. stderr:\n{stderrMissing}");
+                else
+                    Debug.LogWarning("[Rekon] FFmpeg 영상 파일 미생성 (stderr 없음)");
+                return null;
+            }
 
             // lastSeconds가 0이면 전체 파일 반환 (해상도 변경 등 내부 재시작 시)
             if (lastSeconds <= 0)
@@ -244,6 +301,7 @@ namespace RekonOps.Rekon
 
             string args = $"-y -f rawvideo -pix_fmt rgba -video_size {_width}x{_height} " +
                           $"-framerate {_fps} -i pipe:0 " +
+                          $"-vf vflip,format=yuv420p " +
                           $"{encoderArgs} " +
                           $"-movflags +faststart \"{_rollingFilePath}\"";
 
@@ -261,6 +319,20 @@ namespace RekonOps.Rekon
             {
                 _ffmpegProcess = Process.Start(startInfo);
                 _stdin = _ffmpegProcess.StandardInput.BaseStream;
+
+                // stderr 수집 핸들러 등록 (디버깅용 rolling 버퍼)
+                _ffmpegProcess.ErrorDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        lock (_stderrLines)
+                        {
+                            _stderrLines.Enqueue(e.Data);
+                            while (_stderrLines.Count > StderrTailLines)
+                                _stderrLines.Dequeue();
+                        }
+                    }
+                };
 
                 // stderr 비동기 읽기 (데드락 방지)
                 _ffmpegProcess.BeginErrorReadLine();
@@ -280,11 +352,11 @@ namespace RekonOps.Rekon
             // 하드웨어 인코더별 최적 설정
             switch (encoder)
             {
-                case "h264_nvenc": return "-c:v h264_nvenc -preset p4 -rc vbr -cq 23 -pix_fmt yuv420p";
-                case "h264_amf": return "-c:v h264_amf -quality speed -rc cqp -qp_i 23 -qp_p 23 -pix_fmt yuv420p";
-                case "h264_videotoolbox": return "-c:v h264_videotoolbox -q:v 65 -pix_fmt yuv420p";
-                case "h264_qsv": return "-c:v h264_qsv -preset veryfast -global_quality 23 -pix_fmt yuv420p";
-                default: return "-c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p";
+                case "h264_nvenc": return "-c:v h264_nvenc -preset p4 -rc vbr -cq 23";
+                case "h264_amf": return "-c:v h264_amf -quality speed -rc cqp -qp_i 23 -qp_p 23";
+                case "h264_videotoolbox": return "-c:v h264_videotoolbox";
+                case "h264_qsv": return "-c:v h264_qsv -preset veryfast -global_quality 23";
+                default: return "-c:v libx264 -preset ultrafast -crf 23";
             }
         }
 

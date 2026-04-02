@@ -606,12 +606,55 @@ namespace RekonOps.Rekon.Editor
             }
             else
             {
-                // 미설치 시 버튼
+                // ─── 설치 가이드 ───
+                EditorGUILayout.Space(4f);
+
+                // OS별 가이드
+#if UNITY_EDITOR_WIN
+                EditorGUILayout.LabelField("Windows 설치 방법", EditorStyles.boldLabel);
+                EditorGUILayout.Space(2f);
+
+                var guideStyle = new GUIStyle(EditorStyles.label) { wordWrap = true, richText = true };
+
+                EditorGUILayout.LabelField(
+                    "<b>1.</b> ffmpeg.org/download 에서 다운로드\n" +
+                    "    → <i>Windows builds from gyan.dev</i> 클릭\n" +
+                    "    → <i>ffmpeg-release-essentials.zip</i> 다운로드",
+                    guideStyle, GUILayout.Height(48f));
+
+                EditorGUILayout.LabelField(
+                    "<b>2.</b> 압축 해제\n" +
+                    "    → <b>C:\\ffmpeg</b> 에 압축 해제\n" +
+                    "    → <b>C:\\ffmpeg\\bin\\ffmpeg.exe</b> 파일 확인",
+                    guideStyle, GUILayout.Height(48f));
+
+                EditorGUILayout.LabelField(
+                    "<b>3.</b> 환경변수 PATH 추가\n" +
+                    "    → 시스템 속성 → 환경 변수 → Path 편집\n" +
+                    "    → <b>C:\\ffmpeg\\bin</b> 추가",
+                    guideStyle, GUILayout.Height(48f));
+
+                EditorGUILayout.LabelField(
+                    "<b>4.</b> Unity 에디터 재시작 후 자동 감지 확인",
+                    guideStyle, GUILayout.Height(20f));
+#elif UNITY_EDITOR_OSX
+                EditorGUILayout.LabelField("macOS 설치 방법", EditorStyles.boldLabel);
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.HelpBox("터미널에서 실행:\n  brew install ffmpeg\n\n설치 후 Unity 에디터를 재시작하세요.", MessageType.Info);
+#elif UNITY_EDITOR_LINUX
+                EditorGUILayout.LabelField("Linux 설치 방법", EditorStyles.boldLabel);
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.HelpBox("터미널에서 실행:\n  sudo apt install ffmpeg  (Ubuntu/Debian)\n  sudo dnf install ffmpeg  (Fedora)\n\n설치 후 Unity 에디터를 재시작하세요.", MessageType.Info);
+#endif
+
+                EditorGUILayout.Space(4f);
+
+                // 버튼
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     if (GUILayout.Button("다시 확인", GUILayout.Height(24f)))
                         FfmpegHelper.ClearCache();
-                    if (GUILayout.Button("FFmpeg 다운로드 페이지", GUILayout.Height(24f)))
+                    if (GUILayout.Button("ffmpeg.org 열기", GUILayout.Height(24f)))
                         Application.OpenURL("https://ffmpeg.org/download.html");
                 }
             }

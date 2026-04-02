@@ -57,18 +57,12 @@ namespace RekonOps.Rekon
             _captureInterval = 1f / Mathf.Max(1, _config.Fps);
             _asyncGpuReadbackSupported = SystemInfo.supportsAsyncGPUReadback;
 
-            // 영상 캡처 해상도: 1080p 상한 (버그 리포트에 충분한 해상도)
-            const int MaxVideoHeight = 1080;
+            // 원본 화면 해상도로 캡처 (FFmpeg에서 1080p 다운스케일)
             int sw = Screen.width;
             int sh = Screen.height;
-            if (sh > MaxVideoHeight)
-            {
-                float scale = (float)MaxVideoHeight / sh;
-                sw = Mathf.RoundToInt(sw * scale);
-                sh = MaxVideoHeight;
-                // 2의 배수로 맞춤 (FFmpeg 요구)
-                sw = sw % 2 == 0 ? sw : sw + 1;
-            }
+            // 2의 배수로 맞춤 (FFmpeg 요구)
+            sw = sw % 2 == 0 ? sw : sw + 1;
+            sh = sh % 2 == 0 ? sh : sh + 1;
             _currentWidth = sw;
             _currentHeight = sh;
             CreateRenderResources(_currentWidth, _currentHeight);
@@ -156,15 +150,9 @@ namespace RekonOps.Rekon
                 // 화면 크기가 변경되면 RT/Texture 재생성 (에디터에서 Game Window 리사이즈 대응)
                 int sw = Screen.width;
                 int sh = Screen.height;
-                // 1080p 상한 적용
-                const int MaxVideoHeight = 1080;
-                if (sh > MaxVideoHeight)
-                {
-                    float scale = (float)MaxVideoHeight / sh;
-                    sw = Mathf.RoundToInt(sw * scale);
-                    sh = MaxVideoHeight;
-                    sw = sw % 2 == 0 ? sw : sw + 1;
-                }
+                // 2의 배수로 맞춤 (FFmpeg 요구)
+                sw = sw % 2 == 0 ? sw : sw + 1;
+                sh = sh % 2 == 0 ? sh : sh + 1;
                 if (sw != _currentWidth || sh != _currentHeight)
                 {
                     _currentWidth = sw;

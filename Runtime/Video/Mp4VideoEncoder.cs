@@ -337,15 +337,11 @@ namespace RekonOps.Rekon
                 _                   => $"-vcodec libx264 -preset ultrafast -crf {config.Crf}",
             };
 
-            // videotoolbox(Mac/Metal): 데이터가 이미 top-down → vflip 불필요
-            // nvenc/amf/qsv/libx264(Windows/Linux): 데이터가 bottom-up → vflip 필요
-            string vfFilter = (encoderName == "h264_videotoolbox")
-                ? "-pix_fmt yuv420p"
-                : "-vf vflip,format=yuv420p";
-
+            // Y축 반전은 호출 측에서 데이터를 역순 전달하여 처리
+            // (Mp4VideoEncoder는 레거시 링버퍼 경로이며, FrameRingBuffer.GetFrames()에서 처리)
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"{vfFilter} " +
+                   $"-pix_fmt yuv420p " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

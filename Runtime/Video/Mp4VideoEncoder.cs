@@ -337,11 +337,15 @@ namespace RekonOps.Rekon
                 _                   => $"-vcodec libx264 -preset ultrafast -crf {config.Crf}",
             };
 
-            // -vf vflip: RenderTexture Y축 반전(bottom-up) 보정
-            // format=yuv420p: 필터 체인 안에서 포맷 변환 → 하드웨어 인코더도 반드시 필터 실행
+            // videotoolbox(Mac/Metal): 데이터가 이미 top-down → vflip 불필요
+            // nvenc/amf/qsv/libx264(Windows/Linux): 데이터가 bottom-up → vflip 필요
+            string vfFilter = (encoderName == "h264_videotoolbox")
+                ? "-pix_fmt yuv420p"
+                : "-vf vflip,format=yuv420p";
+
             return $"-y -f rawvideo -pix_fmt rgba -video_size {width}x{height} " +
                    $"-framerate {config.Fps} -i pipe:0 " +
-                   $"-vf vflip,format=yuv420p " +
+                   $"{vfFilter} " +
                    $"{encoderArgs} " +
                    $"\"{safeOutputPath}\"";
         }

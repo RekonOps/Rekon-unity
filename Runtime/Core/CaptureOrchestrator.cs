@@ -360,14 +360,33 @@ namespace RekonOps.Rekon
                     return false;
                 }
 
-                // 스크린샷 전용 CaptureResult 생성 (영상/로그/상태 없음)
+                // 스크린샷 전용 CaptureResult 생성 (로그 + 상태 포함)
                 var result = new CaptureResult
                 {
                     Timestamp = DateTime.UtcNow,
                     ScreenshotEntries = entries,
                 };
 
-                Debug.Log($"[Rekon] 스크린샷 전용 리포트 발송: {entries.Length}장");
+                // 로그 + 상태 수집 (임시 디렉토리에 저장)
+                try
+                {
+                    string tempDir = Path.Combine(
+                        Application.temporaryCachePath, "Rekon",
+                        DateTime.Now.ToString("yyyyMMdd_HHmmss_fff"));
+                    Directory.CreateDirectory(tempDir);
+
+                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+                    await Task.WhenAll(
+                        CaptureLogsAsync(tempDir, result, cts.Token),
+                        CaptureStateAsync(tempDir, result, cts.Token)
+                    );
+                }
+                catch (Exception logEx)
+                {
+                    Debug.LogWarning($"[Rekon] 스크린샷 리포트 로그/상태 수집 실패 (무시): {logEx.Message}");
+                }
+
+                Debug.Log($"[Rekon] 스크린샷 전용 리포트 발송: {entries.Length}장 (로그: {(result.LogsPath != null ? "포함" : "없음")})");
                 OnCaptureCompleted?.Invoke(result);
                 OnScreenshotSubmitCompleted?.Invoke(true, entries.Length);
 

@@ -59,7 +59,7 @@ namespace RekonOps.Rekon
         public class LicenseInfo
         {
             public bool Valid;
-            public string Plan;              // "free" | "trial" | "team"
+            public string Plan;              // "free" | "team" | "team_pro"
             public string WorkspaceId;
             public string WorkspaceName;
             public bool JiraSubmitEnabled;
@@ -245,7 +245,7 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// Jira 제출 가능 여부를 확인합니다.
-        /// 캐시된 라이선스가 유효하고, plan이 trial/team이며,
+        /// 캐시된 라이선스가 유효하고, plan이 free가 아니며,
         /// jira_submit feature가 활성화되어 있어야 합니다.
         /// </summary>
         public bool CanSubmitToJira()
@@ -253,8 +253,8 @@ namespace RekonOps.Rekon
             if (_cachedLicense == null || !_cachedLicense.Valid)
                 return false;
 
-            // plan 확인: trial 또는 team만 허용
-            if (_cachedLicense.Plan != "trial" && _cachedLicense.Plan != "team")
+            // plan 확인: free는 허용하지 않음
+            if (_cachedLicense.Plan == "free")
                 return false;
 
             // feature 플래그 확인

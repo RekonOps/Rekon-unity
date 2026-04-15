@@ -12,11 +12,14 @@ namespace RekonOps.Rekon
     ///   4. 영상 녹화 활성화 시 FrameRingBuffer, VideoEncoder, FrameCapturer 초기화
     ///   5. ScreenshotQueue 생성
     ///   6. CaptureOrchestrator 생성 및 모든 의존성 주입
-    ///   7. HotkeyManager MonoBehaviour 생성 및 설정 주입
-    ///   8. HotkeyManager ↔ CaptureOrchestrator 바인딩
-    ///   9. CaptureOverlay 초기화 및 오케스트레이터 바인딩
-    ///  10. SilentSubmitManager 초기화
-    ///  11. SubmitToast 초기화 및 SilentSubmitManager 바인딩
+    ///   7. PerformanceTimelineCollector MonoBehaviour 생성 및 CaptureOrchestrator 바인딩
+    ///   8. HotkeyManager MonoBehaviour 생성 및 설정 주입
+    ///   9. HotkeyManager ↔ CaptureOrchestrator 바인딩
+    ///  10. CaptureOverlay 초기화 및 오케스트레이터 바인딩
+    ///  11. SilentSubmitManager 초기화
+    ///  12. Application.quitting 리소스 정리
+    ///  13. PendingUploadManager 초기화
+    ///  14. SubmitToast 초기화 및 SilentSubmitManager 바인딩
     /// </summary>
     public static class RekonBootstrap
     {
@@ -165,14 +168,19 @@ namespace RekonOps.Rekon
                     screenshotQueue: screenshotQueue,
                     streamingRecorder: streamingRecorder); // null 허용 (FFmpeg 미설치 시)
 
-                // ── 7. HotkeyManager 생성 및 설정 주입 ───────────────────────────
+                // ── 7. PerformanceTimelineCollector 생성 및 수집 즉시 시작 ─
+                var timelineCollector = root.AddComponent<PerformanceTimelineCollector>();
+                timelineCollector.StartCollecting(settings.currentPlan);
+                orchestrator.BindTimelineCollector(timelineCollector);
+
+                // ── 8. HotkeyManager 생성 및 설정 주입 ───────────────────────────
                 var hotkeyManager = root.AddComponent<HotkeyManager>();
                 hotkeyManager.SetSettings(settings);
 
-                // ── 8. HotkeyManager ↔ CaptureOrchestrator 바인딩 ────────────────
+                // ── 9. HotkeyManager ↔ CaptureOrchestrator 바인딩 ────────────────
                 orchestrator.BindHotkeyManager(hotkeyManager);
 
-                // ── 9. CaptureOverlay 초기화 ──────────────────────────────────────
+                // ── 10. CaptureOverlay 초기화 ─────────────────────────────────────
                 var overlay = CaptureOverlay.EnsureInstance();
                 overlay.BindOrchestrator(orchestrator);
 
@@ -185,7 +193,7 @@ namespace RekonOps.Rekon
                 // 롱프레스 UX 피드백: HotkeyManager 이벤트 구독
                 overlay.BindHotkeyManager(hotkeyManager);
 
-                // ── 10. SilentSubmitManager 초기화 ───────────────────────────────
+                // ── 11. SilentSubmitManager 초기화 ───────────────────────────────
                 var manifestGenerator = new ManifestGenerator();
                 var bundleWriter = new BundleWriter(manifestGenerator);
 
@@ -209,6 +217,33 @@ namespace RekonOps.Rekon
 
                 var tokenStore = new SessionTokenStore();
 
+                // ── 라이선스 캐시에서 currentPlan 복원 (플레이어 빌드 대응) ──────────
+                // RekonSettingsWindow는 에디터 전용이므로 플레이어 빌드에서는
+                // currentPlan이 기본값 "free"로 고정될 수 있습니다.
+                // LicenseValidator 캐시(PlayerPrefs)에서 플랜 정보를 읽어 즉시 반영합니다.
+                if (settings.isLinked)
+                {
+                    try
+                    {
+                        var licenseValidator = new LicenseValidator(
+                            RekonSettings.WEB_DASHBOARD_URL, tokenStore);
+                        var cached = licenseValidator.GetCachedLicense();
+                        if (cached != null && cached.Valid && !string.IsNullOrEmpty(cached.Plan))
+                        {
+                            settings.currentPlan               = cached.Plan;
+                            settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
+                            settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
+                            Debug.Log($"[Rekon] 캐시에서 플랜 복원: plan={cached.Plan}, " +
+                                      $"maxBuffer={cached.MaxBufferSeconds}초, " +
+                                      $"maxScreenshot={cached.MaxScreenshotCount}개");
+                        }
+                    }
+                    catch (System.Exception licEx)
+                    {
+                        Debug.LogWarning($"[Rekon] 라이선스 캐시 복원 실패 (free 플랜으로 유지): {licEx.Message}");
+                    }
+                }
+
                 // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
                 orchestrator.BindTokenStore(tokenStore);
 
@@ -217,12 +252,12 @@ namespace RekonOps.Rekon
                 // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩
                 orchestrator.BindSilentSubmitManager(silentSubmitManager);
 
-                // ── 10. Application.quitting 시 리소스 정리 ──────────────────────
+                // ── 12. Application.quitting 시 리소스 정리 ──────────────────────
                 // 정적 핸들러 사용으로 Domain Reload OFF 환경에서 람다 누적 구독 방지
                 Application.quitting -= OnApplicationQuitting;  // 중복 방지
                 Application.quitting += OnApplicationQuitting;
 
-                // ── 11. PendingUploadManager 초기화 ──────────────────────────────────
+                // ── 13. PendingUploadManager 초기화 ──────────────────────────────────
                 var pendingUploadManager = new PendingUploadManager();
 
                 // SilentSubmitManager에 PendingUploadManager 바인딩
@@ -234,7 +269,7 @@ namespace RekonOps.Rekon
                     Debug.Log($"[Rekon] 앱 시작 시 pending 번들 {pendingCount}개 감지. 향후 미전송 리포트 UI에서 재전송 가능합니다.");
                 }
 
-                // ── 12. SubmitToast 초기화 ──────────────────────────────────────────
+                // ── 14. SubmitToast 초기화 ──────────────────────────────────────────
                 var submitToast = SubmitToast.EnsureInstance();
                 submitToast.BindSilentSubmitManager(silentSubmitManager);
 

@@ -248,6 +248,9 @@ namespace RekonOps.Rekon
         // validate-license 응답 후 LicenseValidator가 채워줍니다.
         // ScriptableObject에는 저장되지 않으며, 에디터 세션 동안만 유지됩니다.
 
+        /// <summary>현재 적용 중인 플랜 이름. 라이선스 검증 후 갱신됩니다.</summary>
+        [NonSerialized] public string currentPlan = "free";
+
         /// <summary>플랜이 허용하는 최대 버퍼 시간(초). 라이선스 검증 후 갱신됩니다.</summary>
         [NonSerialized] public int maxAllowedBufferSeconds = 180;
 

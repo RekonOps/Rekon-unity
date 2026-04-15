@@ -288,13 +288,34 @@ namespace RekonOps.Rekon
             }
             filesJson.Append("]");
 
-            var bodyJson = "{" +
-                $"\"workspace_id\":\"{EscapeJson(request.WorkspaceId)}\"," +
-                $"\"title\":\"{EscapeJson(request.Title)}\"," +
-                $"\"description\":\"{EscapeJson(request.Description ?? "")}\"," +
-                $"\"engine\":\"{EscapeJson(request.Engine ?? "unity")}\"," +
-                $"\"files\":{filesJson}" +
-                "}";
+            // performance_timeline: JsonUtility.ToJson() 결과를 EscapeJson 없이 그대로 삽입
+            // (이미 유효한 JSON 객체이므로 이중 이스케이프 금지)
+            string timelineJson = null;
+            if (request.PerformanceTimeline != null)
+            {
+                try
+                {
+                    timelineJson = JsonUtility.ToJson(request.PerformanceTimeline);
+                }
+                catch (Exception tlEx)
+                {
+                    Debug.LogWarning($"[Rekon] 성능 타임라인 직렬화 실패 (무시): {tlEx.Message}");
+                }
+            }
+
+            var bodyBuilder = new StringBuilder("{");
+            bodyBuilder.Append($"\"workspace_id\":\"{EscapeJson(request.WorkspaceId)}\",");
+            bodyBuilder.Append($"\"title\":\"{EscapeJson(request.Title)}\",");
+            bodyBuilder.Append($"\"description\":\"{EscapeJson(request.Description ?? "")}\",");
+            bodyBuilder.Append($"\"engine\":\"{EscapeJson(request.Engine ?? "unity")}\",");
+            bodyBuilder.Append($"\"files\":{filesJson}");
+            if (!string.IsNullOrEmpty(timelineJson))
+            {
+                // JSON 객체를 그대로 삽입 — EscapeJson 미적용 (이중 이스케이프 방지)
+                bodyBuilder.Append($",\"performance_timeline\":{timelineJson}");
+            }
+            bodyBuilder.Append("}");
+            var bodyJson = bodyBuilder.ToString();
 
             var responseJson = await SendWithRetryAsync("POST", url, bodyJson, request.AccessToken, ct);
 
@@ -649,6 +670,12 @@ namespace RekonOps.Rekon
 
         /// <summary>리포트를 생성한 엔진 식별자 (현재는 "unity"만 지원)</summary>
         public string Engine { get; set; } = "unity";
+
+        /// <summary>
+        /// 영상 녹화 구간 동안 수집된 성능 타임라인 데이터.
+        /// null이면 JSON body에 포함하지 않습니다.
+        /// </summary>
+        public PerformanceTimeline PerformanceTimeline { get; set; }
     }
 
     /// <summary>첨부 파일 정보</summary>

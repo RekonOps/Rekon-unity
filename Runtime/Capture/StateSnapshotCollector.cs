@@ -65,6 +65,13 @@ namespace RekonOps.Rekon
                     captured_at = DateTime.UtcNow.ToString("O"),
                 };
 
+                // ── 렌더 파이프라인 / 품질 확장 정보 수집 ──────────────
+                snapshot.vsync_count = QualitySettings.vSyncCount;
+                snapshot.target_fps = Application.targetFrameRate;
+                snapshot.render_pipeline = QualitySettings.renderPipeline != null
+                    ? QualitySettings.renderPipeline.name
+                    : "Built-in";
+
                 // ── 커스텀 컨텍스트 수집 ───────────────────────────────
                 var customContext = _contextRegistry.CollectAll();
                 snapshot.SetCustomContextDictionary(customContext);

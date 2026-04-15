@@ -51,6 +51,12 @@ namespace RekonOps.Rekon
         public StateSnapshot StateSnapshot { get; set; }
 
         /// <summary>
+        /// 영상 녹화 구간 동안 수집된 성능 타임라인 데이터.
+        /// 영상 캡처가 비활성이거나 수집 실패 시 null.
+        /// </summary>
+        public PerformanceTimeline PerformanceTimeline { get; set; }
+
+        /// <summary>
         /// R2에 업로드된 파일들의 공개 URL 목록.
         /// 키: 파일 유형(screenshot, log, video), 값: R2 공개 URL.
         /// R2 업로드가 수행되지 않은 경우 null 또는 빈 사전.

@@ -145,6 +145,7 @@ namespace RekonOps.Rekon.Editor
 
         private bool _foldWeb = true;
         private bool _foldCodec = true;
+        private bool _foldPerformance = false;
         private bool _foldCapture = true;
         private bool _foldReport = true;
         private bool _foldHotkey = true;
@@ -293,6 +294,10 @@ namespace RekonOps.Rekon.Editor
 
             BeginSectionBox();
             DrawCodecStatusSection();
+            EndSectionBox();
+
+            BeginSectionBox();
+            DrawPerformanceSection();
             EndSectionBox();
 
             // #31: 미연동 시 하위 섹션 비활성화
@@ -657,6 +662,48 @@ namespace RekonOps.Rekon.Editor
                     if (GUILayout.Button("ffmpeg.org 열기", GUILayout.Height(24f)))
                         Application.OpenURL("https://ffmpeg.org/download.html");
                 }
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        // ─── 성능 수집 섹션 ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 현재 플랜에 따라 활성화된 성능 수집 항목을 표시합니다.
+        /// 미연동 상태에서는 섹션 자체를 숨깁니다.
+        /// </summary>
+        private void DrawPerformanceSection()
+        {
+            if (!_settings.isLinked) return;
+
+            _foldPerformance = EditorGUILayout.Foldout(_foldPerformance, "성능 수집 (Performance Timeline)", true, EditorStyles.foldoutHeader);
+            if (!_foldPerformance) return;
+
+            EditorGUI.indentLevel++;
+            var plan = _settings.currentPlan ?? "free";
+
+            switch (plan)
+            {
+                case "free":
+                    EditorGUILayout.LabelField("수집 항목", "TimeScale, Network, Scene (기본)");
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.HelpBox("Team 플랜 이상에서 FPS, 메모리 수집이 활성화됩니다.", MessageType.Info);
+                    break;
+
+                case "team":
+                    EditorGUILayout.LabelField("수집 항목", "FPS (5초 평균), 힙 메모리 (Used/Total)");
+                    EditorGUILayout.LabelField("기본 항목", "TimeScale, Network, Scene");
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.HelpBox("Team Pro에서 추가 활성화: GPU 메모리, 텍스처 메모리, CPU/GPU FrameTiming, 씬 전환 이벤트", MessageType.None);
+                    break;
+
+                case "team_pro":
+                    EditorGUILayout.LabelField("수집 항목 (전체)", "FPS, 힙 메모리, GPU 메모리, 텍스처 메모리");
+                    EditorGUILayout.LabelField("프레임 타이밍", "CPU/GPU FrameTiming (ms)");
+                    EditorGUILayout.LabelField("이벤트 추적", "씬 전환, TimeScale 변경");
+                    EditorGUILayout.LabelField("스냅샷", "렌더 파이프라인, VSync, 배터리");
+                    break;
             }
 
             EditorGUI.indentLevel--;
@@ -1468,7 +1515,8 @@ namespace RekonOps.Rekon.Editor
                 {
                     _settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
                     _settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
-                    Debug.Log($"[Rekon] 캐시에서 플랜 제한값 복원: maxBuffer={cached.MaxBufferSeconds}초, " +
+                    _settings.currentPlan = cached.Plan ?? "free";
+                    Debug.Log($"[Rekon] 캐시에서 플랜 제한값 복원: plan={cached.Plan}, maxBuffer={cached.MaxBufferSeconds}초, " +
                               $"maxScreenshot={cached.MaxScreenshotCount}개");
                 }
             }
@@ -1501,6 +1549,7 @@ namespace RekonOps.Rekon.Editor
                     // 플랜 제한값을 settings에 반영
                     _settings.maxAllowedBufferSeconds  = licenseInfo.MaxBufferSeconds;
                     _settings.maxAllowedScreenshotCount = licenseInfo.MaxScreenshotCount;
+                    _settings.currentPlan = licenseInfo.Plan ?? "free";
 
                     Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
                               $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +

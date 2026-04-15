@@ -72,6 +72,15 @@ namespace RekonOps.Rekon
         /// <summary>현재 품질 설정 레벨</summary>
         public int quality_level;
 
+        /// <summary>수직 동기화 카운트 (QualitySettings.vSyncCount)</summary>
+        public int vsync_count;
+
+        /// <summary>목표 프레임레이트 (Application.targetFrameRate)</summary>
+        public int target_fps;
+
+        /// <summary>렌더 파이프라인 이름 ("URP", "HDRP", "Built-in")</summary>
+        public string render_pipeline;
+
         // ── 커스텀 컨텍스트 ────────────────────────────────────────────
         /// <summary>
         /// ContextProviderRegistry에서 수집된 커스텀 K/V 데이터.

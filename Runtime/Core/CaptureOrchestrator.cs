@@ -41,6 +41,9 @@ namespace RekonOps.Rekon
         // 실제 사용할 토큰 스토어: 런타임 바인딩 우선, 없으면 생성자 주입 사용
         private SessionTokenStore ActiveTokenStore => _runtimeTokenStore ?? _tokenStore;
 
+        // 성능 타임라인 수집기 (null 허용 — 미연동 시 수집 건너뜀)
+        private PerformanceTimelineCollector _timelineCollector;
+
         private readonly ScreenshotQueue _screenshotQueue;
 
         private HotkeyManager _hotkeyManager;
@@ -105,6 +108,16 @@ namespace RekonOps.Rekon
             // 별도의 런타임 오버라이드 필드를 사용합니다.
             _runtimeTokenStore = tokenStore;
             Debug.Log("[Rekon] CaptureOrchestrator: SessionTokenStore 바인딩 완료");
+        }
+
+        /// <summary>
+        /// PerformanceTimelineCollector를 바인딩합니다.
+        /// 영상 녹화 시작/종료 시 성능 데이터 수집에 사용됩니다.
+        /// </summary>
+        public void BindTimelineCollector(PerformanceTimelineCollector collector)
+        {
+            _timelineCollector = collector;
+            Debug.Log("[Rekon] CaptureOrchestrator: PerformanceTimelineCollector 바인딩 완료");
         }
 
         /// <summary>
@@ -192,6 +205,8 @@ namespace RekonOps.Rekon
 
             try
             {
+                // 성능 타임라인은 부트스트랩에서 이미 수집 중 (StartCollecting은 Bootstrap에서 호출)
+
                 // 병렬 수집
                 // 영상 캡처 트리거 시에는 스크린샷을 캡처하지 않음 (별도 스크린샷 트리거 사용)
                 var screenshotTask = _settings.videoEnabled
@@ -202,6 +217,21 @@ namespace RekonOps.Rekon
                 var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);
 
                 await Task.WhenAll(screenshotTask, logsTask, stateTask, videoTask);
+
+                // 성능 타임라인 수집 종료 및 결과에 포함
+                if (_timelineCollector != null)
+                {
+                    try
+                    {
+                        result.PerformanceTimeline = _timelineCollector.StopCollecting();
+                        // 다음 리포트를 위해 수집 재시작
+                        _timelineCollector.StartCollecting(_settings.currentPlan);
+                    }
+                    catch (Exception tlEx)
+                    {
+                        Debug.LogWarning($"[Rekon] 성능 타임라인 수집 종료 실패 (무시): {tlEx.Message}");
+                    }
+                }
 
                 // 스크린샷 큐 드레인 — 영상 번들에 포함
                 if (_screenshotQueue != null)
@@ -228,6 +258,17 @@ namespace RekonOps.Rekon
             }
             finally
             {
+                // 실패/타임아웃 경로에서도 StopCollecting 호출 → sceneLoaded 이벤트 누수 방지
+                // StopCollecting 내부에서 _isCollecting = false 처리하므로 이중 호출 안전
+                if (_timelineCollector != null && result.PerformanceTimeline == null)
+                {
+                    try { _timelineCollector.StopCollecting(); }
+                    catch (Exception tlEx)
+                    {
+                        Debug.LogWarning($"[Rekon] finally: 성능 타임라인 정리 실패 (무시): {tlEx.Message}");
+                    }
+                }
+
                 // 원자적으로 플래그 해제: 1(캡처 중) → 0(대기)
                 Interlocked.Exchange(ref _isCapturingFlag, 0);
             }

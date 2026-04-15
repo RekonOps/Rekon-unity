@@ -399,7 +399,8 @@ namespace RekonOps.Rekon
                     WorkspaceId = workspaceId,
                     Title = manifest.title,
                     Description = BuildDescription(manifest),
-                    Files = files
+                    Files = files,
+                    PerformanceTimeline = captureResult.PerformanceTimeline
                 };
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));

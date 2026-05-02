@@ -16,23 +16,30 @@
 
 - `~/IdeaProjects/Rekon-Context/decisions.md` (ADR-### 형식)
 
-## 본 repo 핵심 키워드 (간단 인덱스)
+## 본 repo spec 파일 (2026-05-02 ver, 7개)
 
-> 정식 정의는 위 glossary 파일 참조. 본 인덱스는 빠른 navigation 용.
+| Spec | 파일 경로 |
+|------|----------|
+| Glossary | `~/IdeaProjects/Rekon-Context/spec/unity/glossary-2026-05-02-ver.md` |
+| Architecture (88파일/33,090 LOC) | `~/IdeaProjects/Rekon-Context/spec/unity/architecture-2026-05-02-ver.md` |
+| Capture Tech | `~/IdeaProjects/Rekon-Context/spec/unity/capture-tech-2026-05-02-ver.md` |
+| Data Collection Strategy | `~/IdeaProjects/Rekon-Context/spec/unity/data-collection-strategy-2026-05-02-ver.md` |
+| Video Pipeline | `~/IdeaProjects/Rekon-Context/spec/unity/video-pipeline-2026-05-02-ver.md` |
+| Performance Timeline (11 필드) | `~/IdeaProjects/Rekon-Context/spec/unity/performance-timeline-2026-05-02-ver.md` |
+| Test Strategy (Editor/Integration/Runtime) | `~/IdeaProjects/Rekon-Context/spec/unity/test-strategy-2026-05-02-ver.md` |
 
-- **Unity 2021.3+** — 최소 지원 버전
+## 빠른 키워드 인덱스 (간단)
+
+- **Unity 2022.3+** — 최소 지원 버전 (current 0.2.14)
 - **UPM (Unity Package Manager)** — 패키지 배포 형식, `package.json` + Samples~
 - **Namespace** — `RekonOps.Rekon`
 - **Log prefix** — `[Rekon]`
 - **Async** — `async/await` + `Task` (UniTask 사용 X)
 - **ScriptableObject** — 설정 기반 (RekonSettings)
-- **Editor/** — 에디터 전용 (Editor namespace, EditorWindow, AssetPostprocessor)
-- **Runtime/** — 런타임 코드 (MonoBehaviour, ScriptableObject)
-- **Performance Timeline (T1~T7)** — 성능 수집 7종 (CPU/GPU/Mem/FPS/Battery/Net/Custom)
+- **Editor/** — Editor 전용 (CrashRecovery, UI, RekonSettingsWindow)
+- **Runtime/** — 런타임 (Auth/Bundle/Capture/Core/Performance/Video 등 14개 폴더)
+- **Performance Timeline** — Runtime/Performance/ (5 파일), 11 필드 + 플랜별 분기 (free 3개 / team 이상 10개)
 - **AsyncGPUReadback** — 스크린샷/영상 캡처 비동기 GPU 읽기
-- **FFmpeg** — 영상 인코딩 (별도 설치 가이드 v0.2.11)
+- **FFmpeg** — 영상 인코딩 (`Mp4VideoEncoder.cs`, h264_nvenc/videotoolbox/libx264 폴백)
 - **IL2CPP** — Dev Build 빌드 호환성 보장 (Lovable 포인트)
-- **Inspector Snapshot / Prefab Diff** — Editor 전용 Lovable 기능 (로드맵)
 - **GitHub Actions + Release** — 패키지 배포 자동화
-
-> Phase 2 spec 작성 완료 후 본 인덱스를 자동 갱신합니다.

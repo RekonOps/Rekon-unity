@@ -8,10 +8,33 @@ using UnityEngine.Networking;
 namespace RekonOps.Rekon
 {
     /// <summary>
+    /// R2 파일 업로드 서비스 인터페이스.
+    /// 테스트에서 mock 주입을 위한 seam 역할을 합니다.
+    /// </summary>
+    public interface IR2UploadService
+    {
+        /// <summary>
+        /// 단일 파일을 Presigned URL에 PUT 업로드합니다.
+        /// </summary>
+        /// <param name="presignedUrl">R2 Presigned URL</param>
+        /// <param name="fileData">업로드할 파일 데이터</param>
+        /// <param name="contentType">Content-Type 헤더 값</param>
+        /// <param name="progress">진행률 콜백 (0~1)</param>
+        /// <param name="cancellationToken">취소 토큰</param>
+        /// <returns>업로드 결과</returns>
+        Task<UploadResult> UploadFileAsync(
+            string presignedUrl,
+            byte[] fileData,
+            string contentType,
+            IProgress<float> progress = null,
+            CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
     /// Presigned URL을 사용한 R2 파일 업로드 서비스.
     /// UnityWebRequest PUT으로 파일을 업로드하며, 진행률 콜백/재시도/취소를 지원합니다.
     /// </summary>
-    public class R2UploadService
+    public class R2UploadService : IR2UploadService
     {
         // ─── 설정 ───────────────────────────────────────────────────────────────
 

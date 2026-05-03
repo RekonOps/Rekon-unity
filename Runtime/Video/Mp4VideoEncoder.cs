@@ -1,8 +1,6 @@
 #if UNITY_STANDALONE || UNITY_EDITOR
 using System;
-using System.Diagnostics;
 using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -25,11 +23,22 @@ namespace RekonOps.Rekon
     /// </summary>
     public class Mp4VideoEncoder : IVideoEncoder
     {
-        // FFmpeg 프로세스 최대 대기 시간 (밀리초): 5분
-        private const int FfmpegTimeoutMs = 5 * 60 * 1000;
+        // IFfmpegProcessRunner seam — 테스트 시 Mock으로 대체 가능
+        private readonly IFfmpegProcessRunner _runner;
 
-        // stderr에서 출력할 마지막 줄 수
-        private const int StderrTailLines = 10;
+        /// <summary>
+        /// 기본 생성자. FfmpegProcessRunner 를 사용합니다 (기존 caller 호환).
+        /// </summary>
+        public Mp4VideoEncoder() : this(new FfmpegProcessRunner()) { }
+
+        /// <summary>
+        /// IFfmpegProcessRunner 주입 생성자. 테스트 시 Mock 주입에 사용합니다.
+        /// </summary>
+        /// <param name="runner">FFmpeg 프로세스 실행 구현체</param>
+        public Mp4VideoEncoder(IFfmpegProcessRunner runner)
+        {
+            _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        }
 
         /// <summary>출력 파일 확장자.</summary>
         public string OutputExtension => ".mp4";
@@ -134,181 +143,60 @@ namespace RekonOps.Rekon
             string ffmpegArgs = BuildFfmpegArguments(frameWidth, frameHeight, config, outputPath, encoderName);
             string ffmpegPath = FfmpegHelper.GetPath();
 
-            var startInfo = new ProcessStartInfo
+            // 3. _runner를 통해 FFmpeg 프로세스 실행 (seam 위임)
+            //    RunWithFramesAsync 는 내부에서 Task.Run 을 사용하므로 .GetAwaiter().GetResult() 로 동기 대기
+            int exitCode;
+            try
             {
-                FileName = ffmpegPath,
-                Arguments = ffmpegArgs,
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-            };
-
-            // stderr 수집용 버퍼
-            var stderrLines = new System.Collections.Generic.Queue<string>();
-            bool hasError = false;
-
-            using (var process = new Process())
+                exitCode = _runner.RunWithFramesAsync(ffmpegPath, ffmpegArgs, frames, cancellationToken)
+                                  .GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
             {
-                process.StartInfo = startInfo;
-
-                // stderr 비동기 읽기 (동기로 읽으면 파이프 버퍼 포화로 교착상태 발생 가능)
-                process.ErrorDataReceived += (sender, e) =>
-                {
-                    if (e.Data == null) return;
-                    lock (stderrLines)
-                    {
-                        stderrLines.Enqueue(e.Data);
-                        // 최대 StderrTailLines 줄만 유지
-                        while (stderrLines.Count > StderrTailLines)
-                            stderrLines.Dequeue();
-                    }
-                };
-
-                try
-                {
-                    process.Start();
-                }
-                catch (Exception ex)
-                {
-                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg 프로세스 시작 실패: {ex.Message}\n" +
-                                               $"FFmpeg 경로: {ffmpegPath}\n" +
-                                               "FfmpegHelper.IsInstalled()로 설치 여부를 확인하세요.");
-                    throw;
-                }
-
-                // CancellationToken 등록: 취소 시 FFmpeg 프로세스 강제 종료
-                // using var로 스코프 종료 시 자동 해제하여 메모리 누수 방지
-                using var ctReg = cancellationToken.Register(() =>
-                {
-                    try { process.Kill(); } catch { /* 무시 */ }
-                });
-
-                // stderr 비동기 읽기 시작
-                process.BeginErrorReadLine();
-
-                // 3. 각 프레임의 Data를 stdin에 순차 write
-                try
-                {
-                    using (var stdin = process.StandardInput.BaseStream)
-                    {
-                        int writtenFrames = 0;
-                        for (int i = 0; i < frames.Length; i++)
-                        {
-                            // 취소 요청 시 루프 탈출
-                            cancellationToken.ThrowIfCancellationRequested();
-
-                            // FFmpeg 프로세스가 이미 종료된 경우 루프 탈출
-                            if (process.HasExited)
-                            {
-                                UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: FFmpeg 프로세스가 예기치 않게 종료되었습니다. stdin 쓰기를 중단합니다.");
-                                break;
-                            }
-
-                            var frame = frames[i];
-
-                            // 유효하지 않은 프레임은 건너뜀
-                            if (!frame.IsValid)
-                            {
-                                UnityEngine.Debug.LogWarning(
-                                    $"[Rekon] Mp4VideoEncoder: 프레임 {i}번 건너뜀 (유효하지 않은 데이터).");
-                                continue;
-                            }
-
-                            try
-                            {
-                                // frame.DataLength를 사용해야 합니다.
-                                // ArrayPool.Rent()는 요청 크기 이상의 배열을 반환할 수 있으므로
-                                // Data.Length가 아닌 DataLength(실제 유효 픽셀 바이트 수)로 write합니다.
-                                stdin.Write(frame.Data, 0, frame.DataLength);
-                                writtenFrames++;
-                            }
-                            catch (IOException ioEx)
-                            {
-                                // FFmpeg 프로세스 종료로 인한 파이프 깨짐 처리
-                                UnityEngine.Debug.LogWarning($"[Rekon] Mp4VideoEncoder: stdin 쓰기 중 IOException (FFmpeg 종료 가능성): {ioEx.Message}");
-                                break;
-                            }
-                        }
-
-                        UnityEngine.Debug.Log($"[Rekon] FFmpeg stdin 전송 완료: {writtenFrames}/{frames.Length}프레임");
-                    }
-                    // stdin.Close()는 using 블록 종료 시 자동 호출됨
-                }
-                catch (OperationCanceledException)
-                {
-                    UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: 취소 요청으로 인코딩을 중단합니다.");
-                    hasError = true;
-                    // CancellationToken.Register에서 process.Kill()이 이미 호출됨
-                }
-                catch (Exception ex)
-                {
-                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg stdin 쓰기 중 오류: {ex.Message}");
-                    hasError = true;
-
-                    try { process.Kill(); } catch { /* 무시 */ }
-                }
-
-                // 4. 프로세스 종료 대기 (최대 5분)
-                bool exited = process.WaitForExit(FfmpegTimeoutMs);
-
-                if (!exited)
-                {
-                    UnityEngine.Debug.LogError($"[Rekon] FFmpeg 프로세스 타임아웃 ({FfmpegTimeoutMs / 1000}초 초과). 강제 종료합니다.");
-                    try { process.Kill(); } catch { /* 무시 */ }
-                    hasError = true;
-                }
-
-                // stderr 비동기 읽기 완료 대기 (최대 1초)
-                try { process.WaitForExit(1000); } catch { /* 무시 */ }
-
-                if (!hasError && exited && process.ExitCode != 0)
-                {
-                    hasError = true;
-
-                    // stderr 마지막 몇 줄을 에러 로그에 출력
-                    string stderrSummary;
-                    lock (stderrLines)
-                    {
-                        stderrSummary = string.Join("\n", stderrLines);
-                    }
-
-                    UnityEngine.Debug.LogError(
-                        $"[Rekon] FFmpeg 비정상 종료 (ExitCode={process.ExitCode}).\n" +
-                        $"FFmpeg stderr (마지막 {StderrTailLines}줄):\n{stderrSummary}");
-                }
-
-                // 5. 에러 시 손상된 파일 정리
-                if (hasError && File.Exists(outputPath))
-                {
+                UnityEngine.Debug.LogWarning("[Rekon] Mp4VideoEncoder: 취소 요청으로 인코딩을 중단합니다.");
+                if (File.Exists(outputPath))
                     try { File.Delete(outputPath); } catch { /* 무시 */ }
-                }
+                throw;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"[Rekon] FFmpeg 실행 중 오류: {ex.Message}");
+                if (File.Exists(outputPath))
+                    try { File.Delete(outputPath); } catch { /* 무시 */ }
+                throw;
+            }
 
-                // 6. 생성된 파일 존재/크기 확인 로그
-                if (!hasError)
+            bool hasError = exitCode != 0;
+
+            // 4. 에러 시 손상된 파일 정리
+            if (hasError && File.Exists(outputPath))
+            {
+                try { File.Delete(outputPath); } catch { /* 무시 */ }
+            }
+
+            // 5. 생성된 파일 존재/크기 확인 로그
+            if (!hasError)
+            {
+                if (File.Exists(outputPath))
                 {
-                    if (File.Exists(outputPath))
-                    {
-                        long fileSize = new FileInfo(outputPath).Length;
-                        UnityEngine.Debug.Log(
-                            $"[Rekon] MP4 인코딩 완료: {outputPath} " +
-                            $"({frames.Length}프레임, {fileSize / 1024.0:F1} KB)");
-                    }
-                    else
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            $"[Rekon] MP4 인코딩 완료했으나 출력 파일이 존재하지 않습니다: {outputPath}");
-                    }
+                    long fileSize = new FileInfo(outputPath).Length;
+                    UnityEngine.Debug.Log(
+                        $"[Rekon] MP4 인코딩 완료: {outputPath} " +
+                        $"({frames.Length}프레임, {fileSize / 1024.0:F1} KB)");
                 }
                 else
                 {
-                    // 비정상 종료 시 파일이 없으면 경고만 출력 (예외 미발생)
-                    if (!File.Exists(outputPath))
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            $"[Rekon] FFmpeg 인코딩 실패로 출력 파일이 생성되지 않았습니다: {outputPath}");
-                    }
+                    UnityEngine.Debug.LogWarning(
+                        $"[Rekon] MP4 인코딩 완료했으나 출력 파일이 존재하지 않습니다: {outputPath}");
+                }
+            }
+            else
+            {
+                // 비정상 종료 시 파일이 없으면 경고만 출력 (예외 미발생)
+                if (!File.Exists(outputPath))
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[Rekon] FFmpeg 인코딩 실패로 출력 파일이 생성되지 않았습니다: {outputPath}");
                 }
             }
         }

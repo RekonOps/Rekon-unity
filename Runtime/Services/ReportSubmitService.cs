@@ -29,7 +29,7 @@ namespace RekonOps.Rekon
 
         // ─── 의존성 ─────────────────────────────────────────────────────────────
 
-        private readonly R2UploadService _uploadService;
+        private readonly IR2UploadService _uploadService;
 
         /// <summary>Web API 프록시 기본 URL (RekonSettings.WEB_DASHBOARD_URL)</summary>
         private readonly string _webApiBaseUrl;
@@ -92,8 +92,8 @@ namespace RekonOps.Rekon
         /// ReportSubmitService를 초기화합니다.
         /// Web API 프록시(WEB_DASHBOARD_URL)를 통해 리포트를 제출합니다.
         /// </summary>
-        /// <param name="uploadService">R2 업로드 서비스</param>
-        public ReportSubmitService(R2UploadService uploadService)
+        /// <param name="uploadService">R2 업로드 서비스 (IR2UploadService 구현체)</param>
+        public ReportSubmitService(IR2UploadService uploadService)
         {
             _uploadService = uploadService ?? throw new ArgumentNullException(nameof(uploadService));
 

@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -135,6 +135,7 @@ namespace RekonOps.Rekon
 
         private readonly string _baseUrl;
         private readonly SessionTokenStore _tokenStore;
+        private readonly IRekonHttpClient _httpClient;
         private LicenseInfo _cachedLicense;
 
         // ─── 생성자 ────────────────────────────────────────────────────────────────
@@ -144,13 +145,15 @@ namespace RekonOps.Rekon
         /// </summary>
         /// <param name="baseUrl">웹 대시보드 기본 URL (WEB_DASHBOARD_URL 기반)</param>
         /// <param name="tokenStore">세션 토큰 저장소 (Prefs 추상화 참조용)</param>
-        public LicenseValidator(string baseUrl, SessionTokenStore tokenStore)
+        /// <param name="httpClient">HTTP 클라이언트 (null이면 UnityHttpClient 사용). 테스트에서 MockHttpClient 주입 가능.</param>
+        public LicenseValidator(string baseUrl, SessionTokenStore tokenStore, IRekonHttpClient httpClient = null)
         {
             if (string.IsNullOrEmpty(baseUrl))
                 throw new ArgumentNullException(nameof(baseUrl), "웹 대시보드 URL이 설정되지 않았습니다.");
 
             _baseUrl = baseUrl.TrimEnd('/');
             _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
+            _httpClient = httpClient ?? new UnityHttpClient();
 
             // 저장된 캐시 로드
             _cachedLicense = LoadCacheFromPrefs();
@@ -340,8 +343,7 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// UnityWebRequest로 단일 HTTP POST 요청을 전송합니다.
-        /// AuthBrokerClient.SendRequestAsync 패턴을 따릅니다.
+        /// IRekonHttpClient를 통해 단일 HTTP POST 요청을 전송합니다.
         /// 4xx 응답도 body를 반환합니다 (403 invalid license 처리를 위해).
         /// </summary>
         private async Task<string> SendRequestAsync(
@@ -349,123 +351,37 @@ namespace RekonOps.Rekon
             string jsonBody,
             CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<string>();
-            var syncContext = SynchronizationContext.Current;
+            // validate-license는 사용자 JWT(access_token)로 인증합니다.
+            // apikey는 웹 프록시 서버 사이드에서 처리되므로 전송하지 않습니다.
+            string accessToken = _tokenStore.LoadSupabase();
+            if (string.IsNullOrEmpty(accessToken))
+                throw new NetworkException("access_token이 없습니다. 웹 연동을 먼저 진행하세요.");
 
-            void RunOnMainThread(Action action)
+            var headers = new System.Collections.Generic.Dictionary<string, string>
             {
-                if (syncContext != null)
-                    syncContext.Post(_ => action(), null);
-                else
-                    action();
+                { "Authorization", $"Bearer {accessToken}" },
+                { "Accept", "application/json" }
+            };
+
+            var response = await _httpClient.PostAsync(url, jsonBody, headers, cancellationToken);
+
+            if (response.IsSuccess)
+            {
+                // 200 OK
+                return response.Body;
             }
-
-            RunOnMainThread(async () =>
+            else if (response.StatusCode == 403)
             {
-                UnityWebRequest request = null;
-                bool isDisposed = false;
-                CancellationTokenRegistration registration = default;
-
-                try
-                {
-                    // POST 요청 생성
-                    var bodyBytes = Encoding.UTF8.GetBytes(jsonBody ?? "{}");
-                    var uploadHandler = new UploadHandlerRaw(bodyBytes);
-                    uploadHandler.contentType = "application/json";
-                    request = new UnityWebRequest(url, "POST")
-                    {
-                        uploadHandler = uploadHandler,
-                        downloadHandler = new DownloadHandlerBuffer()
-                    };
-
-                    // 헤더 설정
-                    // validate-license는 사용자 JWT(access_token)로 인증합니다.
-                    // apikey는 웹 프록시 서버 사이드에서 처리되므로 전송하지 않습니다.
-                    string accessToken = _tokenStore.LoadSupabase();
-                    if (string.IsNullOrEmpty(accessToken))
-                    {
-                        tcs.TrySetException(new NetworkException("access_token이 없습니다. 웹 연동을 먼저 진행하세요."));
-                        return;
-                    }
-                    request.SetRequestHeader("Content-Type", "application/json");
-                    request.SetRequestHeader("Accept", "application/json");
-                    request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
-                    request.timeout = (int)RequestTimeoutSeconds;
-
-                    // 취소 등록
-                    registration = cancellationToken.Register(() =>
-                    {
-                        if (!isDisposed)
-                        {
-                            try { request?.Abort(); }
-                            catch (Exception) { /* Abort 실패 무시 */ }
-                        }
-                        tcs.TrySetCanceled();
-                    });
-
-                    // 요청 전송 및 완료 대기
-                    var operation = request.SendWebRequest();
-                    while (!operation.isDone)
-                    {
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            tcs.TrySetCanceled();
-                            return;
-                        }
-                        await Task.Yield();
-                    }
-
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        tcs.TrySetCanceled();
-                        return;
-                    }
-
-                    // 응답 처리
-                    int statusCode = (int)request.responseCode;
-                    string responseText = request.downloadHandler?.text ?? "";
-
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        // 200 OK
-                        tcs.TrySetResult(responseText);
-                    }
-                    else if (statusCode == 403)
-                    {
-                        // 403 Forbidden → 라이선스 무효 응답 (body에 reason 포함)
-                        tcs.TrySetResult(responseText);
-                    }
-                    else if (statusCode == 0)
-                    {
-                        // 네트워크 오류 (재시도 가능)
-                        tcs.TrySetException(new NetworkException(
-                            $"네트워크 오류: {request.error ?? "알 수 없음"}"));
-                    }
-                    else
-                    {
-                        // 기타 HTTP 에러
-                        tcs.TrySetException(new AuthBrokerException(
-                            statusCode,
-                            $"HTTP {statusCode}: {request.error ?? ""} / {responseText}"));
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    tcs.TrySetCanceled();
-                }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-                finally
-                {
-                    isDisposed = true;
-                    registration.Dispose();
-                    request?.Dispose();
-                }
-            });
-
-            return await tcs.Task;
+                // 403 Forbidden → 라이선스 무효 응답 (body에 reason 포함)
+                return response.Body;
+            }
+            else
+            {
+                // 기타 HTTP 에러
+                throw new AuthBrokerException(
+                    response.StatusCode,
+                    $"HTTP {response.StatusCode}: {response.Body}");
+            }
         }
 
         // ─── 내부 메서드: 응답 파싱 ────────────────────────────────────────────────

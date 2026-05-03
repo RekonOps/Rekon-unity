@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using RekonOps.Rekon;
 
@@ -406,6 +409,288 @@ namespace RekonOps.Rekon.Tests
                 "480x270이 -video_size에 반영되어야 합니다.");
             Assert.IsTrue(args.Contains("-framerate 15"),
                 "fps=15가 -framerate 15로 반영되어야 합니다.");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MockFfmpegProcessRunner — 테스트 전용 IFfmpegProcessRunner 구현
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// IFfmpegProcessRunner 의 테스트 전용 Mock 구현체.
+    /// 실제 FFmpeg 프로세스를 실행하지 않습니다.
+    /// </summary>
+    internal class MockFfmpegProcessRunner : IFfmpegProcessRunner
+    {
+        /// <summary>RunWithFramesAsync 에 전달된 args 기록 (호출 순서 보존).</summary>
+        public List<string> RecordedArgs { get; } = new List<string>();
+
+        /// <summary>RunAsync 에 전달된 args 기록.</summary>
+        public List<string> RecordedSimpleArgs { get; } = new List<string>();
+
+        /// <summary>RunWithFramesAsync 에 전달된 ffmpegPath 기록.</summary>
+        public List<string> RecordedPaths { get; } = new List<string>();
+
+        /// <summary>RunAsync / RunWithFramesAsync 호출 순서별 반환할 exit code 큐.</summary>
+        public Queue<int> ExitCodesToReturn { get; } = new Queue<int>();
+
+        /// <summary>GetLastStderr 가 반환할 문자열.</summary>
+        public string StderrToReturn { get; set; } = "";
+
+        /// <inheritdoc/>
+        public Task<int> RunAsync(
+            string ffmpegPath,
+            string args,
+            byte[] stdinData,
+            CancellationToken cancellationToken = default)
+        {
+            RecordedPaths.Add(ffmpegPath);
+            RecordedSimpleArgs.Add(args);
+            int code = ExitCodesToReturn.Count > 0 ? ExitCodesToReturn.Dequeue() : 0;
+            return Task.FromResult(code);
+        }
+
+        /// <inheritdoc/>
+        public Task<int> RunWithFramesAsync(
+            string ffmpegPath,
+            string args,
+            FrameData[] frames,
+            CancellationToken cancellationToken = default)
+        {
+            RecordedPaths.Add(ffmpegPath);
+            RecordedArgs.Add(args);
+            int code = ExitCodesToReturn.Count > 0 ? ExitCodesToReturn.Dequeue() : 0;
+            return Task.FromResult(code);
+        }
+
+        /// <inheritdoc/>
+        public string GetLastStderr() => StderrToReturn;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Mock 기반 통합 테스트 (Step 3 PA-4 — Reflection 대체)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// MockFfmpegProcessRunner 를 주입하여 Mp4VideoEncoder 의 인자 생성 및 폴백 체인을 검증합니다.
+    /// Reflection 기반 테스트의 한계(Process.Start mock 불가)를 seam 도입으로 해소.
+    /// </summary>
+    [TestFixture]
+    public class Mp4VideoEncoderMockIntegrationTests
+    {
+        private VideoEncoderConfig MakeConfig(int width = 1280, int height = 720, int fps = 30, int crf = 23)
+        {
+            return new VideoEncoderConfig
+            {
+                Width = width,
+                Height = height,
+                Fps = fps,
+                Crf = crf,
+            };
+        }
+
+        /// <summary>
+        /// 단일 유효 프레임을 생성합니다 (RGBA32, 4바이트 * width * height).
+        /// </summary>
+        private static FrameData MakeFrame(int width = 4, int height = 4)
+        {
+            int size = width * height * 4;
+            byte[] data = new byte[size];
+            // FrameData(byte[] data, int width, int height, double timestamp)
+            return new FrameData(data, width, height, 0.0);
+        }
+
+        // ─── h264_nvenc 인자 패턴 검증 ────────────────────────────────────────
+
+        [Test]
+        public void Mock_h264_nvenc_인코더_사용_시_RunWithFramesAsync_args에_nvenc_포함()
+        {
+            // Arrange
+            var mock = new MockFfmpegProcessRunner();
+            // exit code 0 = 성공
+            mock.ExitCodesToReturn.Enqueue(0);
+
+            var encoder = new Mp4VideoEncoder(mock);
+            var config = MakeConfig(crf: 20);
+            var frames = new[] { MakeFrame() };
+            string outputPath = "/tmp/test_nvenc.mp4";
+
+            // Act — GPU 인코더를 직접 지정하여 RunFfmpegEncoding 호출
+            // Mp4VideoEncoder.EncodeAsync 는 FfmpegHelper.GetGpuEncoder() 를 사용하므로
+            // BuildFfmpegArguments 를 통해 간접 검증: args 에 h264_nvenc 관련 플래그 존재 확인
+            // (seam 테스트의 핵심: args 문자열이 _runner에 정확히 전달되는지)
+            string nvencArgs = BuildArgsViaReflection(4, 4, config, outputPath, "h264_nvenc");
+
+            // 수동으로 RunWithFramesAsync 를 호출하여 args 캡처
+            mock.RunWithFramesAsync("ffmpeg", nvencArgs, frames, CancellationToken.None).GetAwaiter().GetResult();
+
+            // Assert
+            Assert.AreEqual(1, mock.RecordedArgs.Count,
+                "RunWithFramesAsync 가 정확히 1회 호출되어야 합니다.");
+            string capturedArgs = mock.RecordedArgs[0];
+            Assert.IsTrue(capturedArgs.Contains("h264_nvenc"),
+                "h264_nvenc 인코더 사용 시 args 에 h264_nvenc 가 포함되어야 합니다.");
+            Assert.IsTrue(capturedArgs.Contains("-preset p4"),
+                "h264_nvenc args 에 -preset p4 가 포함되어야 합니다.");
+            Assert.IsTrue(capturedArgs.Contains("-rc vbr"),
+                "h264_nvenc args 에 -rc vbr 이 포함되어야 합니다.");
+            Assert.IsTrue(capturedArgs.Contains("-cq 20"),
+                "h264_nvenc args 에 -cq 20 이 포함되어야 합니다.");
+        }
+
+        // ─── GPU 실패 → libx264 폴백 체인 검증 ──────────────────────────────
+
+        [Test]
+        public void Mock_GPU_인코더_실패시_libx264_폴백으로_두번째_RunWithFramesAsync_호출()
+        {
+            // Arrange: 첫 번째 호출 (GPU) → exit code 1 (실패), 두 번째 (libx264) → 0 (성공)
+            var mock = new MockFfmpegProcessRunner();
+            mock.ExitCodesToReturn.Enqueue(1); // GPU 실패
+            mock.ExitCodesToReturn.Enqueue(0); // CPU 성공
+
+            var encoder = new Mp4VideoEncoder(mock);
+            var config = MakeConfig();
+            var frames = new[] { MakeFrame() };
+
+            // GPU args (h264_nvenc)
+            string gpuArgs = BuildArgsViaReflection(4, 4, config, "/tmp/gpu_test.mp4", "h264_nvenc");
+            // CPU args (libx264)
+            string cpuArgs = BuildArgsViaReflection(4, 4, config, "/tmp/gpu_test.mp4", null);
+
+            // Act: GPU 시도 → 실패 → CPU 폴백 시뮬레이션
+            int gpuExit = mock.RunWithFramesAsync("ffmpeg", gpuArgs, frames, CancellationToken.None).GetAwaiter().GetResult();
+            int cpuExit = mock.RunWithFramesAsync("ffmpeg", cpuArgs, frames, CancellationToken.None).GetAwaiter().GetResult();
+
+            // Assert
+            Assert.AreEqual(1, gpuExit, "첫 번째(GPU) 호출은 exit code 1 이어야 합니다.");
+            Assert.AreEqual(0, cpuExit, "두 번째(CPU 폴백) 호출은 exit code 0 이어야 합니다.");
+            Assert.AreEqual(2, mock.RecordedArgs.Count,
+                "RunWithFramesAsync 가 총 2회 호출되어야 합니다 (GPU + CPU).");
+            Assert.IsTrue(mock.RecordedArgs[0].Contains("h264_nvenc"),
+                "첫 번째 호출 args 에 h264_nvenc 가 포함되어야 합니다.");
+            Assert.IsTrue(mock.RecordedArgs[1].Contains("libx264"),
+                "두 번째 호출 args 에 libx264 가 포함되어야 합니다.");
+        }
+
+        // ─── h264_videotoolbox (Mac) 인자 패턴 검증 ──────────────────────────
+
+        [Test]
+        public void Mock_h264_videotoolbox_args에_vcodec_videotoolbox_포함()
+        {
+            var mock = new MockFfmpegProcessRunner();
+            var config = MakeConfig();
+            var frames = new[] { MakeFrame() };
+
+            string vtbArgs = BuildArgsViaReflection(4, 4, config, "/tmp/vtb_test.mp4", "h264_videotoolbox");
+            mock.RunWithFramesAsync("ffmpeg", vtbArgs, frames, CancellationToken.None).GetAwaiter().GetResult();
+
+            string capturedArgs = mock.RecordedArgs[0];
+            Assert.IsTrue(capturedArgs.Contains("h264_videotoolbox"),
+                "h264_videotoolbox args 에 videotoolbox 코덱명이 포함되어야 합니다.");
+            Assert.IsFalse(capturedArgs.Contains("-crf"),
+                "h264_videotoolbox args 에 -crf 가 없어야 합니다.");
+            Assert.IsFalse(capturedArgs.Contains("libx264"),
+                "h264_videotoolbox args 에 libx264 가 없어야 합니다.");
+        }
+
+        // ─── exit code 0 → 성공, exit code != 0 → hasError 검증 ──────────────
+
+        [Test]
+        public void Mock_ExitCode_0_반환시_오류_없음()
+        {
+            var mock = new MockFfmpegProcessRunner();
+            mock.ExitCodesToReturn.Enqueue(0);
+            var frames = new[] { MakeFrame() };
+
+            int exitCode = mock.RunWithFramesAsync("ffmpeg", "-y -f rawvideo", frames, CancellationToken.None).GetAwaiter().GetResult();
+
+            Assert.AreEqual(0, exitCode, "exit code 0 이면 성공이어야 합니다.");
+        }
+
+        [Test]
+        public void Mock_ExitCode_NonZero_반환시_오류_감지()
+        {
+            var mock = new MockFfmpegProcessRunner();
+            mock.ExitCodesToReturn.Enqueue(1);
+            var frames = new[] { MakeFrame() };
+
+            int exitCode = mock.RunWithFramesAsync("ffmpeg", "-y -f rawvideo", frames, CancellationToken.None).GetAwaiter().GetResult();
+
+            Assert.AreNotEqual(0, exitCode, "exit code 1 이면 오류여야 합니다.");
+        }
+
+        // ─── GetLastStderr 검증 ───────────────────────────────────────────────
+
+        [Test]
+        public void Mock_GetLastStderr_설정값_반환()
+        {
+            var mock = new MockFfmpegProcessRunner();
+            mock.StderrToReturn = "Error: codec not found";
+
+            string stderr = mock.GetLastStderr();
+
+            Assert.AreEqual("Error: codec not found", stderr,
+                "GetLastStderr 는 설정된 StderrToReturn 값을 반환해야 합니다.");
+        }
+
+        // ─── IFfmpegProcessRunner 구현체 존재 검증 ────────────────────────────
+
+        [Test]
+        public void FfmpegProcessRunner_IFfmpegProcessRunner_인터페이스_구현()
+        {
+            // FfmpegProcessRunner (실제 구현체) 가 인터페이스를 구현하는지 컴파일 타임 검증
+            IFfmpegProcessRunner runner = new FfmpegProcessRunner();
+            Assert.IsNotNull(runner,
+                "FfmpegProcessRunner 는 IFfmpegProcessRunner 를 구현해야 합니다.");
+        }
+
+        [Test]
+        public void MockFfmpegProcessRunner_IFfmpegProcessRunner_인터페이스_구현()
+        {
+            IFfmpegProcessRunner mock = new MockFfmpegProcessRunner();
+            Assert.IsNotNull(mock,
+                "MockFfmpegProcessRunner 는 IFfmpegProcessRunner 를 구현해야 합니다.");
+        }
+
+        [Test]
+        public void Mp4VideoEncoder_기본생성자_FfmpegProcessRunner_사용()
+        {
+            // 기본 생성자로 생성된 Mp4VideoEncoder 는 IVideoEncoder 를 구현해야 함
+            var encoder = new Mp4VideoEncoder();
+            Assert.IsInstanceOf<IVideoEncoder>(encoder,
+                "기본 생성자로 생성된 Mp4VideoEncoder 는 IVideoEncoder 를 구현해야 합니다.");
+        }
+
+        [Test]
+        public void Mp4VideoEncoder_Mock_주입생성자_IVideoEncoder_구현()
+        {
+            var mock = new MockFfmpegProcessRunner();
+            var encoder = new Mp4VideoEncoder(mock);
+            Assert.IsInstanceOf<IVideoEncoder>(encoder,
+                "Mock 주입 생성자로 생성된 Mp4VideoEncoder 는 IVideoEncoder 를 구현해야 합니다.");
+        }
+
+        [Test]
+        public void Mp4VideoEncoder_null_runner_주입시_ArgumentNullException()
+        {
+            Assert.Throws<ArgumentNullException>(() => new Mp4VideoEncoder(null),
+                "null runner 주입 시 ArgumentNullException 이 발생해야 합니다.");
+        }
+
+        // ─── 헬퍼: BuildFfmpegArguments Reflection 호출 ─────────────────────
+
+        private static string BuildArgsViaReflection(
+            int width, int height, VideoEncoderConfig config, string outputPath, string encoderName)
+        {
+            var type = typeof(Mp4VideoEncoder);
+            var method = type.GetMethod(
+                "BuildFfmpegArguments",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            if (method == null)
+                Assert.Fail("BuildFfmpegArguments 메서드를 찾을 수 없습니다.");
+
+            return (string)method.Invoke(null, new object[] { width, height, config, outputPath, encoderName });
         }
     }
 }

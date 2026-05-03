@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 
 namespace RekonOps.Rekon
 {
@@ -40,6 +39,9 @@ namespace RekonOps.Rekon
 
         // 실제 사용할 토큰 스토어: 런타임 바인딩 우선, 없으면 생성자 주입 사용
         private SessionTokenStore ActiveTokenStore => _runtimeTokenStore ?? _tokenStore;
+
+        // HTTP 클라이언트 — BindHttpClient() 또는 기본값 UnityHttpClient 사용
+        private IRekonHttpClient _httpClient;
 
         // 성능 타임라인 수집기 (null 허용 — 미연동 시 수집 건너뜀)
         private PerformanceTimelineCollector _timelineCollector;
@@ -108,6 +110,17 @@ namespace RekonOps.Rekon
             // 별도의 런타임 오버라이드 필드를 사용합니다.
             _runtimeTokenStore = tokenStore;
             Debug.Log("[Rekon] CaptureOrchestrator: SessionTokenStore 바인딩 완료");
+        }
+
+        /// <summary>
+        /// IRekonHttpClient를 런타임에 바인딩합니다.
+        /// 테스트에서 MockHttpClient를 주입할 때 사용합니다.
+        /// 호출하지 않으면 CheckUsageLimitAsync에서 UnityHttpClient를 사용합니다.
+        /// </summary>
+        public void BindHttpClient(IRekonHttpClient httpClient)
+        {
+            _httpClient = httpClient;
+            Debug.Log("[Rekon] CaptureOrchestrator: IRekonHttpClient 바인딩 완료");
         }
 
         /// <summary>
@@ -714,68 +727,39 @@ namespace RekonOps.Rekon
                 string baseUrl = RekonSettings.WEB_DASHBOARD_URL.TrimEnd('/');
                 string url = $"{baseUrl}/api/usage?workspace_id={Uri.EscapeDataString(workspaceId)}";
 
-                var tcs = new TaskCompletionSource<string>();
-                var syncContext = System.Threading.SynchronizationContext.Current;
-
-                void RunOnMainThread(Action action)
+                // IRekonHttpClient로 GET 요청 (null이면 UnityHttpClient 사용)
+                var client = _httpClient ?? new UnityHttpClient();
+                var headers = new System.Collections.Generic.Dictionary<string, string>
                 {
-                    if (syncContext != null)
-                        syncContext.Post(_ => action(), null);
-                    else
-                        action();
+                    { "Authorization", $"Bearer {accessToken}" }
+                };
+
+                // 3초 + 여유 1초 대기 (빠른 실패 — 네트워크 단절 대응)
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(4));
+                string responseJson;
+                try
+                {
+                    var response = await client.GetAsync(url, headers, cts.Token);
+                    if (!response.IsSuccess)
+                    {
+                        // fail-open: 4xx, 5xx 모두 null로 처리
+                        Debug.Log($"[Rekon] 사용량 사전 체크 응답 오류 " +
+                                  $"(fail-open, HTTP {response.StatusCode})");
+                        return null;
+                    }
+                    responseJson = response.Body;
                 }
-
-                RunOnMainThread(async () =>
-                {
-                    UnityWebRequest request = null;
-                    bool isDisposed = false;
-
-                    try
-                    {
-                        request = UnityWebRequest.Get(url);
-                        request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
-                        // 3초 타임아웃 (빠른 실패 — 네트워크 단절 대응)
-                        request.timeout = 3;
-
-                        var operation = request.SendWebRequest();
-                        while (!operation.isDone)
-                            await Task.Yield();
-
-                        if (request.result == UnityWebRequest.Result.Success)
-                        {
-                            tcs.TrySetResult(request.downloadHandler.text);
-                        }
-                        else
-                        {
-                            // fail-open: 네트워크 오류, 4xx, 5xx 모두 null로 처리
-                            Debug.Log($"[Rekon] 사용량 사전 체크 응답 오류 " +
-                                      $"(fail-open, HTTP {request.responseCode}): {request.error}");
-                            tcs.TrySetResult(null);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.Log($"[Rekon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
-                        tcs.TrySetResult(null);
-                    }
-                    finally
-                    {
-                        isDisposed = true;
-                        request?.Dispose();
-                    }
-                });
-
-                // 3초 + 여유 1초 대기 (UnityWebRequest.timeout이 이미 3초이므로 4초 초과 시 강제 fail-open)
-                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(4));
-                var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-
-                if (completedTask == timeoutTask || !tcs.Task.IsCompleted)
+                catch (System.Threading.Tasks.TaskCanceledException)
                 {
                     Debug.Log("[Rekon] 사용량 사전 체크 타임아웃 (fail-open). 캡처를 계속 진행합니다.");
                     return null;
                 }
+                catch (Exception ex)
+                {
+                    Debug.Log($"[Rekon] 사용량 사전 체크 예외 (fail-open): {ex.Message}");
+                    return null;
+                }
 
-                string responseJson = tcs.Task.Result;
                 if (string.IsNullOrEmpty(responseJson))
                 {
                     // fail-open

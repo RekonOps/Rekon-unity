@@ -1,9 +1,7 @@
 using System;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 
 namespace RekonOps.Rekon
 {
@@ -34,6 +32,7 @@ namespace RekonOps.Rekon
         private readonly string _supabaseUrl;
         private readonly string _supabaseAnonKey;
         private readonly SessionTokenStore _tokenStore;
+        private readonly IRekonHttpClient _httpClient;
 
         // ─── 응답 모델 ─────────────────────────────────────────────────────────────
 
@@ -74,7 +73,8 @@ namespace RekonOps.Rekon
         /// <param name="supabaseUrl">Supabase 프로젝트 URL</param>
         /// <param name="supabaseAnonKey">Supabase Anon Key</param>
         /// <param name="tokenStore">세션 토큰 저장소</param>
-        public SupabaseAuthClient(string supabaseUrl, string supabaseAnonKey, SessionTokenStore tokenStore)
+        /// <param name="httpClient">HTTP 클라이언트 (null이면 UnityHttpClient 사용). 테스트에서 MockHttpClient 주입 가능.</param>
+        public SupabaseAuthClient(string supabaseUrl, string supabaseAnonKey, SessionTokenStore tokenStore, IRekonHttpClient httpClient = null)
         {
             if (string.IsNullOrEmpty(supabaseUrl))
                 throw new ArgumentNullException(nameof(supabaseUrl), "Supabase URL이 설정되지 않았습니다.");
@@ -84,6 +84,7 @@ namespace RekonOps.Rekon
             _supabaseUrl = supabaseUrl.TrimEnd('/');
             _supabaseAnonKey = supabaseAnonKey;
             _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
+            _httpClient = httpClient ?? new UnityHttpClient();
         }
 
         // ─── 공개 메서드 ───────────────────────────────────────────────────────────
@@ -298,7 +299,7 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// UnityWebRequest로 단일 HTTP 요청을 전송합니다.
+        /// IRekonHttpClient를 통해 단일 HTTP 요청을 전송합니다.
         /// Authorization: Bearer {anonKey} 헤더를 자동으로 추가합니다.
         /// </summary>
         private async Task<string> SendRequestAsync(
@@ -307,119 +308,29 @@ namespace RekonOps.Rekon
             string jsonBody,
             CancellationToken ct)
         {
-            var tcs = new TaskCompletionSource<string>();
-            var syncContext = SynchronizationContext.Current;
-
-            void RunOnMainThread(Action action)
+            var headers = new System.Collections.Generic.Dictionary<string, string>
             {
-                if (syncContext != null)
-                    syncContext.Post(_ => action(), null);
-                else
-                    action();
+                { "Content-Type", "application/json" },
+                { "Accept", "application/json" },
+                { "Authorization", $"Bearer {_supabaseAnonKey}" }
+            };
+
+            HttpResponse response;
+            if (method == "GET")
+                response = await _httpClient.GetAsync(url, headers, ct);
+            else
+                response = await _httpClient.PostAsync(url, jsonBody, headers, ct);
+
+            if (response.IsSuccess)
+            {
+                return response.Body;
             }
-
-            RunOnMainThread(async () =>
+            else
             {
-                UnityWebRequest request = null;
-                bool isDisposed = false;
-                CancellationTokenRegistration registration = default;
-
-                try
-                {
-                    // 요청 생성
-                    if (method == "GET")
-                    {
-                        request = UnityWebRequest.Get(url);
-                    }
-                    else
-                    {
-                        var bodyBytes = Encoding.UTF8.GetBytes(jsonBody ?? "{}");
-                        var uploadHandler = new UploadHandlerRaw(bodyBytes);
-                        uploadHandler.contentType = "application/json";
-                        request = new UnityWebRequest(url, method)
-                        {
-                            uploadHandler = uploadHandler,
-                            downloadHandler = new DownloadHandlerBuffer()
-                        };
-                    }
-
-                    // 헤더 설정
-                    request.SetRequestHeader("Content-Type", "application/json");
-                    request.SetRequestHeader("Accept", "application/json");
-                    request.SetRequestHeader("Authorization", $"Bearer {_supabaseAnonKey}");
-
-                    request.timeout = (int)RequestTimeoutSeconds;
-
-                    // 취소 등록
-                    registration = ct.Register(() =>
-                    {
-                        if (!isDisposed)
-                        {
-                            try { request?.Abort(); }
-                            catch (Exception) { /* Abort 실패 시에도 취소 진행 */ }
-                        }
-                        tcs.TrySetCanceled();
-                    });
-
-                    // 요청 전송 및 완료 대기
-                    var operation = request.SendWebRequest();
-                    while (!operation.isDone)
-                    {
-                        if (ct.IsCancellationRequested)
-                        {
-                            tcs.TrySetCanceled();
-                            return;
-                        }
-                        await Task.Yield();
-                    }
-
-                    if (ct.IsCancellationRequested)
-                    {
-                        tcs.TrySetCanceled();
-                        return;
-                    }
-
-                    // 응답 처리
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        tcs.TrySetResult(request.downloadHandler.text);
-                    }
-                    else
-                    {
-                        int statusCode = (int)request.responseCode;
-                        string responseText = request.downloadHandler?.text ?? "";
-                        string errorMessage = request.error ?? "";
-
-                        if (statusCode == 0)
-                        {
-                            tcs.TrySetException(new NetworkException(
-                                $"네트워크 오류: {errorMessage}"));
-                        }
-                        else
-                        {
-                            tcs.TrySetException(new AuthBrokerException(
-                                statusCode,
-                                $"HTTP {statusCode}: {errorMessage} / {responseText}"));
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    tcs.TrySetCanceled();
-                }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-                finally
-                {
-                    isDisposed = true;
-                    registration.Dispose();
-                    request?.Dispose();
-                }
-            });
-
-            return await tcs.Task;
+                throw new AuthBrokerException(
+                    response.StatusCode,
+                    $"HTTP {response.StatusCode}: {response.Body}");
+            }
         }
     }
 }

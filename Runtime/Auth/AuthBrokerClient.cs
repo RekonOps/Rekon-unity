@@ -1,9 +1,7 @@
 using System;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 
 namespace RekonOps.Rekon
 {
@@ -22,6 +20,7 @@ namespace RekonOps.Rekon
 
         private readonly string _baseUrl;
         private readonly SessionTokenStore _tokenStore;
+        private readonly IRekonHttpClient _httpClient;
         private const int MaxRetryCount = 3;
         private const float RetryBaseDelaySeconds = 2f;
         private const float RequestTimeoutSeconds = 30f;
@@ -61,13 +60,15 @@ namespace RekonOps.Rekon
         /// </summary>
         /// <param name="baseUrl">Auth Broker 기본 URL (RekonSettings.authBrokerUrl)</param>
         /// <param name="tokenStore">세션 토큰 저장소</param>
-        public AuthBrokerClient(string baseUrl, SessionTokenStore tokenStore)
+        /// <param name="httpClient">HTTP 클라이언트 (null이면 UnityHttpClient 사용). 테스트에서 MockHttpClient 주입 가능.</param>
+        public AuthBrokerClient(string baseUrl, SessionTokenStore tokenStore, IRekonHttpClient httpClient = null)
         {
             if (string.IsNullOrEmpty(baseUrl))
                 throw new ArgumentNullException(nameof(baseUrl), "Auth Broker URL이 설정되지 않았습니다.");
 
             _baseUrl = baseUrl.TrimEnd('/');
             _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
+            _httpClient = httpClient ?? new UnityHttpClient();
         }
 
         // ─── 공개 메서드 ───────────────────────────────────────────────────────────
@@ -211,8 +212,7 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// UnityWebRequest로 단일 HTTP 요청을 전송합니다.
-        /// 메인 스레드에서 실행되어야 합니다.
+        /// IRekonHttpClient를 통해 단일 HTTP 요청을 전송합니다.
         /// </summary>
         private async Task<string> SendRequestAsync(
             string method,
@@ -221,130 +221,31 @@ namespace RekonOps.Rekon
             string authToken,
             CancellationToken cancellationToken)
         {
-            var tcs = new TaskCompletionSource<string>();
-            var syncContext = SynchronizationContext.Current;
-
-            // UnityWebRequest는 메인 스레드에서 실행 필요
-            void RunOnMainThread(Action action)
+            var headers = new System.Collections.Generic.Dictionary<string, string>
             {
-                if (syncContext != null)
-                    syncContext.Post(_ => action(), null);
-                else
-                    action();
+                { "Content-Type", "application/json" },
+                { "Accept", "application/json" }
+            };
+
+            if (!string.IsNullOrEmpty(authToken))
+                headers["X-Client-Token"] = authToken;
+
+            HttpResponse response;
+            if (method == "GET")
+                response = await _httpClient.GetAsync(url, headers, cancellationToken);
+            else
+                response = await _httpClient.PostAsync(url, jsonBody, headers, cancellationToken);
+
+            if (response.IsSuccess)
+            {
+                return response.Body;
             }
-
-            RunOnMainThread(async () =>
+            else
             {
-                UnityWebRequest request = null;
-                // dispose 여부를 추적하는 플래그 (Register 콜백과의 레이스 컨디션 방지)
-                bool isDisposed = false;
-                CancellationTokenRegistration registration = default;
-
-                try
-                {
-                    // 요청 생성
-                    if (method == "GET")
-                    {
-                        request = UnityWebRequest.Get(url);
-                    }
-                    else
-                    {
-                        var bodyBytes = Encoding.UTF8.GetBytes(jsonBody ?? "{}");
-                        var uploadHandler = new UploadHandlerRaw(bodyBytes);
-                        uploadHandler.contentType = "application/json";
-                        request = new UnityWebRequest(url, method)
-                        {
-                            uploadHandler = uploadHandler,
-                            downloadHandler = new DownloadHandlerBuffer()
-                        };
-                    }
-
-                    // 헤더 설정
-                    request.SetRequestHeader("Content-Type", "application/json");
-                    request.SetRequestHeader("Accept", "application/json");
-
-                    if (!string.IsNullOrEmpty(authToken))
-                        request.SetRequestHeader("X-Client-Token", authToken);
-
-                    request.timeout = (int)RequestTimeoutSeconds;
-
-                    // 취소 등록 - Abort()를 먼저 호출한 뒤 tcs를 취소 처리.
-                    // isDisposed 플래그로 이미 dispose된 request에 접근하는 것을 방지.
-                    registration = cancellationToken.Register(() =>
-                    {
-                        if (!isDisposed)
-                        {
-                            try { request?.Abort(); }
-                            catch (Exception) { /* Abort 자체가 실패해도 취소는 진행 */ }
-                        }
-                        tcs.TrySetCanceled();
-                    });
-
-                    // 요청 전송 및 완료 대기
-                    var operation = request.SendWebRequest();
-                    while (!operation.isDone)
-                    {
-                        // 취소 요청이 들어오면 대기 루프 탈출 (Abort는 Register 콜백에서 처리됨)
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            tcs.TrySetCanceled();
-                            return;
-                        }
-                        await Task.Yield();
-                    }
-
-                    // 루프 종료 후 한 번 더 취소 여부 확인
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        tcs.TrySetCanceled();
-                        return;
-                    }
-
-                    // 응답 처리 - request가 유효한 상태에서만 접근
-                    if (request.result == UnityWebRequest.Result.Success)
-                    {
-                        tcs.TrySetResult(request.downloadHandler.text);
-                    }
-                    else
-                    {
-                        int statusCode = (int)request.responseCode;
-                        string responseText = request.downloadHandler?.text ?? "";
-                        string errorMessage = request.error ?? "";
-
-                        if (statusCode == 0)
-                        {
-                            // 네트워크 오류 (재시도 가능)
-                            tcs.TrySetException(new NetworkException(
-                                $"네트워크 오류: {errorMessage}"));
-                        }
-                        else
-                        {
-                            // HTTP 에러 코드
-                            tcs.TrySetException(new AuthBrokerException(
-                                statusCode,
-                                $"HTTP {statusCode}: {errorMessage} / {responseText}"));
-                        }
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    tcs.TrySetCanceled();
-                }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-                finally
-                {
-                    // isDisposed 플래그를 먼저 세운 뒤 Dispose 호출.
-                    // 이후 Register 콜백이 실행되더라도 request에 접근하지 않음.
-                    isDisposed = true;
-                    registration.Dispose();
-                    request?.Dispose();
-                }
-            });
-
-            return await tcs.Task;
+                throw new AuthBrokerException(
+                    response.StatusCode,
+                    $"HTTP {response.StatusCode}: {response.Body}");
+            }
         }
     }
 

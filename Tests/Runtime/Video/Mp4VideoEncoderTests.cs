@@ -72,10 +72,10 @@ namespace RekonOps.Rekon.Tests
             var encoder = new Mp4VideoEncoder();
             var frames = new[] { MakeFrame(320, 180) };
 
-            Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            {
-                await encoder.EncodeAsync(frames, null, _config);
-            }, "outputPath가 null이면 ArgumentNullException을 throw해야 합니다.");
+            Assert.That(
+                async () => await encoder.EncodeAsync(frames, null, _config),
+                Throws.TypeOf<ArgumentNullException>(),
+                "outputPath가 null이면 ArgumentNullException을 throw해야 합니다.");
         }
 
         [Test]
@@ -84,10 +84,10 @@ namespace RekonOps.Rekon.Tests
             var encoder = new Mp4VideoEncoder();
             var frames = new[] { MakeFrame(320, 180) };
 
-            Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            {
-                await encoder.EncodeAsync(frames, "", _config);
-            }, "빈 outputPath는 ArgumentNullException을 throw해야 합니다.");
+            Assert.That(
+                async () => await encoder.EncodeAsync(frames, "", _config),
+                Throws.TypeOf<ArgumentNullException>(),
+                "빈 outputPath는 ArgumentNullException을 throw해야 합니다.");
         }
 
         [Test]
@@ -99,10 +99,10 @@ namespace RekonOps.Rekon.Tests
 
             try
             {
-                Assert.ThrowsAsync<ArgumentNullException>(async () =>
-                {
-                    await encoder.EncodeAsync(frames, tempPath, null);
-                }, "config가 null이면 ArgumentNullException을 throw해야 합니다.");
+                Assert.That(
+                    async () => await encoder.EncodeAsync(frames, tempPath, null),
+                    Throws.TypeOf<ArgumentNullException>(),
+                    "config가 null이면 ArgumentNullException을 throw해야 합니다.");
             }
             finally
             {

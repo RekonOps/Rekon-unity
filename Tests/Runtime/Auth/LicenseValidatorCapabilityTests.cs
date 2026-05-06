@@ -255,8 +255,9 @@ namespace RekonOps.Rekon.Tests
                 _mockHttp);
 
             // Act & Assert — NetworkException 또는 AggregateException 발생
-            Assert.ThrowsAsync<AggregateException>(
+            Assert.That(
                 async () => await validator.ValidateAsync(),
+                Throws.TypeOf<AggregateException>(),
                 "access_token 없을 때 예외가 발생해야 합니다.");
 
             // HTTP 호출이 일어나지 않아야 함

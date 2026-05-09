@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace RekonOps.Rekon
 {
@@ -16,6 +17,7 @@ namespace RekonOps.Rekon
     {
         // ─── 상수 ───────────────────────────────────────────────────────────────
 
+        private const int RequestTimeoutSeconds = 30;
         private const int MaxRetries = 3;
         private const float RetryBaseDelaySec = 2f;
 
@@ -28,7 +30,6 @@ namespace RekonOps.Rekon
         // ─── 의존성 ─────────────────────────────────────────────────────────────
 
         private readonly IR2UploadService _uploadService;
-        private readonly IRekonHttpClient _httpClient;
 
         /// <summary>Web API 프록시 기본 URL (RekonSettings.WEB_DASHBOARD_URL)</summary>
         private readonly string _webApiBaseUrl;
@@ -92,11 +93,9 @@ namespace RekonOps.Rekon
         /// Web API 프록시(WEB_DASHBOARD_URL)를 통해 리포트를 제출합니다.
         /// </summary>
         /// <param name="uploadService">R2 업로드 서비스 (IR2UploadService 구현체)</param>
-        /// <param name="httpClient">HTTP 클라이언트 (null 이면 UnityHttpClient 사용 — 테스트 시 mock 주입)</param>
-        public ReportSubmitService(IR2UploadService uploadService, IRekonHttpClient httpClient = null)
+        public ReportSubmitService(IR2UploadService uploadService)
         {
             _uploadService = uploadService ?? throw new ArgumentNullException(nameof(uploadService));
-            _httpClient = httpClient ?? new UnityHttpClient();
 
             // Web 프록시 기본 URL — 상수에서 직접 읽어 Supabase 설정 의존성 제거
             _webApiBaseUrl = RekonSettings.WEB_DASHBOARD_URL.TrimEnd('/');
@@ -417,9 +416,8 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// IRekonHttpClient 를 통해 단일 HTTP POST 요청을 전송합니다.
+        /// UnityWebRequest로 단일 HTTP 요청을 전송합니다.
         /// Bearer 토큰 인증만 사용합니다 (apikey 헤더는 Web 프록시가 대신 처리).
-        /// UnityWebRequest 직접 의존성을 제거하여 단위 테스트에서 mock 주입이 가능합니다.
         /// </summary>
         private async Task<string> SendRequestAsync(
             string method,
@@ -428,70 +426,143 @@ namespace RekonOps.Rekon
             string accessToken,
             CancellationToken ct)
         {
-            var headers = new Dictionary<string, string>
-            {
-                { "Accept", "application/json" },
-                { "Authorization", $"Bearer {accessToken}" }
-            };
+            var tcs = new TaskCompletionSource<string>();
+            var syncContext = SynchronizationContext.Current;
 
-            HttpResponse response;
-            try
+            void RunOnMainThread(Action action)
             {
-                // 현재 모든 호출은 POST — method 매개변수는 호출 측 호환성 유지를 위해 보존
-                response = await _httpClient.PostAsync(url, jsonBody ?? "{}", headers, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                if (syncContext != null)
+                    syncContext.Post(_ => action(), null);
+                else
+                    action();
             }
 
-            // 성공 응답 (2xx) — 본문 반환
-            if (response.IsSuccess)
+            RunOnMainThread(async () =>
             {
-                return response.Body ?? "";
-            }
+                UnityWebRequest request = null;
+                bool isDisposed = false;
+                CancellationTokenRegistration registration = default;
 
-            // ── 에러 응답 분류 ──────────────────────────────────────────────────
-            int statusCode = response.StatusCode;
-            string responseText = response.Body ?? "";
-
-            // 에러 본문 파싱
-            string detailMessage = $"HTTP {statusCode}";
-            string usageLimitReason = null;
-            string upgradeUrl = null;
-            int monthlyLimit = 0;
-            try
-            {
-                var errorObj = JsonUtility.FromJson<ErrorResponse>(responseText);
-                if (!string.IsNullOrEmpty(errorObj?.error))
-                    detailMessage = errorObj.error;
-
-                // 429 사용량 초과 전용 필드 추출
-                if (statusCode == 429 && errorObj?.code == "usage_limit_exceeded")
+                try
                 {
-                    usageLimitReason = errorObj.reason;      // "monthly"
-                    upgradeUrl = errorObj.upgradeUrl;
-                    monthlyLimit = errorObj.monthly_limit;
+                    // 요청 생성
+                    var bodyBytes = Encoding.UTF8.GetBytes(jsonBody ?? "{}");
+                    var uploadHandler = new UploadHandlerRaw(bodyBytes);
+                    uploadHandler.contentType = "application/json";
+                    request = new UnityWebRequest(url, method)
+                    {
+                        uploadHandler = uploadHandler,
+                        downloadHandler = new DownloadHandlerBuffer()
+                    };
+
+                    // 헤더 설정
+                    // apikey 헤더는 Web 프록시가 Supabase 호출 시 대신 추가함
+                    request.SetRequestHeader("Content-Type", "application/json");
+                    request.SetRequestHeader("Accept", "application/json");
+                    request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
+
+                    request.timeout = RequestTimeoutSeconds;
+
+                    // 취소 등록
+                    registration = ct.Register(() =>
+                    {
+                        if (!isDisposed)
+                        {
+                            try { request?.Abort(); }
+                            catch (Exception) { /* Abort 실패 시에도 취소 진행 */ }
+                        }
+                        tcs.TrySetCanceled();
+                    });
+
+                    // 요청 전송 및 완료 대기
+                    var operation = request.SendWebRequest();
+                    while (!operation.isDone)
+                    {
+                        if (ct.IsCancellationRequested)
+                        {
+                            tcs.TrySetCanceled();
+                            return;
+                        }
+                        await Task.Yield();
+                    }
+
+                    if (ct.IsCancellationRequested)
+                    {
+                        tcs.TrySetCanceled();
+                        return;
+                    }
+
+                    // 응답 처리
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        tcs.TrySetResult(request.downloadHandler.text);
+                    }
+                    else
+                    {
+                        int statusCode = (int)request.responseCode;
+                        string responseText = request.downloadHandler?.text ?? "";
+                        string errorMessage = request.error ?? "";
+
+                        // 에러 응답 본문에서 상세 메시지 추출 시도
+                        string detailMessage = errorMessage;
+                        string usageLimitReason = null;
+                        string upgradeUrl = null;
+                        int monthlyLimit = 0;
+                        try
+                        {
+                            var errorObj = JsonUtility.FromJson<ErrorResponse>(responseText);
+                            if (!string.IsNullOrEmpty(errorObj?.error))
+                                detailMessage = errorObj.error;
+
+                            // 429 사용량 초과 전용 필드 추출
+                            if (statusCode == 429 && errorObj?.code == "usage_limit_exceeded")
+                            {
+                                usageLimitReason = errorObj.reason;      // "monthly"
+                                upgradeUrl = errorObj.upgradeUrl;
+                                monthlyLimit = errorObj.monthly_limit;
+                            }
+                        }
+                        catch { /* JSON 파싱 실패 시 기본 에러 메시지 사용 */ }
+
+                        if (statusCode == 0)
+                        {
+                            tcs.TrySetException(new NetworkException(
+                                $"네트워크 오류: {detailMessage}"));
+                        }
+                        else if (statusCode == 429 && usageLimitReason != null)
+                        {
+                            // 사용량 초과 전용 예외: reason + monthlyLimit + upgradeUrl 포함
+                            tcs.TrySetException(new UsageLimitExceededException(
+                                usageLimitReason,
+                                monthlyLimit,
+                                upgradeUrl,
+                                $"HTTP 429: {detailMessage}"));
+                        }
+                        else
+                        {
+                            tcs.TrySetException(new AuthBrokerException(
+                                statusCode,
+                                $"HTTP {statusCode}: {detailMessage}"));
+                        }
+                    }
                 }
-            }
-            catch { /* JSON 파싱 실패 시 기본 메시지 사용 */ }
+                catch (OperationCanceledException)
+                {
+                    tcs.TrySetCanceled();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+                finally
+                {
+                    isDisposed = true;
+                    registration.Dispose();
+                    request?.Dispose();
+                }
+            });
 
-            if (statusCode == 0)
-            {
-                throw new NetworkException($"네트워크 오류: {detailMessage}");
-            }
-
-            if (statusCode == 429 && usageLimitReason != null)
-            {
-                // 사용량 초과 전용 예외: reason + monthlyLimit + upgradeUrl 포함
-                throw new UsageLimitExceededException(
-                    usageLimitReason,
-                    monthlyLimit,
-                    upgradeUrl,
-                    $"HTTP 429: {detailMessage}");
-            }
-
-            throw new AuthBrokerException(statusCode, $"HTTP {statusCode}: {detailMessage}");
+            return await tcs.Task;
         }
 
         // ─── 유틸리티 ───────────────────────────────────────────────────────────

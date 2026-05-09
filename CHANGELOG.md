@@ -13,7 +13,7 @@
 
 ### 변경
 
-#### `ReportSubmitService` HTTP seam 도입 (회귀 가드 강화)
+#### `ReportSubmitService` HTTP seam 도입
 
 - `ReportSubmitService` 의 create-report + confirm-upload 호출이 `IRekonHttpClient` 위임 방식으로 전환됨.
 - `Runtime/Services/ReportSubmitService.cs` 의 `SendRequestAsync` 145L → 22L (단순 위임)
@@ -22,20 +22,17 @@
   - 비즈니스 로직 (UsageLimitExceededException, AuthBrokerException, 재시도 정책) 100% 보존
 - 생성자에 `IRekonHttpClient httpClient = null` 옵셔널 매개변수 추가 — backward compat (외부 caller 0 변경)
   - 기본값: `new UnityHttpClient()` — 실 환경 동작 동일
-  - 테스트 환경: `MockRekonHttpClient` 주입 가능
-
-#### 회귀 가드 강화
-
-- `Tests/Runtime/Helpers/MockRekonHttpClient.cs` (신규): 공용 HTTP mock 헬퍼
-  - URL 패턴별 응답 매핑 (`SetResponseFor`) + 호출 기록 (`Calls`) + 예외 throw 시뮬레이션
-  - `LicenseValidatorCapabilityTests` 의 inline mock 도 공용 헬퍼로 통일
-- `Tests/Runtime/Network/ReportSubmitServiceHttpSeamTests.cs` (신규): 7 시나리오
-  - create-report 200 OK / 429 usage_limit / 401 / 5xx 재시도 / confirm-upload / 생성자 호환성 / AccessToken body 미포함 보안
+  - 테스트 환경: 향후 mock 주입 가능 (Test Framework 환경 문제 해결 후 단위 테스트 추가 예정)
 
 ### 외부 영향
 
 - 외부 caller (`RekonBootstrap.cs`) 변경 없음 — 게임 빌드 정상 동작
-- UPM 패키지 사용자 영향: 0 (내부 구현 리팩토링)
+- UPM 패키지 사용자 영향: 0 (내부 구현 리팩토링 + 테스트 가능성 확보)
+
+### 알려진 이슈
+
+- Unity Test Framework 환경에서 `[Test] public async Task` 광역 인식 실패 — 별도 task 로 추적 (Rekon-Context backlog).
+  관련 단위 테스트는 환경 문제 해결 후 추가 예정.
 
 ---
 

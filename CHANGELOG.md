@@ -9,6 +9,36 @@
 
 ---
 
+## [0.3.0] - 2026-05-09
+
+### 변경
+
+#### `ReportSubmitService` HTTP seam 도입 (회귀 가드 강화)
+
+- `ReportSubmitService` 의 create-report + confirm-upload 호출이 `IRekonHttpClient` 위임 방식으로 전환됨.
+- `Runtime/Services/ReportSubmitService.cs` 의 `SendRequestAsync` 145L → 22L (단순 위임)
+  - 직접 `UnityWebRequest` 사용 → `_httpClient.PostAsync(...)` 호출
+  - `using UnityEngine.Networking` 제거 (코드 의존 0)
+  - 비즈니스 로직 (UsageLimitExceededException, AuthBrokerException, 재시도 정책) 100% 보존
+- 생성자에 `IRekonHttpClient httpClient = null` 옵셔널 매개변수 추가 — backward compat (외부 caller 0 변경)
+  - 기본값: `new UnityHttpClient()` — 실 환경 동작 동일
+  - 테스트 환경: `MockRekonHttpClient` 주입 가능
+
+#### 회귀 가드 강화
+
+- `Tests/Runtime/Helpers/MockRekonHttpClient.cs` (신규): 공용 HTTP mock 헬퍼
+  - URL 패턴별 응답 매핑 (`SetResponseFor`) + 호출 기록 (`Calls`) + 예외 throw 시뮬레이션
+  - `LicenseValidatorCapabilityTests` 의 inline mock 도 공용 헬퍼로 통일
+- `Tests/Runtime/Network/ReportSubmitServiceHttpSeamTests.cs` (신규): 7 시나리오
+  - create-report 200 OK / 429 usage_limit / 401 / 5xx 재시도 / confirm-upload / 생성자 호환성 / AccessToken body 미포함 보안
+
+### 외부 영향
+
+- 외부 caller (`RekonBootstrap.cs`) 변경 없음 — 게임 빌드 정상 동작
+- UPM 패키지 사용자 영향: 0 (내부 구현 리팩토링)
+
+---
+
 ## [1.0.0] - 2026-03-XX
 
 ### 추가

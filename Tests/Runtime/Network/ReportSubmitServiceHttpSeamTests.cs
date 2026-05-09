@@ -16,6 +16,10 @@ namespace RekonOps.Rekon.Tests
     /// 사용 헬퍼:
     ///   - MockRekonHttpClient (Tests/Runtime/Helpers/MockRekonHttpClient.cs)
     ///   - MockR2UploadService (파일 로컬 정의 — 기존 Capability 테스트와 동일 패턴)
+    ///
+    /// 시그니처 주의: Unity Test Framework 환경에서 [Test] async Task 광역 인식 실패 회피를 위해
+    /// public void + .GetAwaiter().GetResult() 패턴 사용 (ReportSubmitServiceTests 와 동일).
+    /// 별도 백로그: 환경 진단 후 async Task 패턴 복원 가능.
     /// </summary>
     [TestFixture]
     public class ReportSubmitServiceHttpSeamTests
@@ -98,7 +102,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T1: create-report 200 OK 정상 흐름 ───────────────────────────────
 
         [Test]
-        public async Task SubmitReportAsync_create_report_200_정상흐름_POST_Authorization_헤더_검증()
+        public void SubmitReportAsync_create_report_200_정상흐름_POST_Authorization_헤더_검증()
         {
             // Arrange
             var mockUpload = new MockR2UploadService();
@@ -120,7 +124,7 @@ namespace RekonOps.Rekon.Tests
             const string token = "bearer-test-token-abc";
 
             // Act
-            var result = await service.SubmitReportAsync(BuildValidRequest(token));
+            var result = service.SubmitReportAsync(BuildValidRequest(token)).GetAwaiter().GetResult();
 
             // Assert — HTTP 호출 횟수 (create + confirm = 2)
             Assert.AreEqual(2, mockHttp.Calls.Count,
@@ -147,7 +151,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T2: create-report 429 usage_limit_exceeded ───────────────────────
 
         [Test]
-        public async Task SubmitReportAsync_create_report_429_usage_limit_exceeded_필드_추출()
+        public void SubmitReportAsync_create_report_429_usage_limit_exceeded_필드_추출()
         {
             // Arrange
             var mockUpload = new MockR2UploadService();
@@ -165,7 +169,7 @@ namespace RekonOps.Rekon.Tests
             var service = new ReportSubmitService(mockUpload, mockHttp);
 
             // Act
-            var result = await service.SubmitReportAsync(BuildValidRequest());
+            var result = service.SubmitReportAsync(BuildValidRequest()).GetAwaiter().GetResult();
 
             // Assert — HTTP 호출은 1번 (재시도 없음 — 429는 재시도 안 함)
             Assert.AreEqual(1, mockHttp.Calls.Count,
@@ -190,7 +194,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T3: create-report 401 — 재시도 없음 ────────────────────────────
 
         [Test]
-        public async Task SubmitReportAsync_create_report_401_재시도_없이_1번만_호출()
+        public void SubmitReportAsync_create_report_401_재시도_없이_1번만_호출()
         {
             // Arrange
             var mockUpload = new MockR2UploadService();
@@ -204,7 +208,7 @@ namespace RekonOps.Rekon.Tests
             var service = new ReportSubmitService(mockUpload, mockHttp);
 
             // Act
-            var result = await service.SubmitReportAsync(BuildValidRequest());
+            var result = service.SubmitReportAsync(BuildValidRequest()).GetAwaiter().GetResult();
 
             // Assert — 4xx 는 재시도 없음 (SendWithRetryAsync 정책)
             Assert.AreEqual(1, mockHttp.Calls.Count,
@@ -220,7 +224,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T4: create-report 5xx — MaxRetries(3) 재시도 ───────────────────
 
         [Test]
-        public async Task SubmitReportAsync_create_report_5xx_MaxRetries_3번_호출()
+        public void SubmitReportAsync_create_report_5xx_MaxRetries_3번_호출()
         {
             // Arrange
             var mockUpload = new MockR2UploadService();
@@ -235,7 +239,7 @@ namespace RekonOps.Rekon.Tests
             var service = new ReportSubmitService(mockUpload, mockHttp);
 
             // Act
-            var result = await service.SubmitReportAsync(BuildValidRequest());
+            var result = service.SubmitReportAsync(BuildValidRequest()).GetAwaiter().GetResult();
 
             // Assert — MaxRetries = 3 (while attempt < MaxRetries)
             Assert.AreEqual(3, mockHttp.Calls.Count,
@@ -248,7 +252,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T5: confirm-upload 정상 흐름 ────────────────────────────────────
 
         [Test]
-        public async Task SubmitReportAsync_confirm_upload_정상흐름_URL_및_ReportId_검증()
+        public void SubmitReportAsync_confirm_upload_정상흐름_URL_및_ReportId_검증()
         {
             // Arrange
             var mockUpload = new MockR2UploadService();
@@ -269,7 +273,7 @@ namespace RekonOps.Rekon.Tests
             var service = new ReportSubmitService(mockUpload, mockHttp);
 
             // Act
-            var result = await service.SubmitReportAsync(BuildValidRequest());
+            var result = service.SubmitReportAsync(BuildValidRequest()).GetAwaiter().GetResult();
 
             // Assert
             Assert.IsTrue(result.Success, "전체 흐름 성공 시 Success=true여야 합니다.");
@@ -315,7 +319,7 @@ namespace RekonOps.Rekon.Tests
         // ─── T7: create-report body 에 AccessToken 포함 금지 — Bearer 만 사용 ─
 
         [Test]
-        public async Task SubmitReportAsync_create_report_body_에_AccessToken_미포함()
+        public void SubmitReportAsync_create_report_body_에_AccessToken_미포함()
         {
             // Arrange — Bearer 헤더에만 토큰 전달, body 에 포함되면 안 됨
             var mockUpload = new MockR2UploadService();
@@ -335,7 +339,7 @@ namespace RekonOps.Rekon.Tests
             var service = new ReportSubmitService(mockUpload, mockHttp);
 
             // Act
-            await service.SubmitReportAsync(BuildValidRequest(sensitiveToken));
+            service.SubmitReportAsync(BuildValidRequest(sensitiveToken)).GetAwaiter().GetResult();
 
             // Assert — create-report body 에 토큰이 포함되면 안 됨
             Assert.IsTrue(mockHttp.Calls.Count > 0, "HTTP 호출이 있어야 합니다.");

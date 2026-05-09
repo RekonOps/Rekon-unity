@@ -14,17 +14,77 @@ namespace RekonOps.Rekon.Tests
     [TestFixture]
     public class LicenseValidatorCapabilityTests
     {
+        // ─── MockHttpClient ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 테스트용 MockHttpClient.
+        /// IRekonHttpClient를 구현하며, 호출 기록 + 설정 가능한 응답을 제공합니다.
+        /// </summary>
+        private class MockHttpClient : IRekonHttpClient
+        {
+            /// <summary>기록된 요청 목록</summary>
+            public List<RequestCall> Calls { get; } = new List<RequestCall>();
+
+            /// <summary>반환할 응답 (기본: 200 OK)</summary>
+            public HttpResponse ResponseToReturn { get; set; } = new HttpResponse { StatusCode = 200, Body = "{}" };
+
+            /// <summary>설정 시 해당 예외를 throw합니다 (null이면 무시)</summary>
+            public Exception ExceptionToThrow { get; set; }
+
+            public Task<HttpResponse> GetAsync(
+                string url,
+                Dictionary<string, string> headers = null,
+                CancellationToken cancellationToken = default)
+            {
+                Calls.Add(new RequestCall { Method = "GET", Url = url, Headers = headers });
+                if (ExceptionToThrow != null) throw ExceptionToThrow;
+                return Task.FromResult(ResponseToReturn);
+            }
+
+            public Task<HttpResponse> PostAsync(
+                string url,
+                string jsonBody,
+                Dictionary<string, string> headers = null,
+                CancellationToken cancellationToken = default)
+            {
+                Calls.Add(new RequestCall { Method = "POST", Url = url, Body = jsonBody, Headers = headers });
+                if (ExceptionToThrow != null) throw ExceptionToThrow;
+                return Task.FromResult(ResponseToReturn);
+            }
+
+            public Task<HttpResponse> PutAsync(
+                string url,
+                byte[] body,
+                string contentType,
+                IProgress<float> progress = null,
+                CancellationToken cancellationToken = default)
+            {
+                Calls.Add(new RequestCall { Method = "PUT", Url = url, ContentType = contentType });
+                if (ExceptionToThrow != null) throw ExceptionToThrow;
+                return Task.FromResult(ResponseToReturn);
+            }
+
+            public class RequestCall
+            {
+                public string Method;
+                public string Url;
+                public string Body;
+                public string ContentType;
+                public Dictionary<string, string> Headers;
+            }
+        }
+
         // ─── 픽스처 ─────────────────────────────────────────────────────────────
 
         private SessionTokenStore _tokenStore;
-        private MockRekonHttpClient _mockHttp;
+        private MockHttpClient _mockHttp;
 
         [SetUp]
         public void SetUp()
         {
             _tokenStore = new SessionTokenStore("com.rekonops.capability-test");
             _tokenStore.Clear();
-            _mockHttp = new MockRekonHttpClient();
+            _mockHttp = new MockHttpClient();
         }
 
         [TearDown]

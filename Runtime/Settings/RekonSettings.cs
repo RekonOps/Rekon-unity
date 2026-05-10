@@ -194,13 +194,13 @@ namespace RekonOps.Rekon
         /// <summary>웹 대시보드 기본 URL (Scripting Define Symbol로 전환)</summary>
         /// <remarks>
         /// REKON_LOCAL: http://localhost:3000 (로컬 개발)
-        /// REKON_DEV: https://rekon.vercel.app (Vercel dev 배포)
-        /// 없음: https://app.rekonops.dev (prod)
+        /// REKON_DEV: https://rekonops.vercel.app (Vercel dev preview)
+        /// 없음: https://www.rekonops.dev (prod)
         /// </remarks>
 #if REKON_LOCAL
         public const string WEB_DASHBOARD_URL = "http://localhost:3000";
 #elif REKON_DEV
-        public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
+        public const string WEB_DASHBOARD_URL = "https://rekonops.vercel.app";
 #else
         public const string WEB_DASHBOARD_URL = "https://www.rekonops.dev";
 #endif

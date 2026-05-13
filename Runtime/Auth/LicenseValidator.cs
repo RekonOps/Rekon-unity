@@ -189,30 +189,18 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 라이선스를 서버에서 검증합니다.
-        /// licenseKey / userId 는 선택적입니다. 없으면 JWT로 서버에서 자동 조회합니다.
+        /// JWT(access_token) 기반으로 서버에서 자동 조회합니다.
         /// 네트워크 실패 시 Grace Period 내 캐시를 반환합니다.
         /// </summary>
-        /// <param name="licenseKey">라이선스 키 (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
-        /// <param name="userId">사용자 UUID (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
         /// <param name="ct">취소 토큰</param>
         /// <returns>검증된 라이선스 정보</returns>
-        public async Task<LicenseInfo> ValidateAsync(string licenseKey = null, string userId = null, CancellationToken ct = default)
+        public async Task<LicenseInfo> ValidateAsync(CancellationToken ct = default)
         {
             var url = $"{_baseUrl}/api/unity/validate-license";
             var pluginVersion = GetPluginVersion();
 
-            // licenseKey/userId 둘 다 있을 때만 body에 포함, 없으면 plugin_version만 전송
-            string body;
-            if (!string.IsNullOrEmpty(licenseKey) && !string.IsNullOrEmpty(userId))
-            {
-                body = $"{{\"license_key\":\"{EscapeJsonString(licenseKey)}\"," +
-                       $"\"user_id\":\"{EscapeJsonString(userId)}\"," +
-                       $"\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
-            }
-            else
-            {
-                body = $"{{\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
-            }
+            // JWT 자동 조회 path 만 사용 — licenseKey/userId 직접 전달 제거 (#169)
+            string body = $"{{\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
 
             try
             {

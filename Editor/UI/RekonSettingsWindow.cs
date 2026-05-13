@@ -1554,7 +1554,7 @@ namespace RekonOps.Rekon.Editor
                     Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
                               $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +
                               $"maxScreenshot={licenseInfo.MaxScreenshotCount}개, " +
-                              $"maxSeats={licenseInfo.MaxSeats}명");
+                              $"maxSeats={licenseInfo.MaxSeatsDisplay()}");
 
                     EditorApplication.delayCall += Repaint;
                 }

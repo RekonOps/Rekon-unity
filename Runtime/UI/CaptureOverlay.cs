@@ -383,15 +383,15 @@ namespace RekonOps.Rekon
             // 홀드 시작 시 토스트 표시 (0 → 양수 전환 시 한 번만)
             if (progress > 0f && _toastTimer <= 0f)
             {
-                _toastText  = "리포트 발송 중... (2초 유지)";
-                _toastTimer = 2.5f; // 롱프레스 임계값(2초)보다 조금 길게 유지
+                _toastText  = "리포트 발송 중... (1초 유지)";
+                _toastTimer = 1.5f; // 롱프레스 임계값(1초)보다 조금 길게 유지
             }
 
             // 홀드 취소(0으로 리셋) → 토스트 제거
             if (progress <= 0f)
             {
                 // 롱프레스 완료 토스트가 표시 중이면 그대로 유지
-                if (_toastText == "리포트 발송 중... (2초 유지)")
+                if (_toastText == "리포트 발송 중... (1초 유지)")
                 {
                     _toastText  = "";
                     _toastTimer = 0f;
@@ -401,7 +401,7 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// HotkeyManager.OnScreenshotLongPress 이벤트 핸들러.
-        /// 2초 롱프레스 완료 시 홀드 프로그레스 바만 리셋합니다.
+        /// 1초 롱프레스 완료 시 홀드 프로그레스 바만 리셋합니다.
         /// 실제 토스트는 발송 결과(OnScreenshotSubmitCompleted) 이벤트에서 표시됩니다.
         /// </summary>
         private void HandleScreenshotLongPress()
@@ -678,7 +678,7 @@ namespace RekonOps.Rekon
 
             // 안내 텍스트
             Rect textRect = new Rect(innerX, y + 5f, innerW, 16f);
-            GUI.Label(textRect, "리포트 발송 중... (2초 유지)", _labelStyle ?? GUI.skin.label);
+            GUI.Label(textRect, "리포트 발송 중... (1초 유지)", _labelStyle ?? GUI.skin.label);
 
             // 프로그레스 바 배경
             float fillY = y + 24f;

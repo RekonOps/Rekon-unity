@@ -50,6 +50,7 @@ namespace RekonOps.Rekon
             public bool video_capture;
             public int max_buffer_seconds;
             public int max_screenshot_count;
+            // max_seats: JsonUtility는 nullable 미지원 → int 유지 (null = -1 매핑)
             public int max_seats;
         }
 
@@ -73,8 +74,31 @@ namespace RekonOps.Rekon
             /// <summary>플랜별 최대 스크린샷 개수. 기본값: 3 (free)</summary>
             public int MaxScreenshotCount { get; set; } = 3;
 
-            /// <summary>플랜별 최대 시트(멤버) 수. 기본값: 1 (free)</summary>
-            public int MaxSeats { get; set; } = 1;
+            /// <summary>
+            /// 플랜별 최대 시트(멤버) 수. null = 무제한 (team/team_pro), 1 = free 기본값.
+            /// #145 옵션 A: backend max_seats NULL = 무제한 정책 반영.
+            /// </summary>
+            public int? MaxSeats { get; set; } = 1;
+
+            /// <summary>
+            /// 시트 수가 무제한인지 여부를 반환합니다.
+            /// team/team_pro 플랜 또는 MaxSeats == null 인 경우 무제한입니다.
+            /// </summary>
+            public bool IsSeatUnlimited()
+            {
+                // MaxSeats가 null이거나 plan이 team/team_pro이면 무제한
+                if (!MaxSeats.HasValue) return true;
+                return Plan == "team" || Plan == "team_pro";
+            }
+
+            /// <summary>
+            /// 시트 한도 표시용 문자열을 반환합니다.
+            /// 무제한이면 "무제한", 유한이면 "{n}명" 형식.
+            /// </summary>
+            public string MaxSeatsDisplay()
+            {
+                return IsSeatUnlimited() ? "무제한" : $"{MaxSeats?.ToString()}명";
+            }
 
             /// <summary>연동된 외부 제공자 목록 (예: ["jira"])</summary>
             public string[] ConnectedProviders;
@@ -108,6 +132,8 @@ namespace RekonOps.Rekon
             public string connected_providers_csv; // 쉼표 구분 문자열
             public int max_buffer_seconds;
             public int max_screenshot_count;
+            // max_seats: -1 = 무제한(null), 0 이하 무효, 양수 = 한도
+            // JsonUtility nullable 미지원 → -1 매직 값으로 null 표현 (#145 옵션 A)
             public int max_seats;
         }
 
@@ -163,30 +189,18 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 라이선스를 서버에서 검증합니다.
-        /// licenseKey / userId 는 선택적입니다. 없으면 JWT로 서버에서 자동 조회합니다.
+        /// JWT(access_token) 기반으로 서버에서 자동 조회합니다.
         /// 네트워크 실패 시 Grace Period 내 캐시를 반환합니다.
         /// </summary>
-        /// <param name="licenseKey">라이선스 키 (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
-        /// <param name="userId">사용자 UUID (선택). null/빈 값이면 서버에서 JWT로 자동 조회</param>
         /// <param name="ct">취소 토큰</param>
         /// <returns>검증된 라이선스 정보</returns>
-        public async Task<LicenseInfo> ValidateAsync(string licenseKey = null, string userId = null, CancellationToken ct = default)
+        public async Task<LicenseInfo> ValidateAsync(CancellationToken ct = default)
         {
             var url = $"{_baseUrl}/api/unity/validate-license";
             var pluginVersion = GetPluginVersion();
 
-            // licenseKey/userId 둘 다 있을 때만 body에 포함, 없으면 plugin_version만 전송
-            string body;
-            if (!string.IsNullOrEmpty(licenseKey) && !string.IsNullOrEmpty(userId))
-            {
-                body = $"{{\"license_key\":\"{EscapeJsonString(licenseKey)}\"," +
-                       $"\"user_id\":\"{EscapeJsonString(userId)}\"," +
-                       $"\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
-            }
-            else
-            {
-                body = $"{{\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
-            }
+            // JWT 자동 조회 path 만 사용 — licenseKey/userId 직접 전달 제거 (#169)
+            string body = $"{{\"plugin_version\":\"{EscapeJsonString(pluginVersion)}\"}}";
 
             try
             {
@@ -417,9 +431,10 @@ namespace RekonOps.Rekon
             info.VideoCaptureEnabled = ExtractBoolField(json, "video_capture") ?? false;
 
             // 플랜별 제한값 파싱 (features 블록 내 int 필드)
-            info.MaxBufferSeconds    = ExtractIntFieldInFeatures(json, "max_buffer_seconds",    60);
-            info.MaxScreenshotCount  = ExtractIntFieldInFeatures(json, "max_screenshot_count",  3);
-            info.MaxSeats            = ExtractIntFieldInFeatures(json, "max_seats",             1);
+            info.MaxBufferSeconds   = ExtractIntFieldInFeatures(json, "max_buffer_seconds",   60);
+            info.MaxScreenshotCount = ExtractIntFieldInFeatures(json, "max_screenshot_count", 3);
+            // max_seats: null = 무제한 (#145 옵션 A). 서버가 null 반환 시 null로 보존.
+            info.MaxSeats = ExtractNullableIntFieldInFeatures(json, "max_seats");
 
             // connected_providers 배열 파싱 (예: ["jira"])
             info.ConnectedProviders = ExtractStringArray(json, "connected_providers");
@@ -498,7 +513,8 @@ namespace RekonOps.Rekon
                         : "",
                     max_buffer_seconds   = info.MaxBufferSeconds,
                     max_screenshot_count = info.MaxScreenshotCount,
-                    max_seats            = info.MaxSeats
+                    // MaxSeats가 null(무제한)이면 -1로 직렬화 (#145 옵션 A)
+                    max_seats = info.MaxSeats.HasValue ? info.MaxSeats.Value : -1
                 };
 
                 var json = JsonUtility.ToJson(cache);
@@ -540,7 +556,10 @@ namespace RekonOps.Rekon
                         : new string[0],
                     MaxBufferSeconds   = cache.max_buffer_seconds   > 0 ? cache.max_buffer_seconds   : 60,
                     MaxScreenshotCount = cache.max_screenshot_count > 0 ? cache.max_screenshot_count : 3,
-                    MaxSeats           = cache.max_seats            > 0 ? cache.max_seats            : 1
+                    // -1은 무제한(null)으로 복원, 그 외 양수는 그대로, 0 이하 무효는 1 (#145 옵션 A)
+                    MaxSeats = cache.max_seats == -1 ? (int?)null
+                             : cache.max_seats  > 0 ? cache.max_seats
+                             : 1
                 };
 
                 // expires_at 파싱
@@ -637,6 +656,17 @@ namespace RekonOps.Rekon
         /// </summary>
         private static int ExtractIntFieldInFeatures(string json, string fieldName, int defaultValue)
         {
+            var result = ExtractNullableIntFieldInFeatures(json, fieldName);
+            return result.HasValue ? result.Value : defaultValue;
+        }
+
+        /// <summary>
+        /// JSON 문자열의 "features" 객체 내에서 nullable int 타입 필드를 추출합니다.
+        /// 필드 값이 null 이면 null 반환, 숫자이면 해당 값 반환, 필드 부재 시 null 반환.
+        /// #145 옵션 A: max_seats null = 무제한 처리에 사용.
+        /// </summary>
+        private static int? ExtractNullableIntFieldInFeatures(string json, string fieldName)
+        {
             // features 객체 범위 추출
             string searchScope = json;
             int featuresIdx = json.IndexOf("\"features\"", StringComparison.Ordinal);
@@ -657,10 +687,19 @@ namespace RekonOps.Rekon
                 }
             }
 
-            // "fieldName":123 패턴 매칭
-            var pattern = $"\"{fieldName}\"\\s*:\\s*(\\d+)";
-            var match = System.Text.RegularExpressions.Regex.Match(searchScope, pattern);
-            return match.Success ? int.Parse(match.Groups[1].Value) : defaultValue;
+            // "fieldName": null 패턴 → null 반환
+            var nullPattern = $"\"{fieldName}\"\\s*:\\s*null";
+            if (System.Text.RegularExpressions.Regex.IsMatch(searchScope, nullPattern))
+                return null;
+
+            // "fieldName": 123 패턴 → 숫자 반환
+            var numPattern = $"\"{fieldName}\"\\s*:\\s*(\\d+)";
+            var match = System.Text.RegularExpressions.Regex.Match(searchScope, numPattern);
+            if (match.Success)
+                return int.Parse(match.Groups[1].Value);
+
+            // 필드 없음 → null 반환
+            return null;
         }
 
         /// <summary>

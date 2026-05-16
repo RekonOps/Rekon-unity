@@ -194,13 +194,13 @@ namespace RekonOps.Rekon
         /// <summary>웹 대시보드 기본 URL (Scripting Define Symbol로 전환)</summary>
         /// <remarks>
         /// REKON_LOCAL: http://localhost:3000 (로컬 개발)
-        /// REKON_DEV: https://rekon.vercel.app (Vercel dev 배포)
-        /// 없음: https://app.rekonops.dev (prod)
+        /// REKON_DEV: https://rekonops.vercel.app (Vercel dev preview)
+        /// 없음: https://www.rekonops.dev (prod)
         /// </remarks>
 #if REKON_LOCAL
         public const string WEB_DASHBOARD_URL = "http://localhost:3000";
 #elif REKON_DEV
-        public const string WEB_DASHBOARD_URL = "https://rekon.vercel.app";
+        public const string WEB_DASHBOARD_URL = "https://rekonops.vercel.app";
 #else
         public const string WEB_DASHBOARD_URL = "https://www.rekonops.dev";
 #endif
@@ -227,7 +227,11 @@ namespace RekonOps.Rekon
 
         // webDashboardUrl 인스턴스 필드 제거됨 — WEB_DASHBOARD_URL 상수를 사용할 것
 
-        [Tooltip("라이선스 키 (워크스페이스 설정 페이지에서 복사)")]
+        // licenseKey: backend validate-license 가 license_key direct path 제거함에 따라 사용 중단 (#169)
+        // 필드 자체는 ScriptableObject 직렬화 호환성 유지를 위해 보존 (삭제는 다음 major release)
+        [System.Obsolete("JWT 기반 인증으로 통일됨. 이 필드는 무시됩니다. 다음 release 에서 제거 예정.")]
+        [UnityEngine.HideInInspector]
+        [Tooltip("[사용 중단] 라이선스 키 — JWT 기반 인증으로 대체됨")]
         public string licenseKey = "";
 
         [Header("Auth Broker")]

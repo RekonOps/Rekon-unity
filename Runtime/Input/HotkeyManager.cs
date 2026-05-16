@@ -8,8 +8,8 @@ namespace RekonOps.Rekon
     /// Play Mode에서만 동작하며, Edit Mode에서는 입력 처리를 건너뜁니다.
     ///
     /// 스크린샷 핫키 롱프레스 동작:
-    ///   - 짧게 누름 (< 2초): OnScreenshotTrigger 발행 (스크린샷 캡처)
-    ///   - 2초 홀드: OnScreenshotLongPress 발행 (리포트 발송)
+    ///   - 짧게 누름 (< 1초): OnScreenshotTrigger 발행 (스크린샷 캡처)
+    ///   - 1초 홀드: OnScreenshotLongPress 발행 (리포트 발송)
     ///   - 홀드 중 매 프레임: OnScreenshotHoldProgress 발행 (0.0~1.0 진행률)
     /// </summary>
     public class HotkeyManager : MonoBehaviour
@@ -20,7 +20,7 @@ namespace RekonOps.Rekon
         public event Action OnCaptureTrigger;
 
         /// <summary>
-        /// 스크린샷 핫키가 짧게 눌렸을 때 발행되는 이벤트 (< 2초).
+        /// 스크린샷 핫키가 짧게 눌렸을 때 발행되는 이벤트 (< 1초).
         /// </summary>
         public event Action OnScreenshotTrigger;
 
@@ -30,7 +30,7 @@ namespace RekonOps.Rekon
         public event Action<float> OnScreenshotHoldProgress;
 
         /// <summary>
-        /// 스크린샷 핫키 2초 롱프레스 완료 시 발행되는 이벤트.
+        /// 스크린샷 핫키 1초 롱프레스 완료 시 발행되는 이벤트.
         /// </summary>
         public event Action OnScreenshotLongPress;
 
@@ -52,7 +52,7 @@ namespace RekonOps.Rekon
         private bool _screenshotLongPressTriggered = false;
 
         /// <summary>롱프레스 임계값 (초)</summary>
-        private const float LongPressThreshold = 2f;
+        private const float LongPressThreshold = 1f;
 
         /// <summary>
         /// 핫키 제공자를 외부에서 주입합니다 (테스트 및 DI 지원).
@@ -129,7 +129,7 @@ namespace RekonOps.Rekon
 
                     if (_screenshotHoldTimer >= LongPressThreshold)
                     {
-                        // 2초 롱프레스 완료
+                        // 1초 롱프레스 완료
                         _screenshotLongPressTriggered = true;
                         OnScreenshotHoldProgress?.Invoke(1f);
                         OnScreenshotLongPress?.Invoke();

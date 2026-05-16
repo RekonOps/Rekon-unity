@@ -1540,9 +1540,8 @@ namespace RekonOps.Rekon.Editor
                 if (_licenseValidator == null)
                     _licenseValidator = new LicenseValidator(RekonSettings.WEB_DASHBOARD_URL, _tokenStore);
 
-                // licenseKey/userId가 없어도 JWT(access_token)만으로 서버에서 자동 조회합니다.
-                var licenseInfo = await _licenseValidator.ValidateAsync(
-                    _settings.licenseKey, _settings.userId, ct);
+                // JWT(access_token)만으로 서버에서 자동 조회합니다. (#169 licenseKey/userId 인자 제거)
+                var licenseInfo = await _licenseValidator.ValidateAsync(ct);
 
                 if (licenseInfo != null && licenseInfo.Valid)
                 {
@@ -1554,7 +1553,7 @@ namespace RekonOps.Rekon.Editor
                     Debug.Log($"[Rekon] 플랜 제한값 적용: plan={licenseInfo.Plan}, " +
                               $"maxBuffer={licenseInfo.MaxBufferSeconds}초, " +
                               $"maxScreenshot={licenseInfo.MaxScreenshotCount}개, " +
-                              $"maxSeats={licenseInfo.MaxSeats}명");
+                              $"maxSeats={licenseInfo.MaxSeatsDisplay()}");
 
                     EditorApplication.delayCall += Repaint;
                 }

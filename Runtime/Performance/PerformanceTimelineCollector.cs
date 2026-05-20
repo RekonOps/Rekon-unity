@@ -9,11 +9,12 @@ namespace RekonOps.Rekon
     /// <summary>
     /// Update() 기반 1초 간격 샘플링으로 성능 타임라인을 수집하는 MonoBehaviour.
     ///
-    /// 플랜별 수집 범위:
-    ///   - free      : timescale, network, scene만 수집
-    ///   - team      : + FPS(5초 슬라이딩 평균) + 힙 메모리
-    ///   - team_pro  : + GPU 메모리 + 텍스처 메모리 + FrameTimingManager
-    ///                 + 씬 전환 이벤트 + TimeScale 변화 이벤트 + PerformanceSnapshot
+    /// 플랜별 수집 범위 (성능 타임라인 = team_pro 전용, 2026-05-20 정책):
+    ///   - free / team : timescale, network, scene 만 수집 (단, backend create-report 가
+    ///                   team_pro 만 저장하므로 실제 timeline 미적재)
+    ///   - team_pro    : + FPS(5초 슬라이딩 평균) + 힙 메모리 + GPU 메모리 + 텍스처 메모리
+    ///                   + FrameTimingManager + 씬 전환 이벤트 + TimeScale 변화 + PerformanceSnapshot
+    ///                   → '리플레이' 경험 (성능 + 로그 싱크 결합)의 성능 축
     ///
     /// 링버퍼:
     ///   고정 크기 배열(_sampleBuffer)과 _sampleHead 포인터를 사용해
@@ -137,8 +138,8 @@ namespace RekonOps.Rekon
             sample.network = Application.internetReachability != NetworkReachability.NotReachable;
             sample.scene = SceneManager.GetActiveScene().name;
 
-            // Team 이상: FPS + 메모리
-            if (_plan == "team" || _plan == "team_pro")
+            // 성능 타임라인은 team_pro 전용 (리플레이 경험 = 성능 + 로그 싱크)
+            if (_plan == "team_pro")
             {
                 // FPS 5초 슬라이딩 평균 계산
                 float sum = 0f;

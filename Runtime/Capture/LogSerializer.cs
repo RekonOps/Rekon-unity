@@ -168,12 +168,12 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// LogEntry 배열을 JSONL 문자열로 직렬화합니다 (internal — 테스트에서 직접 호출 가능).
+        /// LogEntry 배열을 JSONL 문자열로 직렬화합니다 (SaveAsJsonlAsync 내부 + 테스트에서 호출).
         ///
         /// 각 줄: {"t_abs":425.123,"type":"Error","msg":"...","stack":"..."}
         /// JSON 이스케이프: " → \" , \ → \\ , \n → \n , \r → \r , \t → \t , 제어문자 → \uXXXX
         /// </summary>
-        internal string SerializeAsJsonl(LogEntry[] entries)
+        public string SerializeAsJsonl(LogEntry[] entries)
         {
             if (entries == null || entries.Length == 0)
                 return string.Empty;

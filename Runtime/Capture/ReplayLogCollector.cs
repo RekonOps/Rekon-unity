@@ -114,7 +114,7 @@ namespace RekonOps.Rekon
         /// 로그 항목을 직접 추가합니다 (테스트에서 logMessageReceivedThreaded 직접 호출 대체 용도).
         /// OnLogReceived가 이 메서드를 호출하므로 보관 정책이 동일하게 적용됩니다.
         /// </summary>
-        internal void AddEntry(LogEntry entry)
+        public void AddEntry(LogEntry entry)
         {
             if (_disposed)
                 return;

@@ -9,25 +9,48 @@
 
 ---
 
-## [0.3.0] - 2026-05-09
+## [0.3.0] - 2026-05-20
 
 ### 변경
 
-#### `ReportSubmitService` HTTP seam 도입
+#### 네트워크 계층 추상화 (HTTP seam)
 
 - `ReportSubmitService` 의 create-report + confirm-upload 호출이 `IRekonHttpClient` 위임 방식으로 전환됨.
-- `Runtime/Services/ReportSubmitService.cs` 의 `SendRequestAsync` 145L → 22L (단순 위임)
-  - 직접 `UnityWebRequest` 사용 → `_httpClient.PostAsync(...)` 호출
-  - `using UnityEngine.Networking` 제거 (코드 의존 0)
+  - 직접 `UnityWebRequest` 사용 → `_httpClient.PostAsync(...)` 호출, `using UnityEngine.Networking` 제거
   - 비즈니스 로직 (UsageLimitExceededException, AuthBrokerException, 재시도 정책) 100% 보존
-- 생성자에 `IRekonHttpClient httpClient = null` 옵셔널 매개변수 추가 — backward compat (외부 caller 0 변경)
-  - 기본값: `new UnityHttpClient()` — 실 환경 동작 동일
-  - 테스트 환경: 향후 mock 주입 가능 (Test Framework 환경 문제 해결 후 단위 테스트 추가 예정)
+- `IRekonHttpClient` / `UnityHttpClient` 신규 — 생성자 `IRekonHttpClient httpClient = null` 옵셔널 주입 (backward compat, 외부 caller 0 변경)
+  - 기본값 `new UnityHttpClient()` — 실 환경 동작 동일, 테스트 환경 mock 주입 가능
+
+#### FFmpeg 실행 추상화
+
+- `IFfmpegProcessRunner` / `FfmpegProcessRunner` 신규 — `Mp4VideoEncoder` 의 FFmpeg 프로세스 실행을 seam 으로 분리 (테스트 가능성 확보)
+
+#### 라이선스 검증 단순화 (#145)
+
+- `LicenseValidator` 가 `max_seats` nullable 처리 — team / team_pro 무제한 시트 정책 반영
+- `licenseKey` / `userId` 인자 제거 → JWT 기반 인증으로 통일
+
+#### 성능 타임라인 team_pro 전용 (#229)
+
+- `PerformanceTimelineCollector` 가 team_pro 플랜에서만 FPS / 힙·GPU·텍스처 메모리 / 프레임 타이밍 / 씬·TimeScale 이벤트 수집
+- free / team 은 timescale / network / scene 만 수집 (실제 적재는 backend create-report 가 team_pro 만 저장)
+
+#### 단축키 (#202)
+
+- 스크린샷 리포트 롱프레스 임계값 2초 → 1초 단축
+
+### 제거
+
+- Obsolete dead code 제거: `ReportSubmitter.cs` (513L), `VideoEncoder.cs` (119L)
+
+### 수정
+
+- 개발 환경 URL 정정 (`rekon.vercel.app` → `rekonops.vercel.app`)
 
 ### 외부 영향
 
 - 외부 caller (`RekonBootstrap.cs`) 변경 없음 — 게임 빌드 정상 동작
-- UPM 패키지 사용자 영향: 0 (내부 구현 리팩토링 + 테스트 가능성 확보)
+- UPM 패키지 사용자 영향: 내부 리팩토링 위주. 동작 변경은 (1) 롱프레스 1초, (2) 성능 타임라인 team_pro 전용 2건뿐
 
 ### 알려진 이슈
 

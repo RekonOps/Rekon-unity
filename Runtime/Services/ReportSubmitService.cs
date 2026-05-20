@@ -304,6 +304,21 @@ namespace RekonOps.Rekon
                 }
             }
 
+            // replay_metadata: performance_timeline과 동일하게 JsonUtility.ToJson() 결과를
+            // EscapeJson 없이 그대로 삽입 (이미 유효한 JSON 객체이므로 이중 이스케이프 금지)
+            string replayMetaJson = null;
+            if (request.ReplayMetadata != null)
+            {
+                try
+                {
+                    replayMetaJson = JsonUtility.ToJson(request.ReplayMetadata);
+                }
+                catch (Exception rmEx)
+                {
+                    Debug.LogWarning($"[Rekon] 리플레이 메타데이터 직렬화 실패 (무시): {rmEx.Message}");
+                }
+            }
+
             var bodyBuilder = new StringBuilder("{");
             bodyBuilder.Append($"\"workspace_id\":\"{EscapeJson(request.WorkspaceId)}\",");
             bodyBuilder.Append($"\"title\":\"{EscapeJson(request.Title)}\",");
@@ -314,6 +329,11 @@ namespace RekonOps.Rekon
             {
                 // JSON 객체를 그대로 삽입 — EscapeJson 미적용 (이중 이스케이프 방지)
                 bodyBuilder.Append($",\"performance_timeline\":{timelineJson}");
+            }
+            if (!string.IsNullOrEmpty(replayMetaJson))
+            {
+                // JSON 객체를 그대로 삽입 — EscapeJson 미적용 (이중 이스케이프 방지)
+                bodyBuilder.Append($",\"replay_metadata\":{replayMetaJson}");
             }
             bodyBuilder.Append("}");
             var bodyJson = bodyBuilder.ToString();
@@ -605,6 +625,12 @@ namespace RekonOps.Rekon
         /// null이면 JSON body에 포함하지 않습니다.
         /// </summary>
         public PerformanceTimeline PerformanceTimeline { get; set; }
+
+        /// <summary>
+        /// team_pro 플랜 전용 리플레이 메타데이터 (영상+로그 싱크 재생용).
+        /// null이면 JSON body에 포함하지 않습니다 (free/team 또는 비team_pro 캡처).
+        /// </summary>
+        public ReplayMetadata ReplayMetadata { get; set; }
     }
 
     /// <summary>첨부 파일 정보</summary>

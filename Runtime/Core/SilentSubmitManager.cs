@@ -400,7 +400,8 @@ namespace RekonOps.Rekon
                     Title = manifest.title,
                     Description = BuildDescription(manifest),
                     Files = files,
-                    PerformanceTimeline = captureResult.PerformanceTimeline
+                    PerformanceTimeline = captureResult.PerformanceTimeline,
+                    ReplayMetadata = captureResult.ReplayMetadata
                 };
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));

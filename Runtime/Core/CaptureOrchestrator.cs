@@ -46,6 +46,9 @@ namespace RekonOps.Rekon
         // 성능 타임라인 수집기 (null 허용 — 미연동 시 수집 건너뜀)
         private PerformanceTimelineCollector _timelineCollector;
 
+        // team_pro 전용 시간 윈도우 로그 수집기 (null 허용 — free/team 플랜 시 null)
+        private ReplayLogCollector _replayLogCollector;
+
         private readonly ScreenshotQueue _screenshotQueue;
 
         private HotkeyManager _hotkeyManager;
@@ -131,6 +134,17 @@ namespace RekonOps.Rekon
         {
             _timelineCollector = collector;
             Debug.Log("[Rekon] CaptureOrchestrator: PerformanceTimelineCollector 바인딩 완료");
+        }
+
+        /// <summary>
+        /// team_pro 전용 ReplayLogCollector를 바인딩합니다 (BindTimelineCollector 패턴).
+        /// team_pro 플랜 시에만 RekonBootstrap에서 호출됩니다.
+        /// null 전달 시 기존 _logCollector(LogRingBuffer) 경로로 fallback됩니다.
+        /// </summary>
+        public void BindReplayLogCollector(ReplayLogCollector collector)
+        {
+            _replayLogCollector = collector;
+            Debug.Log("[Rekon] CaptureOrchestrator: ReplayLogCollector 바인딩 완료 (team_pro 리플레이 활성)");
         }
 
         /// <summary>
@@ -485,10 +499,56 @@ namespace RekonOps.Rekon
             {
                 token.ThrowIfCancellationRequested();
 
-                LogEntry[] entries = _logCollector.GetEntries();
-                string path = Path.Combine(dir, "logs.txt");
-                await _logSerializer.SaveAsync(entries, path);
-                result.LogsPath = path;
+                bool isTeamPro = _settings.currentPlan == "team_pro";
+
+                if (isTeamPro && _replayLogCollector != null)
+                {
+                    // ── team_pro: JSONL 직렬화 + ReplayMetadata 적재 ──────────────
+                    LogEntry[] entries = _replayLogCollector.GetEntries();
+                    string jsonlPath = Path.Combine(dir, "logs.jsonl");
+                    await _logSerializer.SaveAsJsonlAsync(entries, jsonlPath);
+                    result.LogsPath = jsonlPath;
+
+                    // 영상 시작/길이 실측 (frames 비었으면 fallback 0)
+                    FrameData[] frames = _frameBuffer?.GetFrames();
+                    double videoStartT    = (frames != null && frames.Length > 0) ? frames[0].Timestamp : 0.0;
+                    double videoDurationS = (frames != null && frames.Length > 0)
+                        ? frames[frames.Length - 1].Timestamp - frames[0].Timestamp : 0.0;
+
+                    // 시간축 보정: realtime − unscaled (캡처 시점 1회 측정)
+                    double clockOffset = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
+
+                    double captureTriggerT = Time.realtimeSinceStartupAsDouble;
+
+                    // 로그 수 분류 (로그는 realtime 축, 영상은 unscaled 축 → clock_offset 보정)
+                    int countInVideo    = CountLogsInRange(entries, videoStartT,                  videoStartT + videoDurationS, clockOffset);
+                    int countBeforeVideo = CountLogsInRange(entries, double.NegativeInfinity,      videoStartT,                  clockOffset);
+
+                    result.ReplayMetadata = new ReplayMetadata
+                    {
+                        video_start_t_abs      = videoStartT,
+                        video_duration_s       = videoDurationS,
+                        capture_trigger_t_abs  = captureTriggerT,
+                        play_mode_start_t_abs  = 0.0,   // Play Mode 시작 = 0 기준
+                        clock_offset           = clockOffset,
+                        log_count_total        = entries.Length,
+                        log_count_in_video     = countInVideo,
+                        log_count_before_video = countBeforeVideo,
+                        schema_version         = 2,
+                    };
+
+                    Debug.Log($"[Rekon] team_pro JSONL 로그 + ReplayMetadata 완료: " +
+                              $"총 {entries.Length}건, 영상 내 {countInVideo}건, 이전 {countBeforeVideo}건");
+                }
+                else
+                {
+                    // ── free/team: 기존 텍스트 직렬화 (100% 보존) ────────────────
+                    LogEntry[] entries = _logCollector.GetEntries();
+                    string path = Path.Combine(dir, "logs.txt");
+                    await _logSerializer.SaveAsync(entries, path);
+                    result.LogsPath = path;
+                    result.ReplayMetadata = null;
+                }
 
                 ReportProgress("logs", 0.50f);
             }
@@ -498,6 +558,28 @@ namespace RekonOps.Rekon
                 Debug.LogError($"[Rekon] 로그 수집 실패: {ex.Message}");
                 ReportProgress("logs", 0.50f, ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 지정 realtime 구간 내 로그 수를 반환합니다.
+        /// 로그는 realtime 축, 영상 구간은 unscaled 축이므로 clockOffset으로 변환하여 비교합니다.
+        /// logT(realtime) → unscaled 변환: logT - clockOffset
+        /// </summary>
+        private static int CountLogsInRange(
+            LogEntry[] entries,
+            double rangeStartUnscaled,
+            double rangeEndUnscaled,
+            double clockOffset)
+        {
+            int count = 0;
+            foreach (var e in entries)
+            {
+                // 로그(realtime 축) → unscaled 축 환산
+                double logUnscaled = e.Timestamp - clockOffset;
+                if (logUnscaled >= rangeStartUnscaled && logUnscaled < rangeEndUnscaled)
+                    count++;
+            }
+            return count;
         }
 
         private async Task CaptureStateAsync(string dir, CaptureResult result, CancellationToken token)

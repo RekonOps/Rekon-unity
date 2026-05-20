@@ -57,6 +57,12 @@ namespace RekonOps.Rekon
         public PerformanceTimeline PerformanceTimeline { get; set; }
 
         /// <summary>
+        /// team_pro 플랜 전용 리플레이 메타데이터 (영상+로그 싱크 재생용).
+        /// free/team 플랜이거나 캡처 실패 시 null.
+        /// </summary>
+        public ReplayMetadata ReplayMetadata { get; set; }
+
+        /// <summary>
         /// R2에 업로드된 파일들의 공개 URL 목록.
         /// 키: 파일 유형(screenshot, log, video), 값: R2 공개 URL.
         /// R2 업로드가 수행되지 않은 경우 null 또는 빈 사전.

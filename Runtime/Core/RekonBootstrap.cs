@@ -247,6 +247,27 @@ namespace RekonOps.Rekon
                 // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
                 orchestrator.BindTokenStore(tokenStore);
 
+                // ── team_pro 전용: ReplayLogCollector 생성 (plan 확정 후) ───────
+                // free/team 플랜에서는 생성하지 않아 메모리·성능 영향 0.
+                // _logCollector(LogRingBuffer)는 free/team fallback + CrashRecovery 의존성 보존.
+                if (settings.currentPlan == "team_pro")
+                {
+                    try
+                    {
+                        var replayLogCollector = new ReplayLogCollector(
+                            windowSeconds: settings.maxAllowedBufferSeconds > 0
+                                ? (double)settings.maxAllowedBufferSeconds
+                                : 180.0,
+                            maxBytes: 32L * 1024 * 1024);
+                        orchestrator.BindReplayLogCollector(replayLogCollector);
+                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 생성 + 바인딩 완료 (시간 윈도우 로그 수집 시작)");
+                    }
+                    catch (System.Exception replayEx)
+                    {
+                        Debug.LogWarning($"[Rekon] ReplayLogCollector 초기화 실패 (기존 LogRingBuffer로 fallback): {replayEx.Message}");
+                    }
+                }
+
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
                 // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩

@@ -247,6 +247,31 @@ namespace RekonOps.Rekon
                 // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
                 orchestrator.BindTokenStore(tokenStore);
 
+                // ── team_pro 전용: ReplayLogCollector 생성 (plan 확정 후) ───────
+                // free/team 플랜에서는 생성하지 않아 메모리·성능 영향 0.
+                // _logCollector(LogRingBuffer)는 free/team fallback + CrashRecovery 의존성 보존.
+                if (settings.currentPlan == "team_pro")
+                {
+                    try
+                    {
+                        var replayLogCollector = new ReplayLogCollector(
+                            windowSeconds: settings.maxAllowedBufferSeconds > 0
+                                ? (double)settings.maxAllowedBufferSeconds
+                                : 180.0,
+                            maxBytes: 32L * 1024 * 1024);
+                        orchestrator.BindReplayLogCollector(replayLogCollector);
+                        // 스크린샷 전용 리포트도 같은 컬렉터 인스턴스를 공유 — 영상·스크린샷이
+                        // 동일 로그 풀을 사용해 중복 구독을 방지한다. 이 바인딩이 없으면 스크린샷
+                        // 경로가 logs.txt fallback 으로 떨어져 web 시점마커(2-pane)가 비활성된다.
+                        orchestrator.BindScreenshotReplayLogCollector(replayLogCollector);
+                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 생성 + 바인딩 완료 (영상+스크린샷 시간 윈도우 로그 수집 시작)");
+                    }
+                    catch (System.Exception replayEx)
+                    {
+                        Debug.LogWarning($"[Rekon] ReplayLogCollector 초기화 실패 (기존 LogRingBuffer로 fallback): {replayEx.Message}");
+                    }
+                }
+
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);
                 silentSubmitManager.BindOrchestrator(orchestrator);
                 // 제출 중 캡처 차단을 위해 오케스트레이터에 SilentSubmitManager 역방향 바인딩

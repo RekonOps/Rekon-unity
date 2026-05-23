@@ -286,8 +286,11 @@ namespace RekonOps.Rekon
                     var entries = _screenshotQueue.DrainAll();
                     if (entries.Length > 0)
                     {
+                        // CaptureRealtime 오름차순 정렬: 비동기 캡처 완료 순서가 달라도
+                        // screenshot_0 이 항상 가장 먼저 캡처된 항목이 되도록 보장합니다.
+                        SortEntriesByCaptureRealtime(entries);
                         result.ScreenshotEntries = entries;
-                        Debug.Log($"[Rekon] 스크린샷 큐 드레인: {entries.Length}장 영상 번들에 포함");
+                        Debug.Log($"[Rekon] 스크린샷 큐 드레인: {entries.Length}장 영상 번들에 포함 (캡처 시각 순 정렬)");
                     }
                 }
 
@@ -450,6 +453,13 @@ namespace RekonOps.Rekon
                     OnScreenshotSubmitCompleted?.Invoke(false, 0);
                     return false;
                 }
+
+                // CaptureRealtime 오름차순 정렬: 비동기 캡처 완료 순서가 달라도
+                // screenshot_0 이 항상 가장 먼저 캡처된 항목이 되도록 보장합니다.
+                // ManifestGenerator 가 ScreenshotEntries[i] → screenshot_i.png 로 부여하고,
+                // SilentSubmitManager 가 screenshot_N → ScreenshotEntries[N].CaptureRealtime 역참조하므로
+                // 이 정렬이 captured_t_abs 와 파일명 순서를 일치시키는 핵심 단계입니다.
+                SortEntriesByCaptureRealtime(entries);
 
                 // 스크린샷 전용 CaptureResult 생성 (로그 + 상태 포함)
                 var result = new CaptureResult
@@ -635,6 +645,25 @@ namespace RekonOps.Rekon
             {
                 Debug.LogError($"[Rekon] 스크린샷 리포트 로그 수집 실패: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// ScreenshotEntry 배열을 CaptureRealtime 오름차순으로 정렬합니다.
+        /// CaptureRealtime = 0.0 인 항목(기존 2-파라미터 Enqueue)은 안정적으로 끝으로 밀리지 않고
+        /// 0 값끼리는 원래 순서를 유지합니다 (Array.Sort 은 불안정 정렬이지만 0 vs 0 교환은 무해).
+        ///
+        /// 호출 위치:
+        ///   - StartAsync() 내 영상 번들 경로 DrainAll 직후
+        ///   - SubmitScreenshotOnlyAsync() 내 DrainAll 직후
+        ///
+        /// 보장: screenshot_0 = 가장 먼저 캡처된 항목, screenshot_N-1 = 마지막 캡처.
+        /// </summary>
+        private static void SortEntriesByCaptureRealtime(ScreenshotEntry[] entries)
+        {
+            if (entries == null || entries.Length <= 1)
+                return;
+
+            Array.Sort(entries, (a, b) => a.CaptureRealtime.CompareTo(b.CaptureRealtime));
         }
 
         /// <summary>

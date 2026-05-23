@@ -46,6 +46,13 @@ namespace RekonOps.Rekon
         // 성능 타임라인 수집기 (null 허용 — 미연동 시 수집 건너뜀)
         private PerformanceTimelineCollector _timelineCollector;
 
+        // team_pro 전용 시간 윈도우 로그 수집기 — 영상 캡처 경로 (null 허용 — free/team 플랜 시 null)
+        private ReplayLogCollector _replayLogCollector;
+
+        // team_pro 전용 스크린샷 경로 로그 수집기 (null 허용 — free/team 또는 미바인딩 시 null)
+        // 영상 없는 스크린샷 리포트에서 .jsonl 로그를 수집·전송하기 위해 별도 관리합니다.
+        private ReplayLogCollector _screenshotReplayLogCollector;
+
         private readonly ScreenshotQueue _screenshotQueue;
 
         private HotkeyManager _hotkeyManager;
@@ -131,6 +138,33 @@ namespace RekonOps.Rekon
         {
             _timelineCollector = collector;
             Debug.Log("[Rekon] CaptureOrchestrator: PerformanceTimelineCollector 바인딩 완료");
+        }
+
+        /// <summary>
+        /// team_pro 전용 ReplayLogCollector를 바인딩합니다 (BindTimelineCollector 패턴).
+        /// team_pro 플랜 시에만 RekonBootstrap에서 호출됩니다.
+        /// null 전달 시 기존 _logCollector(LogRingBuffer) 경로로 fallback됩니다.
+        /// ⚠️ 이 바인딩은 영상 캡처 경로 전용입니다. 스크린샷 경로는 BindScreenshotReplayLogCollector 사용.
+        /// </summary>
+        public void BindReplayLogCollector(ReplayLogCollector collector)
+        {
+            _replayLogCollector = collector;
+            Debug.Log("[Rekon] CaptureOrchestrator: ReplayLogCollector 바인딩 완료 (team_pro 영상 리플레이 활성)");
+        }
+
+        /// <summary>
+        /// team_pro 전용 스크린샷 경로 ReplayLogCollector를 바인딩합니다.
+        /// 영상 없는 스크린샷 전용 리포트(SubmitScreenshotOnlyAsync)에서 .jsonl 로그를 수집·전송합니다.
+        /// team_pro 플랜 시에만 RekonBootstrap에서 호출됩니다.
+        /// null 전달 시 스크린샷 리포트에서 .jsonl 수집을 건너뜁니다.
+        /// </summary>
+        public void BindScreenshotReplayLogCollector(ReplayLogCollector collector)
+        {
+            _screenshotReplayLogCollector = collector;
+            if (collector != null)
+                Debug.Log("[Rekon] CaptureOrchestrator: 스크린샷 경로 ReplayLogCollector 바인딩 완료 (team_pro 싱크 활성)");
+            else
+                Debug.Log("[Rekon] CaptureOrchestrator: 스크린샷 경로 ReplayLogCollector 해제됨");
         }
 
         /// <summary>
@@ -252,8 +286,11 @@ namespace RekonOps.Rekon
                     var entries = _screenshotQueue.DrainAll();
                     if (entries.Length > 0)
                     {
+                        // CaptureRealtime 오름차순 정렬: 비동기 캡처 완료 순서가 달라도
+                        // screenshot_0 이 항상 가장 먼저 캡처된 항목이 되도록 보장합니다.
+                        SortEntriesByCaptureRealtime(entries);
                         result.ScreenshotEntries = entries;
-                        Debug.Log($"[Rekon] 스크린샷 큐 드레인: {entries.Length}장 영상 번들에 포함");
+                        Debug.Log($"[Rekon] 스크린샷 큐 드레인: {entries.Length}장 영상 번들에 포함 (캡처 시각 순 정렬)");
                     }
                 }
 
@@ -351,6 +388,9 @@ namespace RekonOps.Rekon
 
             try
             {
+                // team_pro 싱크: 캡처 직전 realtimeSinceStartupAsDouble 을 기록 (로그 t_abs 와 동일한 시간축)
+                double captureRealtime = Time.realtimeSinceStartupAsDouble;
+
                 byte[] pngBytes = await _screenshotCapturer.CaptureAsync();
                 if (pngBytes == null || pngBytes.Length == 0)
                 {
@@ -358,7 +398,7 @@ namespace RekonOps.Rekon
                     return;
                 }
 
-                bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow);
+                bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow, captureRealtime);
                 int newCount = _screenshotQueue.Count;
 
                 Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{ScreenshotQueue.MaxCapacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
@@ -414,6 +454,13 @@ namespace RekonOps.Rekon
                     return false;
                 }
 
+                // CaptureRealtime 오름차순 정렬: 비동기 캡처 완료 순서가 달라도
+                // screenshot_0 이 항상 가장 먼저 캡처된 항목이 되도록 보장합니다.
+                // ManifestGenerator 가 ScreenshotEntries[i] → screenshot_i.png 로 부여하고,
+                // SilentSubmitManager 가 screenshot_N → ScreenshotEntries[N].CaptureRealtime 역참조하므로
+                // 이 정렬이 captured_t_abs 와 파일명 순서를 일치시키는 핵심 단계입니다.
+                SortEntriesByCaptureRealtime(entries);
+
                 // 스크린샷 전용 CaptureResult 생성 (로그 + 상태 포함)
                 var result = new CaptureResult
                 {
@@ -430,8 +477,11 @@ namespace RekonOps.Rekon
                     Directory.CreateDirectory(tempDir);
 
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+
+                    // team_pro: _screenshotReplayLogCollector 가 바인딩된 경우 .jsonl 로그 수집
+                    // 영상 경로의 _replayLogCollector 와 독립적으로 동작 — 영상 경로 불변 보장
                     await Task.WhenAll(
-                        CaptureLogsAsync(tempDir, result, cts.Token),
+                        CaptureScreenshotLogsAsync(tempDir, result, cts.Token),
                         CaptureStateAsync(tempDir, result, cts.Token)
                     );
                 }
@@ -485,10 +535,56 @@ namespace RekonOps.Rekon
             {
                 token.ThrowIfCancellationRequested();
 
-                LogEntry[] entries = _logCollector.GetEntries();
-                string path = Path.Combine(dir, "logs.txt");
-                await _logSerializer.SaveAsync(entries, path);
-                result.LogsPath = path;
+                bool isTeamPro = _settings.currentPlan == "team_pro";
+
+                if (isTeamPro && _replayLogCollector != null)
+                {
+                    // ── team_pro: JSONL 직렬화 + ReplayMetadata 적재 ──────────────
+                    LogEntry[] entries = _replayLogCollector.GetEntries();
+                    string jsonlPath = Path.Combine(dir, "logs.jsonl");
+                    await _logSerializer.SaveAsJsonlAsync(entries, jsonlPath);
+                    result.LogsPath = jsonlPath;
+
+                    // 영상 시작/길이 실측 (frames 비었으면 fallback 0)
+                    FrameData[] frames = _frameBuffer?.GetFrames();
+                    double videoStartT    = (frames != null && frames.Length > 0) ? frames[0].Timestamp : 0.0;
+                    double videoDurationS = (frames != null && frames.Length > 0)
+                        ? frames[frames.Length - 1].Timestamp - frames[0].Timestamp : 0.0;
+
+                    // 시간축 보정: realtime − unscaled (캡처 시점 1회 측정)
+                    double clockOffset = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
+
+                    double captureTriggerT = Time.realtimeSinceStartupAsDouble;
+
+                    // 로그 수 분류 (로그는 realtime 축, 영상은 unscaled 축 → clock_offset 보정)
+                    int countInVideo    = CountLogsInRange(entries, videoStartT,                  videoStartT + videoDurationS, clockOffset);
+                    int countBeforeVideo = CountLogsInRange(entries, double.NegativeInfinity,      videoStartT,                  clockOffset);
+
+                    result.ReplayMetadata = new ReplayMetadata
+                    {
+                        video_start_t_abs      = videoStartT,
+                        video_duration_s       = videoDurationS,
+                        capture_trigger_t_abs  = captureTriggerT,
+                        play_mode_start_t_abs  = 0.0,   // Play Mode 시작 = 0 기준
+                        clock_offset           = clockOffset,
+                        log_count_total        = entries.Length,
+                        log_count_in_video     = countInVideo,
+                        log_count_before_video = countBeforeVideo,
+                        schema_version         = 2,
+                    };
+
+                    Debug.Log($"[Rekon] team_pro JSONL 로그 + ReplayMetadata 완료: " +
+                              $"총 {entries.Length}건, 영상 내 {countInVideo}건, 이전 {countBeforeVideo}건");
+                }
+                else
+                {
+                    // ── free/team: 기존 텍스트 직렬화 (100% 보존) ────────────────
+                    LogEntry[] entries = _logCollector.GetEntries();
+                    string path = Path.Combine(dir, "logs.txt");
+                    await _logSerializer.SaveAsync(entries, path);
+                    result.LogsPath = path;
+                    result.ReplayMetadata = null;
+                }
 
                 ReportProgress("logs", 0.50f);
             }
@@ -498,6 +594,98 @@ namespace RekonOps.Rekon
                 Debug.LogError($"[Rekon] 로그 수집 실패: {ex.Message}");
                 ReportProgress("logs", 0.50f, ex.Message);
             }
+        }
+
+        /// <summary>
+        /// 스크린샷 전용 리포트의 로그를 수집합니다.
+        ///
+        /// team_pro + _screenshotReplayLogCollector 바인딩 시:
+        ///   → .jsonl 로그 수집 + 전송 (captured_t_abs 싱크용)
+        ///   → replay_metadata 는 생성하지 않음 (스크린샷 경로 — 영상 없음)
+        ///
+        /// free/team 또는 _screenshotReplayLogCollector 미바인딩 시:
+        ///   → 기존 LogRingBuffer(txt) 경로로 fallback (100% 불변)
+        ///
+        /// ⚠️ 영상 경로(_replayLogCollector)에는 절대 영향 없음.
+        /// </summary>
+        private async Task CaptureScreenshotLogsAsync(string dir, CaptureResult result, CancellationToken token)
+        {
+            try
+            {
+                token.ThrowIfCancellationRequested();
+
+                bool isTeamPro = _settings.currentPlan == "team_pro";
+
+                if (isTeamPro && _screenshotReplayLogCollector != null)
+                {
+                    // ── team_pro: JSONL 직렬화 (captured_t_abs 싱크 마커용) ────────
+                    // replay_metadata 는 영상 전용 — 스크린샷 경로에서는 생성하지 않음
+                    LogEntry[] entries = _screenshotReplayLogCollector.GetEntries();
+                    string jsonlPath = Path.Combine(dir, "logs.jsonl");
+                    await _logSerializer.SaveAsJsonlAsync(entries, jsonlPath);
+                    result.LogsPath = jsonlPath;
+                    // replay_metadata 는 null 유지 (스크린샷 경로 — 영상+로그 싱크 메타 불필요)
+                    result.ReplayMetadata = null;
+
+                    Debug.Log($"[Rekon] 스크린샷 리포트 team_pro JSONL 로그 수집 완료: {entries.Length}건 " +
+                              $"(replay_metadata 없음 — captured_t_abs 직접 비교)");
+                }
+                else
+                {
+                    // ── free/team 또는 미바인딩: 기존 텍스트 직렬화 (100% 보존) ────
+                    LogEntry[] entries = _logCollector.GetEntries();
+                    string path = Path.Combine(dir, "logs.txt");
+                    await _logSerializer.SaveAsync(entries, path);
+                    result.LogsPath = path;
+                    result.ReplayMetadata = null;
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Rekon] 스크린샷 리포트 로그 수집 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// ScreenshotEntry 배열을 CaptureRealtime 오름차순으로 정렬합니다.
+        /// CaptureRealtime = 0.0 인 항목(기존 2-파라미터 Enqueue)은 안정적으로 끝으로 밀리지 않고
+        /// 0 값끼리는 원래 순서를 유지합니다 (Array.Sort 은 불안정 정렬이지만 0 vs 0 교환은 무해).
+        ///
+        /// 호출 위치:
+        ///   - StartAsync() 내 영상 번들 경로 DrainAll 직후
+        ///   - SubmitScreenshotOnlyAsync() 내 DrainAll 직후
+        ///
+        /// 보장: screenshot_0 = 가장 먼저 캡처된 항목, screenshot_N-1 = 마지막 캡처.
+        /// </summary>
+        private static void SortEntriesByCaptureRealtime(ScreenshotEntry[] entries)
+        {
+            if (entries == null || entries.Length <= 1)
+                return;
+
+            Array.Sort(entries, (a, b) => a.CaptureRealtime.CompareTo(b.CaptureRealtime));
+        }
+
+        /// <summary>
+        /// 지정 realtime 구간 내 로그 수를 반환합니다.
+        /// 로그는 realtime 축, 영상 구간은 unscaled 축이므로 clockOffset으로 변환하여 비교합니다.
+        /// logT(realtime) → unscaled 변환: logT - clockOffset
+        /// </summary>
+        private static int CountLogsInRange(
+            LogEntry[] entries,
+            double rangeStartUnscaled,
+            double rangeEndUnscaled,
+            double clockOffset)
+        {
+            int count = 0;
+            foreach (var e in entries)
+            {
+                // 로그(realtime 축) → unscaled 축 환산
+                double logUnscaled = e.Timestamp - clockOffset;
+                if (logUnscaled >= rangeStartUnscaled && logUnscaled < rangeEndUnscaled)
+                    count++;
+            }
+            return count;
         }
 
         private async Task CaptureStateAsync(string dir, CaptureResult result, CancellationToken token)

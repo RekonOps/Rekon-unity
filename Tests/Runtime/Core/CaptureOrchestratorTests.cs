@@ -675,4 +675,286 @@ namespace RekonOps.Rekon.Tests
             public bool IsAltHeld() => true;
         }
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // team_pro plan 분기 테스트 (Phase A 신규)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// CaptureOrchestrator plan 분기 테스트.
+    ///
+    /// team_pro → JSONL + ReplayMetadata non-null
+    /// free / team → TXT + ReplayMetadata null
+    ///
+    /// Unity Test Framework는 [Test] public async Task 를 광역 인식 못하는 알려진 이슈(#164)로
+    /// 모든 테스트는 IEnumerator [UnityTest] 로 작성하고 WaitUntil 로 대기합니다.
+    /// </summary>
+    [TestFixture]
+    public class CaptureOrchestratorPlanBranchTests
+    {
+        // ── 목(Mock) ────────────────────────────────────────────────────────────
+
+        private class MockScreenshotCapturer : IScreenshotCapturer
+        {
+            public Task<byte[]> CaptureAsync() => Task.FromResult(new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+            public Task SaveAsync(byte[] bytes, string path)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllBytes(path, bytes ?? Array.Empty<byte>());
+                return Task.CompletedTask;
+            }
+        }
+
+        private class MockLogCollector : ILogCollector
+        {
+            public LogEntry[] Entries { get; set; } = new[]
+            {
+                new LogEntry(1.0, LogType.Log, "free 로그", ""),
+            };
+            public int Count => Entries.Length;
+            public LogEntry[] GetEntries() => Entries;
+        }
+
+        private class MockStateCollector : IStateSnapshotCollector
+        {
+            public Task<StateSnapshot> CollectAsync() => Task.FromResult(new StateSnapshot
+            {
+                engine = "Unity", engine_version = "2022.3.0f1",
+                captured_at = DateTime.UtcNow.ToString("O"),
+            });
+        }
+
+        private class MockVideoEncoder : IVideoEncoder
+        {
+            public string OutputExtension => "";
+            public float RecommendedTimeoutSeconds => 30f;
+            public Task EncodeAsync(FrameData[] frames, string outputPath,
+                VideoEncoderConfig config, CancellationToken ct = default)
+            {
+                Directory.CreateDirectory(outputPath);
+                return Task.CompletedTask;
+            }
+        }
+
+        // ── 픽스처 ──────────────────────────────────────────────────────────────
+
+        private MockScreenshotCapturer _screenshot;
+        private MockLogCollector _logs;
+        private LogSerializer _logSerializer;
+        private MockStateCollector _state;
+        private FrameRingBuffer _frameBuffer;
+        private MockVideoEncoder _videoEncoder;
+        private VideoEncoderConfig _videoConfig;
+        private RekonSettings _settings;
+        private CaptureOrchestrator _orchestrator;
+        private string _tempDir;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _screenshot   = new MockScreenshotCapturer();
+            _logs         = new MockLogCollector();
+            _logSerializer = new LogSerializer(enableMasking: false);
+            _state        = new MockStateCollector();
+            _frameBuffer  = new FrameRingBuffer(10);
+            _videoEncoder = new MockVideoEncoder();
+            _videoConfig  = new VideoEncoderConfig { Width = 320, Height = 180, Fps = 10 };
+
+            _settings = ScriptableObject.CreateInstance<RekonSettings>();
+            _settings.videoEnabled = true;
+
+            _orchestrator = new CaptureOrchestrator(
+                _screenshot, _logs, _logSerializer, _state,
+                _frameBuffer, _videoEncoder, _videoConfig, _settings);
+
+            _tempDir = Path.Combine(
+                Path.GetTempPath(),
+                "OrchestratorPlanTests_" + Guid.NewGuid().ToString("N"));
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _orchestrator?.Dispose();
+            _frameBuffer?.Dispose();
+            UnityEngine.Object.DestroyImmediate(_settings);
+            if (Directory.Exists(_tempDir))
+                Directory.Delete(_tempDir, recursive: true);
+        }
+
+        // ── plan = "free" : TXT + ReplayMetadata null ─────────────────────────
+
+        [UnityTest]
+        public IEnumerator FreePlan_LogsPath_EndsWith_Txt()
+        {
+            _settings.currentPlan = "free";
+            // ReplayLogCollector 바인딩 안 함 → _replayLogCollector = null
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsFalse(task.IsFaulted, $"오류: {task.Exception?.Message}");
+            Assert.IsNotNull(task.Result, "결과가 null이면 안 됩니다.");
+            Assert.IsTrue(task.Result.LogsPath.EndsWith(".txt"),
+                $"free 플랜 LogsPath는 .txt 여야 합니다. 실제: {task.Result.LogsPath}");
+        }
+
+        [UnityTest]
+        public IEnumerator FreePlan_ReplayMetadata_IsNull()
+        {
+            _settings.currentPlan = "free";
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNull(task.Result.ReplayMetadata,
+                "free 플랜에서 ReplayMetadata는 null이어야 합니다.");
+        }
+
+        // ── plan = "team" : TXT + ReplayMetadata null ─────────────────────────
+
+        [UnityTest]
+        public IEnumerator TeamPlan_LogsPath_EndsWith_Txt()
+        {
+            _settings.currentPlan = "team";
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsTrue(task.Result.LogsPath.EndsWith(".txt"),
+                "team 플랜 LogsPath는 .txt 여야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPlan_ReplayMetadata_IsNull()
+        {
+            _settings.currentPlan = "team";
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNull(task.Result.ReplayMetadata,
+                "team 플랜에서 ReplayMetadata는 null이어야 합니다.");
+        }
+
+        // ── plan = "team_pro" + ReplayLogCollector 없음 : fallback to TXT ──────
+
+        [UnityTest]
+        public IEnumerator TeamPro_WithoutReplayCollector_FallbackToTxt()
+        {
+            _settings.currentPlan = "team_pro";
+            // BindReplayLogCollector 호출 안 함 → _replayLogCollector = null → fallback
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsTrue(task.Result.LogsPath.EndsWith(".txt"),
+                "ReplayLogCollector 없을 때 team_pro도 .txt fallback이어야 합니다.");
+            Assert.IsNull(task.Result.ReplayMetadata);
+        }
+
+        // ── plan = "team_pro" + ReplayLogCollector 있음 : JSONL + ReplayMetadata ─
+
+        [UnityTest]
+        public IEnumerator TeamPro_WithReplayCollector_LogsPath_EndsWith_Jsonl()
+        {
+            _settings.currentPlan = "team_pro";
+
+            using var replayCollector = new ReplayLogCollector();
+            replayCollector.AddEntry(new LogEntry(1.0, LogType.Log, "team_pro 로그", ""));
+            _orchestrator.BindReplayLogCollector(replayCollector);
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsTrue(task.Result.LogsPath.EndsWith(".jsonl"),
+                $"team_pro + ReplayCollector 시 LogsPath는 .jsonl 이어야 합니다. 실제: {task.Result.LogsPath}");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPro_WithReplayCollector_ReplayMetadata_NotNull()
+        {
+            _settings.currentPlan = "team_pro";
+
+            using var replayCollector = new ReplayLogCollector();
+            replayCollector.AddEntry(new LogEntry(1.0, LogType.Log, "메타 테스트", ""));
+            _orchestrator.BindReplayLogCollector(replayCollector);
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.IsNotNull(task.Result.ReplayMetadata,
+                "team_pro 플랜에서 ReplayMetadata는 non-null이어야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPro_ReplayMetadata_SchemaVersion_Is2()
+        {
+            _settings.currentPlan = "team_pro";
+
+            using var replayCollector = new ReplayLogCollector();
+            replayCollector.AddEntry(new LogEntry(1.0, LogType.Log, "버전 테스트", ""));
+            _orchestrator.BindReplayLogCollector(replayCollector);
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.AreEqual(2, task.Result.ReplayMetadata.schema_version,
+                "schema_version은 2(clock_offset 추가된 버전)이어야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPro_ReplayMetadata_LogCountTotal_Matches()
+        {
+            _settings.currentPlan = "team_pro";
+
+            using var replayCollector = new ReplayLogCollector();
+            replayCollector.AddEntry(new LogEntry(1.0, LogType.Log, "로그1", ""));
+            replayCollector.AddEntry(new LogEntry(2.0, LogType.Warning, "로그2", ""));
+            replayCollector.AddEntry(new LogEntry(3.0, LogType.Error, "로그3", "스택"));
+            _orchestrator.BindReplayLogCollector(replayCollector);
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            Assert.AreEqual(3, task.Result.ReplayMetadata.log_count_total,
+                "log_count_total이 수집한 로그 수와 일치해야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPro_ExistingTxtFallback_FreePathNotAffected()
+        {
+            // team_pro 전환 후에도 free 계정 (ReplayLogCollector 없음) 은 기존 동작
+            _settings.currentPlan = "free";
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            var result = task.Result;
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.LogsPath.EndsWith(".txt"), "free 플랜은 항상 .txt.");
+            Assert.IsNull(result.ReplayMetadata, "free 플랜은 항상 null.");
+        }
+
+        [UnityTest]
+        public IEnumerator TeamPro_JsonlFile_ContainsValidJsonLines()
+        {
+            _settings.currentPlan = "team_pro";
+
+            using var replayCollector = new ReplayLogCollector();
+            replayCollector.AddEntry(new LogEntry(10.5, LogType.Error, "JSONL 검증", "at A()"));
+            _orchestrator.BindReplayLogCollector(replayCollector);
+
+            var task = _orchestrator.StartAsync();
+            yield return new WaitUntil(() => task.IsCompleted);
+
+            string jsonlPath = task.Result.LogsPath;
+            Assert.IsTrue(File.Exists(jsonlPath), ".jsonl 파일이 존재해야 합니다.");
+
+            string content = File.ReadAllText(jsonlPath);
+            StringAssert.Contains("\"t_abs\":", content);
+            StringAssert.Contains("\"type\":\"Error\"", content);
+            StringAssert.Contains("\"msg\":\"JSONL 검증\"", content);
+        }
+    }
 }

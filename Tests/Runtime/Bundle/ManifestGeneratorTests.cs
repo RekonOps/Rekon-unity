@@ -135,6 +135,109 @@ namespace RekonOps.Rekon.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
+        // CaptureRealtime 순서 — screenshot_N 파일명 단조 증가 검증 (#버그수정)
+        // ──────────────────────────────────────────────────────────────
+
+        [Test]
+        public void BuildArtifactList_ScreenshotEntries_파일명N_CaptureRealtime_단조증가_가정_검증()
+        {
+            // 이 테스트는 ManifestGenerator 가 ScreenshotEntries[i] → screenshot_{i}.png 로 부여하므로,
+            // Orchestrator 가 DrainAll 후 CaptureRealtime 오름차순 정렬을 수행했다면
+            // 아티팩트 파일명 N 과 CaptureRealtime 이 단조 증가한다는 계약을 검증합니다.
+            var method = GetBuildArtifactListMethod();
+            Assert.IsNotNull(method, "BuildArtifactList 메서드를 찾을 수 없습니다.");
+
+            string logsPath = CreateTempFile("logs.zip", new byte[] { 0x50, 0x4B, 0x03, 0x04 });
+            string statePath = CreateTempFile("state.json", System.Text.Encoding.UTF8.GetBytes("{}"));
+
+            // Orchestrator 정렬 완료된 상태: CaptureRealtime 오름차순으로 배열된 entries
+            var entries = new ScreenshotEntry[]
+            {
+                new ScreenshotEntry(new byte[] { 0x89, 0x50 }, DateTime.UtcNow, 1.0), // screenshot_0
+                new ScreenshotEntry(new byte[] { 0x89, 0x51 }, DateTime.UtcNow, 2.0), // screenshot_1
+                new ScreenshotEntry(new byte[] { 0x89, 0x52 }, DateTime.UtcNow, 3.0), // screenshot_2
+            };
+
+            var captureResult = new CaptureResult
+            {
+                ScreenshotEntries = entries,
+                LogsPath          = logsPath,
+                StatePath         = statePath,
+                Timestamp         = DateTime.UtcNow,
+            };
+
+            var artifacts = (System.Collections.Generic.List<BundleArtifact>)method.Invoke(null, new object[] { captureResult });
+
+            // ManifestGenerator 는 ScreenshotEntries[i] → screenshot_{i}.png 부여
+            var screenshotArtifacts = artifacts
+                .Where(a => a.type == BundleArtifactType.Screenshot)
+                .OrderBy(a => a.file_name)
+                .ToList();
+
+            Assert.AreEqual(3, screenshotArtifacts.Count);
+
+            // 파일명 N 과 ScreenshotEntries[N].CaptureRealtime 이 단조 증가 검증
+            for (int i = 0; i < screenshotArtifacts.Count; i++)
+            {
+                Assert.AreEqual($"screenshot_{i}.png", screenshotArtifacts[i].file_name,
+                    $"screenshot_{i}.png 가 i={i} 위치여야 합니다.");
+                // CaptureRealtime 은 entries[i] 에 있으며 i+1 > i 이면 CaptureRealtime 도 더 커야 함
+                if (i > 0)
+                {
+                    Assert.Greater(entries[i].CaptureRealtime, entries[i - 1].CaptureRealtime,
+                        $"entries[{i}].CaptureRealtime({entries[i].CaptureRealtime}) > " +
+                        $"entries[{i - 1}].CaptureRealtime({entries[i - 1].CaptureRealtime}) 이어야 합니다.");
+                }
+            }
+        }
+
+        [Test]
+        public void BuildArtifactList_ScreenshotEntries_빈항목스킵시_파일명N은_원본인덱스i()
+        {
+            // 빈 항목 스킵 시 파일명 N 이 원본 배열 인덱스 i 를 그대로 사용하는 것을 명시적으로 검증.
+            // 즉 entries[0] 이 빈 항목이면 entries[1] 은 screenshot_1.png (not screenshot_0.png).
+            // 이것은 SilentSubmitManager 역참조(screenshot_N → entries[N])와 일치해야 하므로 정상 계약.
+            var method = GetBuildArtifactListMethod();
+            Assert.IsNotNull(method, "BuildArtifactList 메서드를 찾을 수 없습니다.");
+
+            string logsPath = CreateTempFile("logs.zip", new byte[] { 0x50, 0x4B, 0x03, 0x04 });
+            string statePath = CreateTempFile("state.json", System.Text.Encoding.UTF8.GetBytes("{}"));
+
+            var entries = new ScreenshotEntry[]
+            {
+                new ScreenshotEntry(new byte[0], DateTime.UtcNow, 1.0),              // 빈 항목(i=0) → 스킵
+                new ScreenshotEntry(new byte[] { 0x89, 0x51 }, DateTime.UtcNow, 2.0), // i=1 → screenshot_1.png
+                new ScreenshotEntry(new byte[] { 0x89, 0x52 }, DateTime.UtcNow, 3.0), // i=2 → screenshot_2.png
+            };
+
+            var captureResult = new CaptureResult
+            {
+                ScreenshotEntries = entries,
+                LogsPath          = logsPath,
+                StatePath         = statePath,
+                Timestamp         = DateTime.UtcNow,
+            };
+
+            var artifacts = (System.Collections.Generic.List<BundleArtifact>)method.Invoke(null, new object[] { captureResult });
+
+            var screenshotArtifacts = artifacts
+                .Where(a => a.type == BundleArtifactType.Screenshot)
+                .ToList();
+
+            // 빈 항목 스킵 → 2개만 등록
+            Assert.AreEqual(2, screenshotArtifacts.Count);
+
+            // i=1 → screenshot_1.png, i=2 → screenshot_2.png (i=0 은 스킵되므로 screenshot_0.png 없음)
+            var fileNames = screenshotArtifacts.Select(a => a.file_name).ToList();
+            Assert.IsTrue(fileNames.Contains("screenshot_1.png"),
+                "빈 항목 스킵 후 i=1 은 screenshot_1.png 이어야 합니다.");
+            Assert.IsTrue(fileNames.Contains("screenshot_2.png"),
+                "빈 항목 스킵 후 i=2 는 screenshot_2.png 이어야 합니다.");
+            Assert.IsFalse(fileNames.Contains("screenshot_0.png"),
+                "i=0 이 빈 항목이면 screenshot_0.png 는 없어야 합니다.");
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // Generate() 경유 통합 테스트
         // ──────────────────────────────────────────────────────────────
 

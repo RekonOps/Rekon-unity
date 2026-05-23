@@ -9,10 +9,31 @@ namespace RekonOps.Rekon
         public readonly byte[] PngBytes;
         public readonly DateTime Timestamp;
 
+        /// <summary>
+        /// 스크린샷이 캡처된 시점의 Time.realtimeSinceStartupAsDouble 값 (초).
+        /// 로그 .jsonl 의 t_abs 와 동일한 시간축 — 싱크 마커로 사용됩니다.
+        /// 기존 2-파라미터 생성자 호출 시 0.0 (하위 호환 기본값).
+        /// team_pro 전용 스크린샷 리포트에서 captured_t_abs 로 전송됩니다.
+        /// </summary>
+        public readonly double CaptureRealtime;
+
+        /// <summary>기존 생성자 (하위 호환 유지 — CaptureRealtime = 0.0)</summary>
         public ScreenshotEntry(byte[] pngBytes, DateTime timestamp)
         {
-            PngBytes  = pngBytes;
-            Timestamp = timestamp;
+            PngBytes       = pngBytes;
+            Timestamp      = timestamp;
+            CaptureRealtime = 0.0;
+        }
+
+        /// <summary>
+        /// team_pro 싱크용 생성자.
+        /// captureRealtime: 캡처 시점의 Time.realtimeSinceStartupAsDouble 값.
+        /// </summary>
+        public ScreenshotEntry(byte[] pngBytes, DateTime timestamp, double captureRealtime)
+        {
+            PngBytes        = pngBytes;
+            Timestamp       = timestamp;
+            CaptureRealtime = captureRealtime;
         }
     }
 
@@ -32,9 +53,23 @@ namespace RekonOps.Rekon
 
         /// <summary>
         /// 큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
+        /// (기존 오버로드 — 하위 호환 유지, CaptureRealtime = 0.0)
         /// </summary>
         /// <returns>eviction이 발생하면 true, 그렇지 않으면 false</returns>
         public bool Enqueue(byte[] pngBytes, DateTime timestamp)
+        {
+            return Enqueue(pngBytes, timestamp, 0.0);
+        }
+
+        /// <summary>
+        /// 큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
+        /// team_pro 싱크용 오버로드 — captureRealtime: Time.realtimeSinceStartupAsDouble.
+        /// </summary>
+        /// <param name="pngBytes">PNG 바이트</param>
+        /// <param name="timestamp">캡처 시각 (DateTime.UtcNow)</param>
+        /// <param name="captureRealtime">캡처 시점 Time.realtimeSinceStartupAsDouble</param>
+        /// <returns>eviction이 발생하면 true, 그렇지 않으면 false</returns>
+        public bool Enqueue(byte[] pngBytes, DateTime timestamp, double captureRealtime)
         {
             if (pngBytes == null || pngBytes.Length == 0) return false;
             lock (_lock)
@@ -42,7 +77,7 @@ namespace RekonOps.Rekon
                 bool evicted = _entries.Count >= MaxCapacity;
                 if (evicted)
                     _entries.RemoveAt(0);
-                _entries.Add(new ScreenshotEntry(pngBytes, timestamp));
+                _entries.Add(new ScreenshotEntry(pngBytes, timestamp, captureRealtime));
                 return evicted;
             }
         }

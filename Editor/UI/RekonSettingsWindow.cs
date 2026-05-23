@@ -561,7 +561,7 @@ namespace RekonOps.Rekon.Editor
             EditorGUI.DrawRect(rect, bgColor);
 
             string label = isLinked
-                ? $"● 연동됨  |  {workspaceName}"
+                ? $"● 연동됨  |  {workspaceName}  |  {PlanDisplayName(_settings.currentPlan)} 플랜"
                 : "○ 미연동  —  웹 로그인이 필요합니다";
 
             GUI.Label(rect, label, new GUIStyle(EditorStyles.boldLabel)
@@ -570,6 +570,14 @@ namespace RekonOps.Rekon.Editor
                 fontSize  = 12,
             });
         }
+
+        /// <summary>플랜 코드 → 사용자 표시 이름 (연동 배지 등 UI 표시용).</summary>
+        private static string PlanDisplayName(string plan) => plan switch
+        {
+            "team_pro" => "Team Pro",
+            "team"     => "Team",
+            _          => "Free",
+        };
 
         // ─── 코덱 상태 섹션 ─────────────────────────────────────────────────────
 

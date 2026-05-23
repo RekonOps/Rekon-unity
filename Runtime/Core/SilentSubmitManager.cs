@@ -275,6 +275,7 @@ namespace RekonOps.Rekon
                 // manifest.artifacts 기반으로 순회하여 captureResult 인덱스 불일치 문제를 방지합니다.
                 // ManifestGenerator가 빈 엔트리를 건너뛰더라도 manifest에 실제 저장된 항목만 업로드합니다.
                 {
+                    bool isTeamPro = _settings.currentPlan == "team_pro";
                     string bundleDir = BundleWriter.GetBundleDirectory(manifest.id);
                     foreach (var artifact in manifest.artifacts)
                     {
@@ -284,11 +285,26 @@ namespace RekonOps.Rekon
                             string screenshotPath = Path.Combine(bundleDir, artifact.file_name);
                             if (File.Exists(screenshotPath))
                             {
+                                // team_pro: 스크린샷 인덱스로 ScreenshotEntries[idx].CaptureRealtime 주입
+                                // free/team: CapturedTAbs = null → JSON 미포함
+                                double? capturedTAbs = null;
+                                if (isTeamPro
+                                    && captureResult.ScreenshotEntries != null
+                                    && TryParseScreenshotIndex(artifact.file_name, out int ssIdx)
+                                    && ssIdx < captureResult.ScreenshotEntries.Length)
+                                {
+                                    double rt = captureResult.ScreenshotEntries[ssIdx].CaptureRealtime;
+                                    // CaptureRealtime = 0 은 기존 2-파라미터 Enqueue(하위 호환) 경우 — 미전송
+                                    if (rt > 0.0)
+                                        capturedTAbs = rt;
+                                }
+
                                 files.Add(new FileAttachment
                                 {
-                                    FileName = artifact.file_name,
-                                    Data = await ReadFileAsync(screenshotPath),
-                                    FileType = "screenshot"
+                                    FileName     = artifact.file_name,
+                                    Data         = await ReadFileAsync(screenshotPath),
+                                    FileType     = "screenshot",
+                                    CapturedTAbs = capturedTAbs
                                 });
                             }
                         }
@@ -395,13 +411,15 @@ namespace RekonOps.Rekon
 
                 var request = new ReportSubmitRequest
                 {
-                    AccessToken = accessToken,
-                    WorkspaceId = workspaceId,
-                    Title = manifest.title,
-                    Description = BuildDescription(manifest),
-                    Files = files,
+                    AccessToken        = accessToken,
+                    WorkspaceId        = workspaceId,
+                    Title              = manifest.title,
+                    Description        = BuildDescription(manifest),
+                    Files              = files,
                     PerformanceTimeline = captureResult.PerformanceTimeline,
-                    ReplayMetadata = captureResult.ReplayMetadata
+                    ReplayMetadata     = captureResult.ReplayMetadata,
+                    // team_pro 여부 전달 — FilesJsonBuilder.Build() 에서 captured_t_abs 포함 여부 결정
+                    IsTeamPro          = _settings.currentPlan == "team_pro"
                 };
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -510,6 +528,22 @@ namespace RekonOps.Rekon
         private static async Task<byte[]> ReadFileAsync(string path)
         {
             return await Task.Run(() => File.ReadAllBytes(path));
+        }
+
+        /// <summary>
+        /// "screenshot_N.png" 형식의 파일명에서 인덱스(N)를 파싱합니다.
+        /// 파싱 성공 시 true + idx 반환. 실패 시 false.
+        /// BundleWriter 와 동일 로직 (BundleWriter.TryParseScreenshotIndex 는 private).
+        /// </summary>
+        private static bool TryParseScreenshotIndex(string fileName, out int idx)
+        {
+            idx = -1;
+            if (!fileName.StartsWith("screenshot_") || !fileName.EndsWith(".png"))
+                return false;
+            string numStr = fileName.Substring(
+                "screenshot_".Length,
+                fileName.Length - "screenshot_".Length - ".png".Length);
+            return int.TryParse(numStr, out idx) && idx >= 0;
         }
     }
 }

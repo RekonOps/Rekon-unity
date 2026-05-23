@@ -46,8 +46,12 @@ namespace RekonOps.Rekon
         // 성능 타임라인 수집기 (null 허용 — 미연동 시 수집 건너뜀)
         private PerformanceTimelineCollector _timelineCollector;
 
-        // team_pro 전용 시간 윈도우 로그 수집기 (null 허용 — free/team 플랜 시 null)
+        // team_pro 전용 시간 윈도우 로그 수집기 — 영상 캡처 경로 (null 허용 — free/team 플랜 시 null)
         private ReplayLogCollector _replayLogCollector;
+
+        // team_pro 전용 스크린샷 경로 로그 수집기 (null 허용 — free/team 또는 미바인딩 시 null)
+        // 영상 없는 스크린샷 리포트에서 .jsonl 로그를 수집·전송하기 위해 별도 관리합니다.
+        private ReplayLogCollector _screenshotReplayLogCollector;
 
         private readonly ScreenshotQueue _screenshotQueue;
 
@@ -140,11 +144,27 @@ namespace RekonOps.Rekon
         /// team_pro 전용 ReplayLogCollector를 바인딩합니다 (BindTimelineCollector 패턴).
         /// team_pro 플랜 시에만 RekonBootstrap에서 호출됩니다.
         /// null 전달 시 기존 _logCollector(LogRingBuffer) 경로로 fallback됩니다.
+        /// ⚠️ 이 바인딩은 영상 캡처 경로 전용입니다. 스크린샷 경로는 BindScreenshotReplayLogCollector 사용.
         /// </summary>
         public void BindReplayLogCollector(ReplayLogCollector collector)
         {
             _replayLogCollector = collector;
-            Debug.Log("[Rekon] CaptureOrchestrator: ReplayLogCollector 바인딩 완료 (team_pro 리플레이 활성)");
+            Debug.Log("[Rekon] CaptureOrchestrator: ReplayLogCollector 바인딩 완료 (team_pro 영상 리플레이 활성)");
+        }
+
+        /// <summary>
+        /// team_pro 전용 스크린샷 경로 ReplayLogCollector를 바인딩합니다.
+        /// 영상 없는 스크린샷 전용 리포트(SubmitScreenshotOnlyAsync)에서 .jsonl 로그를 수집·전송합니다.
+        /// team_pro 플랜 시에만 RekonBootstrap에서 호출됩니다.
+        /// null 전달 시 스크린샷 리포트에서 .jsonl 수집을 건너뜁니다.
+        /// </summary>
+        public void BindScreenshotReplayLogCollector(ReplayLogCollector collector)
+        {
+            _screenshotReplayLogCollector = collector;
+            if (collector != null)
+                Debug.Log("[Rekon] CaptureOrchestrator: 스크린샷 경로 ReplayLogCollector 바인딩 완료 (team_pro 싱크 활성)");
+            else
+                Debug.Log("[Rekon] CaptureOrchestrator: 스크린샷 경로 ReplayLogCollector 해제됨");
         }
 
         /// <summary>
@@ -365,6 +385,9 @@ namespace RekonOps.Rekon
 
             try
             {
+                // team_pro 싱크: 캡처 직전 realtimeSinceStartupAsDouble 을 기록 (로그 t_abs 와 동일한 시간축)
+                double captureRealtime = Time.realtimeSinceStartupAsDouble;
+
                 byte[] pngBytes = await _screenshotCapturer.CaptureAsync();
                 if (pngBytes == null || pngBytes.Length == 0)
                 {
@@ -372,7 +395,7 @@ namespace RekonOps.Rekon
                     return;
                 }
 
-                bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow);
+                bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow, captureRealtime);
                 int newCount = _screenshotQueue.Count;
 
                 Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{ScreenshotQueue.MaxCapacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
@@ -444,8 +467,11 @@ namespace RekonOps.Rekon
                     Directory.CreateDirectory(tempDir);
 
                     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+
+                    // team_pro: _screenshotReplayLogCollector 가 바인딩된 경우 .jsonl 로그 수집
+                    // 영상 경로의 _replayLogCollector 와 독립적으로 동작 — 영상 경로 불변 보장
                     await Task.WhenAll(
-                        CaptureLogsAsync(tempDir, result, cts.Token),
+                        CaptureScreenshotLogsAsync(tempDir, result, cts.Token),
                         CaptureStateAsync(tempDir, result, cts.Token)
                     );
                 }
@@ -557,6 +583,57 @@ namespace RekonOps.Rekon
             {
                 Debug.LogError($"[Rekon] 로그 수집 실패: {ex.Message}");
                 ReportProgress("logs", 0.50f, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 스크린샷 전용 리포트의 로그를 수집합니다.
+        ///
+        /// team_pro + _screenshotReplayLogCollector 바인딩 시:
+        ///   → .jsonl 로그 수집 + 전송 (captured_t_abs 싱크용)
+        ///   → replay_metadata 는 생성하지 않음 (스크린샷 경로 — 영상 없음)
+        ///
+        /// free/team 또는 _screenshotReplayLogCollector 미바인딩 시:
+        ///   → 기존 LogRingBuffer(txt) 경로로 fallback (100% 불변)
+        ///
+        /// ⚠️ 영상 경로(_replayLogCollector)에는 절대 영향 없음.
+        /// </summary>
+        private async Task CaptureScreenshotLogsAsync(string dir, CaptureResult result, CancellationToken token)
+        {
+            try
+            {
+                token.ThrowIfCancellationRequested();
+
+                bool isTeamPro = _settings.currentPlan == "team_pro";
+
+                if (isTeamPro && _screenshotReplayLogCollector != null)
+                {
+                    // ── team_pro: JSONL 직렬화 (captured_t_abs 싱크 마커용) ────────
+                    // replay_metadata 는 영상 전용 — 스크린샷 경로에서는 생성하지 않음
+                    LogEntry[] entries = _screenshotReplayLogCollector.GetEntries();
+                    string jsonlPath = Path.Combine(dir, "logs.jsonl");
+                    await _logSerializer.SaveAsJsonlAsync(entries, jsonlPath);
+                    result.LogsPath = jsonlPath;
+                    // replay_metadata 는 null 유지 (스크린샷 경로 — 영상+로그 싱크 메타 불필요)
+                    result.ReplayMetadata = null;
+
+                    Debug.Log($"[Rekon] 스크린샷 리포트 team_pro JSONL 로그 수집 완료: {entries.Length}건 " +
+                              $"(replay_metadata 없음 — captured_t_abs 직접 비교)");
+                }
+                else
+                {
+                    // ── free/team 또는 미바인딩: 기존 텍스트 직렬화 (100% 보존) ────
+                    LogEntry[] entries = _logCollector.GetEntries();
+                    string path = Path.Combine(dir, "logs.txt");
+                    await _logSerializer.SaveAsync(entries, path);
+                    result.LogsPath = path;
+                    result.ReplayMetadata = null;
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[Rekon] 스크린샷 리포트 로그 수집 실패: {ex.Message}");
             }
         }
 

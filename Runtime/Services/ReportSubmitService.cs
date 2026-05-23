@@ -276,18 +276,9 @@ namespace RekonOps.Rekon
             var url = $"{_webApiBaseUrl}/api/unity/reports";
 
             // JSON 본문 수동 구성 (JsonUtility는 직렬화 제약이 있으므로)
-            var filesJson = new StringBuilder("[");
-            for (int i = 0; i < request.Files.Count; i++)
-            {
-                var file = request.Files[i];
-                if (i > 0) filesJson.Append(",");
-                filesJson.Append("{");
-                filesJson.Append($"\"type\":\"{EscapeJson(file.FileType)}\",");
-                filesJson.Append($"\"filename\":\"{EscapeJson(file.FileName)}\",");
-                filesJson.Append($"\"file_size\":{file.Data.Length}");
-                filesJson.Append("}");
-            }
-            filesJson.Append("]");
+            // FilesJsonBuilder: team_pro 여부에 따라 captured_t_abs 포함/미포함 처리
+            bool isTeamProPlan = request.IsTeamPro;
+            string filesJson = FilesJsonBuilder.Build(request.Files, isTeamProPlan);
 
             // performance_timeline: JsonUtility.ToJson() 결과를 EscapeJson 없이 그대로 삽입
             // (이미 유효한 JSON 객체이므로 이중 이스케이프 금지)
@@ -324,7 +315,7 @@ namespace RekonOps.Rekon
             bodyBuilder.Append($"\"title\":\"{EscapeJson(request.Title)}\",");
             bodyBuilder.Append($"\"description\":\"{EscapeJson(request.Description ?? "")}\",");
             bodyBuilder.Append($"\"engine\":\"{EscapeJson(request.Engine ?? "unity")}\",");
-            bodyBuilder.Append($"\"files\":{filesJson}");
+            bodyBuilder.Append($"\"files\":{filesJson}"); // FilesJsonBuilder.Build() 결과
             if (!string.IsNullOrEmpty(timelineJson))
             {
                 // JSON 객체를 그대로 삽입 — EscapeJson 미적용 (이중 이스케이프 방지)
@@ -631,6 +622,13 @@ namespace RekonOps.Rekon
         /// null이면 JSON body에 포함하지 않습니다 (free/team 또는 비team_pro 캡처).
         /// </summary>
         public ReplayMetadata ReplayMetadata { get; set; }
+
+        /// <summary>
+        /// team_pro 플랜 여부.
+        /// true 이면 스크린샷 FileAttachment.CapturedTAbs → files JSON에 captured_t_abs 포함.
+        /// false(free/team) 이면 미포함.
+        /// </summary>
+        public bool IsTeamPro { get; set; }
     }
 
     /// <summary>첨부 파일 정보</summary>
@@ -644,6 +642,14 @@ namespace RekonOps.Rekon
 
         /// <summary>파일 유형: "screenshot", "video", "log"</summary>
         public string FileType { get; set; }
+
+        /// <summary>
+        /// team_pro 전용 — 스크린샷 캡처 시점의 Time.realtimeSinceStartupAsDouble 값 (초).
+        /// 로그 .jsonl 의 t_abs 와 동일한 시간축이어 싱크 마커로 사용됩니다.
+        /// null 이면 JSON 직렬화 시 captured_t_abs 필드를 포함하지 않습니다.
+        /// 스크린샷(FileType == "screenshot") 이고 team_pro 인 경우에만 설정됩니다.
+        /// </summary>
+        public double? CapturedTAbs { get; set; }
     }
 
     /// <summary>제출 진행률 정보</summary>

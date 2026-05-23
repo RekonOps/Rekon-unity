@@ -209,6 +209,105 @@ namespace RekonOps.Rekon.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
+        // CaptureRealtime — 단조 증가 순서 검증 (team_pro 싱크 핵심)
+        // ──────────────────────────────────────────────────────────────
+
+        [Test]
+        public void Enqueue_CaptureRealtime_DrainAll_순서_검증()
+        {
+            // 서로 다른 CaptureRealtime 값으로 3개 Enqueue
+            _queue.Enqueue(SampleBytes1, DateTime.UtcNow, 1.0);
+            _queue.Enqueue(SampleBytes2, DateTime.UtcNow, 2.0);
+            _queue.Enqueue(SampleBytes3, DateTime.UtcNow, 3.0);
+
+            var drained = _queue.DrainAll();
+
+            // DrainAll 자체는 Enqueue 순서(FIFO) 반환 — 정렬은 Orchestrator 책임
+            Assert.AreEqual(3, drained.Length);
+            Assert.AreEqual(1.0, drained[0].CaptureRealtime, "첫 번째로 Enqueue된 항목의 CaptureRealtime = 1.0 이어야 합니다.");
+            Assert.AreEqual(2.0, drained[1].CaptureRealtime);
+            Assert.AreEqual(3.0, drained[2].CaptureRealtime);
+        }
+
+        [Test]
+        public void Enqueue_CaptureRealtime_역순_DrainAll_후_FIFO_확인()
+        {
+            // 역순 CaptureRealtime 으로 Enqueue (비동기 경합 시뮬레이션)
+            _queue.Enqueue(SampleBytes3, DateTime.UtcNow, 3.0);
+            _queue.Enqueue(SampleBytes1, DateTime.UtcNow, 1.0);
+            _queue.Enqueue(SampleBytes2, DateTime.UtcNow, 2.0);
+
+            var drained = _queue.DrainAll();
+
+            // DrainAll 은 FIFO — 큐 삽입 순서 그대로 반환
+            Assert.AreEqual(3.0, drained[0].CaptureRealtime, "DrainAll 은 Enqueue 순서(FIFO)를 그대로 반환해야 합니다.");
+            Assert.AreEqual(1.0, drained[1].CaptureRealtime);
+            Assert.AreEqual(2.0, drained[2].CaptureRealtime);
+
+            // 정렬 후 단조 증가 검증 (Orchestrator 가 수행할 Array.Sort 동작 확인)
+            Array.Sort(drained, (a, b) => a.CaptureRealtime.CompareTo(b.CaptureRealtime));
+            Assert.AreEqual(1.0, drained[0].CaptureRealtime, "정렬 후 index 0 = 가장 작은 CaptureRealtime 이어야 합니다.");
+            Assert.AreEqual(2.0, drained[1].CaptureRealtime);
+            Assert.AreEqual(3.0, drained[2].CaptureRealtime);
+        }
+
+        [Test]
+        public void Enqueue_CaptureRealtime_정렬_후_screenshot_N_단조증가_검증()
+        {
+            // 비동기 경합 시나리오: 두 번째 캡처가 먼저 완료되어 Enqueue 됨
+            // (CaptureRealtime 은 await 이전에 기록하므로 올바른 시각을 보유)
+            _queue.Enqueue(SampleBytes2, DateTime.UtcNow, 2.0); // 첫 번째 캡처이지만 나중에 완료
+            _queue.Enqueue(SampleBytes1, DateTime.UtcNow, 1.0); // 두 번째 캡처이지만 먼저 완료
+
+            var drained = _queue.DrainAll();
+
+            // 정렬 전: FIFO 순서 (Enqueue 순서)
+            Assert.AreEqual(2.0, drained[0].CaptureRealtime, "DrainAll 원본 순서: Enqueue 순서 그대로.");
+
+            // 정렬 후: CaptureRealtime 오름차순
+            Array.Sort(drained, (a, b) => a.CaptureRealtime.CompareTo(b.CaptureRealtime));
+            Assert.AreEqual(1.0, drained[0].CaptureRealtime,
+                "정렬 후 screenshot_0 = 가장 먼저 캡처된 항목(CaptureRealtime 최소값)이어야 합니다.");
+            Assert.AreEqual(2.0, drained[1].CaptureRealtime,
+                "정렬 후 screenshot_1 = 두 번째로 캡처된 항목이어야 합니다.");
+
+            // 단조 증가 검증
+            for (int i = 1; i < drained.Length; i++)
+            {
+                Assert.GreaterOrEqual(drained[i].CaptureRealtime, drained[i - 1].CaptureRealtime,
+                    $"정렬 후 drained[{i}].CaptureRealtime >= drained[{i - 1}].CaptureRealtime 이어야 합니다 " +
+                    $"(screenshot_{i}.png 의 captured_t_abs 가 screenshot_{i - 1}.png 보다 크거나 같아야 함).");
+            }
+        }
+
+        [Test]
+        public void Enqueue_5장_CaptureRealtime_정렬_후_screenshot_N_단조증가_검증()
+        {
+            // team_pro 5장 만료 시나리오 — 비동기 경합으로 역순 Enqueue
+            _queue.Enqueue(SampleBytes5, DateTime.UtcNow, 5.0);
+            _queue.Enqueue(SampleBytes4, DateTime.UtcNow, 4.0);
+            _queue.Enqueue(SampleBytes3, DateTime.UtcNow, 3.0);
+            _queue.Enqueue(SampleBytes2, DateTime.UtcNow, 2.0);
+            _queue.Enqueue(SampleBytes1, DateTime.UtcNow, 1.0);
+
+            var drained = _queue.DrainAll();
+            Array.Sort(drained, (a, b) => a.CaptureRealtime.CompareTo(b.CaptureRealtime));
+
+            // 단조 증가 검증
+            for (int i = 1; i < drained.Length; i++)
+            {
+                Assert.GreaterOrEqual(drained[i].CaptureRealtime, drained[i - 1].CaptureRealtime,
+                    $"drained[{i}].CaptureRealtime >= drained[{i - 1}].CaptureRealtime 이어야 합니다.");
+            }
+
+            // screenshot_0 이 가장 작은 CaptureRealtime
+            Assert.AreEqual(1.0, drained[0].CaptureRealtime,
+                "정렬 후 screenshot_0 = CaptureRealtime 최소값(1.0) 이어야 합니다.");
+            Assert.AreEqual(5.0, drained[4].CaptureRealtime,
+                "정렬 후 screenshot_4 = CaptureRealtime 최대값(5.0) 이어야 합니다.");
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // 스레드 안전성 (멀티스레드 스트레스)
         // ──────────────────────────────────────────────────────────────
 

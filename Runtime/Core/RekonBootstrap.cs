@@ -260,7 +260,11 @@ namespace RekonOps.Rekon
                                 : 180.0,
                             maxBytes: 32L * 1024 * 1024);
                         orchestrator.BindReplayLogCollector(replayLogCollector);
-                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 생성 + 바인딩 완료 (시간 윈도우 로그 수집 시작)");
+                        // 스크린샷 전용 리포트도 같은 컬렉터 인스턴스를 공유 — 영상·스크린샷이
+                        // 동일 로그 풀을 사용해 중복 구독을 방지한다. 이 바인딩이 없으면 스크린샷
+                        // 경로가 logs.txt fallback 으로 떨어져 web 시점마커(2-pane)가 비활성된다.
+                        orchestrator.BindScreenshotReplayLogCollector(replayLogCollector);
+                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 생성 + 바인딩 완료 (영상+스크린샷 시간 윈도우 로그 수집 시작)");
                     }
                     catch (System.Exception replayEx)
                     {

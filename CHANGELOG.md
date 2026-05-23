@@ -9,6 +9,22 @@
 
 ---
 
+## [0.4.0] - 2026-05-23
+
+### 추가
+
+- **team_pro 리플레이 로그 수집** (#230): JSONL + `ReplayMetadata` + `ReplayLogCollector` — 영상↔로그 시간축(`realtimeSinceStartup`) 싱크 재생 기반.
+- **스크린샷 `captured_t_abs`** (`realtimeSinceStartupAsDouble`) + `.jsonl` 로그 수집 — team_pro 스크린샷 리포트의 로그 타임라인 시점마커 싱크.
+- **웹 연동 배지에 연동된 계정 플랜 표시** (Free / Team / Team Pro).
+
+### 수정
+
+- 스크린샷 `captured_t_abs` 캡처 시각순 정렬 (파일명-시각 매핑 일치).
+- 스크린샷 `ReplayLogCollector` 부트스트랩 바인딩 누락 보강 → 2-pane 시점마커 활성.
+- `#230` 리플레이 `.cs` 의 `.meta` 누락 보강 (GUID 일관성).
+
+---
+
 ## [0.3.0] - 2026-05-20
 
 ### 변경

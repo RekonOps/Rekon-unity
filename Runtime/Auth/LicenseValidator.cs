@@ -61,6 +61,7 @@ namespace RekonOps.Rekon
         {
             public bool Valid;
             public string Plan;              // "free" | "team" | "team_pro"
+            public string Reason;            // invalid 시 서버 사유 (license_expired, suspended, seats_exceeded 등)
             public string WorkspaceId;
             public string WorkspaceName;
             public bool JiraSubmitEnabled;
@@ -222,7 +223,7 @@ namespace RekonOps.Rekon
                     _cachedLicense = licenseInfo;
                     ClearCache();
                     Debug.LogWarning("[Rekon] 라이선스 무효: " +
-                                     $"reason={licenseInfo.Plan ?? "unknown"}");
+                                     $"reason={licenseInfo.Reason ?? "unknown"}");
                     OnLicenseInvalid?.Invoke(responseJson);
                 }
 
@@ -411,6 +412,7 @@ namespace RekonOps.Rekon
             {
                 Valid = response.valid,
                 Plan = response.plan,
+                Reason = response.reason,
                 WorkspaceId = response.workspace_id,
                 WorkspaceName = response.workspace_name,
                 LastCheckedAt = DateTime.UtcNow

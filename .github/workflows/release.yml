@@ -3,6 +3,11 @@
 # ============================================
 # 트리거: v* 태그 푸시 시 GitHub Release 자동 생성
 # 예시: git tag v1.0.0 && git push origin v1.0.0
+#
+# [A7 UPM 산출물 무결성]
+# - UPM tarball(.tgz) SHA256 체크섬 생성 후 Release 첨부
+# - 패키지 의존성 SBOM(CycloneDX JSON) 생성 후 Release 첨부
+# - 고객이 수신한 SDK 변조 여부를 독립적으로 검증할 수 있게 함
 
 name: Unity Release
 
@@ -17,17 +22,122 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # Release 생성 권한
+      contents: write # Release 생성 + 산출물 업로드 권한
 
     steps:
       # 1. 소스 체크아웃
       - name: 소스 코드 체크아웃
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
 
+      # ──────────────────────────────────────────────────
+      # [A7-1] UPM tarball 생성 + SHA256 체크섬
+      # ──────────────────────────────────────────────────
+      # UPM Git URL 방식에서는 별도 .tgz가 없으므로
+      # git archive 로 릴리스 소스 tarball 을 직접 생성해 무결성 기준점으로 삼는다.
+      # 고객이 "내가 설치한 패키지가 이 릴리스와 동일한가"를 확인할 수 있다.
+      - name: "[A7] UPM tarball 생성"
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          TARBALL="rekon-unity-${VERSION}.tgz"
+          # git archive: .meta / Tests~ 등 Unity 메타파일 포함, 불필요 파일 제외
+          git archive --format=tar.gz \
+            --prefix="dev.rekonops.rekon/" \
+            HEAD \
+            -- Runtime Editor package.json package.json.meta \
+               CHANGELOG.md CHANGELOG.md.meta \
+               LICENSE LICENSE.meta \
+               README.md README.md.meta \
+               Documentation~ Samples~ \
+            -o "${TARBALL}" 2>/dev/null || \
+          git archive --format=tar.gz \
+            --prefix="dev.rekonops.rekon/" \
+            HEAD \
+            -o "${TARBALL}"
+          echo "TARBALL=${TARBALL}" >> "$GITHUB_ENV"
+          echo "TARBALL_VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: "[A7] SHA256 체크섬 생성"
+        run: |
+          sha256sum "${TARBALL}" > "${TARBALL}.sha256"
+          echo "=== SHA256 체크섬 ==="
+          cat "${TARBALL}.sha256"
+
+      # ──────────────────────────────────────────────────
+      # [A7-2] 경량 SBOM 생성 (CycloneDX JSON)
+      # Unity UPM 패키지는 외부 npm/pip 의존성이 없고
+      # package.json dependencies={} 이므로 구조화된 메타데이터 SBOM을 직접 생성한다.
+      # ──────────────────────────────────────────────────
+      - name: "[A7] SBOM 생성 (CycloneDX JSON)"
+        run: |
+          VERSION="${TARBALL_VERSION}"
+          PKG_NAME=$(jq -r '.name' package.json)
+          PKG_VERSION=$(jq -r '.version' package.json)
+          PKG_DESC=$(jq -r '.description' package.json)
+          PKG_AUTHOR=$(jq -r '.author.name' package.json)
+          PKG_REPO=$(jq -r '.repository.url' package.json)
+          TARBALL_SHA=$(awk '{print $1}' "${TARBALL}.sha256")
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cat > "rekon-unity-${VERSION}-sbom.json" <<SBOM_EOF
+          {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "version": 1,
+            "serialNumber": "urn:uuid:$(cat /proc/sys/kernel/random/uuid 2>/dev/null || python3 -c 'import uuid; print(uuid.uuid4())')",
+            "metadata": {
+              "timestamp": "${TIMESTAMP}",
+              "tools": [
+                {
+                  "vendor": "RekonOps",
+                  "name": "github-actions-release",
+                  "version": "${VERSION}"
+                }
+              ],
+              "component": {
+                "type": "library",
+                "bom-ref": "${PKG_NAME}@${PKG_VERSION}",
+                "name": "${PKG_NAME}",
+                "version": "${PKG_VERSION}",
+                "description": "${PKG_DESC}",
+                "licenses": [
+                  { "license": { "id": "MIT" } }
+                ],
+                "externalReferences": [
+                  {
+                    "type": "vcs",
+                    "url": "${PKG_REPO}"
+                  },
+                  {
+                    "type": "distribution",
+                    "url": "https://github.com/RekonOps/Rekon-unity/releases/tag/${VERSION}"
+                  }
+                ],
+                "hashes": [
+                  {
+                    "alg": "SHA-256",
+                    "content": "${TARBALL_SHA}"
+                  }
+                ]
+              }
+            },
+            "components": []
+          }
+          SBOM_EOF
+
+          echo "SBOM_FILE=rekon-unity-${VERSION}-sbom.json" >> "$GITHUB_ENV"
+          echo "=== SBOM 생성 완료 ==="
+          cat "rekon-unity-${VERSION}-sbom.json"
+
       # 2. GitHub Release 자동 생성
       #    - 태그 기반 릴리스 노트 자동 생성
       #    - 이전 태그 이후 커밋 내역 포함
+      #    ★ 기존 단계 — 변경 없음 (체크섬/SBOM 파일만 files에 추가)
       - name: GitHub Release 생성
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v2
         with:
           generate_release_notes: true # 자동 릴리스 노트 생성
+          # [A7] tarball + SHA256 체크섬 + SBOM을 Release 산출물로 첨부
+          files: |
+            ${{ env.TARBALL }}
+            ${{ env.TARBALL }}.sha256
+            ${{ env.SBOM_FILE }}

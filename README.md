@@ -187,6 +187,26 @@ docs/              # 사용자 가이드, API 레퍼런스
 
 ---
 
+## SDK 무결성 검증
+
+모든 GitHub Release에는 SHA-256 체크섬 파일과 CycloneDX SBOM이 첨부됩니다.
+다운로드한 tarball이 변조되지 않았는지 확인하는 방법:
+
+```bash
+# macOS / Linux
+sha256sum -c rekon-unity-v1.0.0.tgz.sha256
+# 출력: rekon-unity-v1.0.0.tgz: OK
+
+# Windows (PowerShell)
+$expected = (Get-Content "rekon-unity-v1.0.0.tgz.sha256" -Raw).Split(" ")[0].Trim()
+$actual   = (Get-FileHash "rekon-unity-v1.0.0.tgz" -Algorithm SHA256).Hash.ToLower()
+if ($expected -eq $actual) { "OK" } else { "FAIL" }
+```
+
+> 자세한 검증 방법 및 SBOM 확인은 [SECURITY.md](./SECURITY.md) 참조.
+
+---
+
 ## 관련 저장소
 
 | 저장소 | 설명 |

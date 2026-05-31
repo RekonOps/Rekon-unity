@@ -128,7 +128,7 @@ namespace RekonOps.Rekon.Tests
         public void Property_RandomPlaintexts_RoundTripInvariant()
         {
             // 재현 가능한 시드 — 무작위성을 보장하면서도 CI 실패 시 재현 가능
-            var rng = new System.Random(seed: 42);
+            var rng = new System.Random(42);
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+한글유니코드테스트";
 
             for (int trial = 0; trial < 20; trial++)
@@ -158,7 +158,7 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void Property_RandomPlaintexts_CiphertextNotEqualToPlaintext()
         {
-            var rng = new System.Random(seed: 99);
+            var rng = new System.Random(99);
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
             for (int trial = 0; trial < 20; trial++)
@@ -185,7 +185,7 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void Property_SamePlaintext_ProducesDifferentCiphertextsEachTime()
         {
-            var rng = new System.Random(seed: 7);
+            var rng = new System.Random(7);
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
             for (int trial = 0; trial < 15; trial++)

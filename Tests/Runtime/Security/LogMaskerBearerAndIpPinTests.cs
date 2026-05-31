@@ -169,7 +169,7 @@ namespace RekonOps.Rekon.Tests
         public void Property_RandomEmail_AfterMaskEmail_OriginalPatternAbsent()
         {
             // 재현 가능한 시드
-            var rng = new System.Random(seed: 101);
+            var rng = new System.Random(101);
             string[] domains   = { "example.com", "test.io", "sample.org", "mail.net", "abc.co.kr" };
             string[] localPre  = { "user", "admin", "contact", "info", "support", "dev123", "qa.tester" };
 
@@ -200,7 +200,7 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void Property_RandomBearerToken_AfterMaskBearer_OriginalTokenAbsent()
         {
-            var rng = new System.Random(seed: 202);
+            var rng = new System.Random(202);
             // BearerRegex 가 허용하는 문자 집합 (끝 '=' 패딩 제외한 본체 문자)
             const string tokenChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~+/";
 
@@ -231,7 +231,7 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void Property_RandomPublicIp_AfterMaskIp_OriginalIpAbsent()
         {
-            var rng = new System.Random(seed: 303);
+            var rng = new System.Random(303);
 
             for (int trial = 0; trial < 15; trial++)
             {
@@ -280,7 +280,7 @@ namespace RekonOps.Rekon.Tests
         {
             // 사설 IP 생성기: 각 대역에서 순환 선택
             var privateIps = new System.Collections.Generic.List<string>();
-            var rng = new System.Random(seed: 404);
+            var rng = new System.Random(404);
 
             for (int i = 0; i < 5; i++)
                 privateIps.Add($"10.{rng.Next(0, 256)}.{rng.Next(0, 256)}.{rng.Next(1, 256)}");

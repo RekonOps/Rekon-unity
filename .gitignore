@@ -86,6 +86,23 @@ sysinfo.txt
 !README.md.meta
 !LICENSE.meta
 !CHANGELOG.md.meta
+!SECURITY.md.meta
+
+# ============================================================
+# 작업/AI 메타 문서 — repo 에서 제외 (dev 로컬에만 유지, prod·UPM 미포함)
+# 기준: 패키지 사용자가 볼 문서(README/CHANGELOG/LICENSE/SECURITY)만 커밋,
+#       나머지 작업 메타는 git 에 올리지 않음 → 브랜치 분기 관리 불필요
+# ============================================================
+CLAUDE.md
+CLAUDE.md.meta
+CONTEXT.md
+CONTEXT.md.meta
+findings.md
+findings.md.meta
+progress.md
+progress.md.meta
+task_plan.md
+task_plan.md.meta
 
 # Unity3D Generated File On Crash Reports
 sysinfo.txt

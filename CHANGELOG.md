@@ -9,6 +9,21 @@
 
 ---
 
+## [0.4.1] - 2026-06-01
+
+### 수정
+
+- **빌드 에러 fix (CS1739)**: 보안 회귀 테스트(`LogMasker`/`TokenEncryptor` property test)의 `new System.Random(seed: N)` → positional 인자로 변경. .NET 생성자 파라미터명은 `Seed`(대문자)라 소문자 named argument 불일치로 컴파일 실패하던 것 복구 (7곳).
+
+### 패키징
+
+- **git URL 설치 시 `.meta` 누락 경고 제거**: `.upmignore` 는 npm registry publish 시에만 적용되고 git URL 설치엔 무시되어, repo 의 작업용 `.md` 가 PackageCache(immutable)로 따라가 "has no meta file" 경고 다수 발생하던 문제 해결.
+  - 작업/AI 메타 5종(`CLAUDE`/`CONTEXT`/`findings`/`progress`/`task_plan`) git 추적 제외 (dev 로컬만 유지, prod·UPM 미포함).
+  - `SECURITY.md.meta` 를 `.gitignore` whitelist 에 추가 (패키지 배포 문서).
+  - 기준 확립: 패키지 사용자가 볼 문서(README/CHANGELOG/LICENSE/SECURITY)만 커밋.
+
+---
+
 ## [0.4.0] - 2026-05-23
 
 ### 추가

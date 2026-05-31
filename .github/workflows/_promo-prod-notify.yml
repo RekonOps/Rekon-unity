@@ -1,0 +1,52 @@
+# ⚠️ 임시 워크플로우 — 홍보 데모 prod 배포 알림 1회 수동 발송용.
+#    태그 없이 배포된 prod 변경(임시 FPS 데모 로그)의 Discord 알림 기록을 위해 추가.
+#    1회 실행(workflow_dispatch) 후 즉시 삭제(롤백)할 것.
+name: 임시 prod 알림 (홍보 데모)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  notify-prod:
+    name: prod 수동 알림
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Discord 알림
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_PROD }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${GITHUB_SHA}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          DEPLOY_TIME=$(TZ='Asia/Seoul' date '+%Y-%m-%d %H:%M KST')
+          PAYLOAD=$(jq -n \
+            --arg short_sha "$SHORT_SHA" \
+            --arg actor "${{ github.actor }}" \
+            --arg deploy_time "$DEPLOY_TIME" \
+            --arg commit_url "$COMMIT_URL" \
+            --arg workflow_url "$WORKFLOW_URL" \
+            '{
+              embeds: [{
+                title: "🚀 Rekon Unity prod 배포 (홍보 데모 로그)",
+                description: "태그 없이 배포된 임시 변경 — 홍보 영상용 FPS 데모 로그. 촬영 후 롤백 예정.",
+                color: 15844367,
+                fields: [
+                  { name: "환경", value: "prod", inline: true },
+                  { name: "커밋", value: ("`" + $short_sha + "`"), inline: true },
+                  { name: "작성자", value: $actor, inline: true },
+                  { name: "구분", value: "임시(데모) — 롤백 예정", inline: false },
+                  { name: "배포 시각", value: $deploy_time, inline: true }
+                ],
+                footer: {
+                  text: ("커밋: " + $commit_url + " | 워크플로우: " + $workflow_url)
+                }
+              }]
+            }')
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK")
+          echo "Discord 응답 코드: $HTTP"

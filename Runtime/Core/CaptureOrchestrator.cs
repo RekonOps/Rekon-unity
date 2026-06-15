@@ -902,7 +902,14 @@ namespace RekonOps.Rekon
         {
             try
             {
-                string accessToken = _tokenStore.LoadSupabase();
+                var tokenStore = ActiveTokenStore;
+                if (tokenStore == null)
+                {
+                    // 토큰 스토어 자체가 없음 → fail-open
+                    Debug.Log("[Rekon] 사용량 사전 체크: 토큰 스토어 없음. 캡처를 계속 진행합니다.");
+                    return null;
+                }
+                string accessToken = tokenStore.LoadSupabase();
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     // 토큰 없음 → fail-open

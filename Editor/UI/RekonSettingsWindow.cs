@@ -476,8 +476,20 @@ namespace RekonOps.Rekon.Editor
                         tenantIdProp.stringValue = "";
                         _webLoginState = WebLoginState.Idle;
                         _webLoginErrorMessage = null;
+
+                        // 즉시 영속화 필수:
+                        //   이 변경을 OnGUI 끝의 ApplyModifiedProperties(337)에 맡기면, isLinked=false가
+                        //   같은 패스의 하위 섹션(#31, line 307) 컨트롤 수를 Layout↔Repaint 간 불일치시켜
+                        //   IMGUI 예외가 저장 직전에 발생 → 해제가 저장되지 않는다. 여기서 바로 저장한다.
+                        _serializedSettings.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(_settings);
+                        AssetDatabase.SaveAssets();
                         Debug.Log("[Rekon] 웹 대시보드 연동 해제됨");
-                        Repaint();
+
+                        // 현재 GUI 패스를 안전하게 종료(레이아웃 불일치 예외 회피).
+                        // 다음 패스는 isLinked=false로 일관되게 다시 그린다.
+                        EditorGUI.indentLevel = 0;
+                        GUIUtility.ExitGUI();
                     }
                 }
             }

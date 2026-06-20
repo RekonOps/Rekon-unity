@@ -27,6 +27,13 @@ namespace RekonOps.Rekon
         private static ScreenshotQueue _screenshotQueue;
         private static StreamingVideoRecorder _streamingRecorder;
 
+        // 이른 로그 tap: 플레이 진입(SubsystemRegistration)~컬렉터 생성 전 구간 로그 보존용.
+        private static readonly System.Collections.Generic.List<LogEntry> _earlyLogBuffer = new System.Collections.Generic.List<LogEntry>();
+        private static readonly object _earlyLogLock = new object();
+        private static volatile bool _earlyTapActive;
+        private static double _earlyTapLastMainThreadTime;
+        private const int EarlyLogBufferCap = 2000;
+
         /// <summary>
         /// Domain Reload OFF 대응: 정적 상태 리셋.
         /// Domain Reload가 비활성화된 환경(Enter Play Mode Options)에서
@@ -47,6 +54,16 @@ namespace RekonOps.Rekon
             RekonSettingsProvider.ResetCache();
             // BundleWriter 정적 경로 캐시 리셋
             BundleWriter.ResetStaticCache();
+            // 코드 트리거(Rekon.Capture) 핸들/제목 리셋
+            Rekon.Orchestrator = null;
+            Rekon.PendingReportTitle = null;
+
+            // 이른 로그 tap 재시작(멱등): Domain Reload OFF 누적 방지 위해 -= 후 +=.
+            // 여기(SubsystemRegistration)부터 구독해 부트스트랩 컬렉터 생성 전 로그까지 보존한다.
+            Application.logMessageReceivedThreaded -= OnEarlyLogReceived;
+            lock (_earlyLogLock) { _earlyLogBuffer.Clear(); }
+            _earlyTapActive = true;
+            Application.logMessageReceivedThreaded += OnEarlyLogReceived;
         }
 
         /// <summary>
@@ -59,6 +76,42 @@ namespace RekonOps.Rekon
             // FFmpeg 프로세스 정리 (Play Mode 종료 시 고아 프로세스 방지)
             _streamingRecorder?.Dispose();
             _streamingRecorder = null;
+        }
+
+        // ── 이른 로그 tap ────────────────────────────────────────────────
+        // 플레이 진입(SubsystemRegistration) 직후부터 로그를 버퍼링하여,
+        // 컬렉터(LogRingBuffer/ReplayLogCollector) 생성 전 구간 로그까지 보존한다.
+        private static void OnEarlyLogReceived(string condition, string stackTrace, LogType logType)
+        {
+            if (!_earlyTapActive) return;
+
+            // Time.realtimeSinceStartupAsDouble 는 메인 스레드 전용 → LogRingBuffer 와 동일 fallback 패턴
+            double timestamp;
+            try { timestamp = Time.realtimeSinceStartupAsDouble; _earlyTapLastMainThreadTime = timestamp; }
+            catch { timestamp = _earlyTapLastMainThreadTime; }
+
+            lock (_earlyLogLock)
+            {
+                if (_earlyLogBuffer.Count >= EarlyLogBufferCap) return; // 상한(이상 상황 폭주 방지)
+                _earlyLogBuffer.Add(new LogEntry(
+                    timestamp: timestamp,
+                    logType: logType,
+                    message: condition,
+                    stackTrace: stackTrace));
+            }
+        }
+
+        /// <summary>이른 tap 을 중지하고 버퍼된 로그를 반환한다(unsubscribe → 컬렉터 구독과 겹침 방지).</summary>
+        private static LogEntry[] DrainEarlyLogs()
+        {
+            Application.logMessageReceivedThreaded -= OnEarlyLogReceived;
+            _earlyTapActive = false;
+            lock (_earlyLogLock)
+            {
+                var arr = _earlyLogBuffer.ToArray();
+                _earlyLogBuffer.Clear();
+                return arr;
+            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -87,8 +140,38 @@ namespace RekonOps.Rekon
 
                 // ── 3. 공통 의존성 생성 ───────────────────────────────────────────
 
+                // 이른 tap 버퍼 회수: 컬렉터 구독 직전에 unsubscribe → 중복/누락 없이 인계.
+                LogEntry[] earlyLogs = DrainEarlyLogs();
+
                 // 로그 링버퍼: Application.logMessageReceivedThreaded 구독 시작
                 var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
+
+                // team_pro 리플레이 로그 컬렉터를 여기서 조기 생성·구독 → 부트스트랩 시작부터 수집.
+                //   (plan 확정 전이라 window 는 기본 180s = team_pro 값. team_pro 아니면 아래 plan 분기에서 dispose)
+                //   LogRingBuffer 와 연속 생성(사이 로그 없음)한 뒤, 둘 다 earlyLogs 로 seed 한다.
+                ReplayLogCollector replayLogCollector = null;
+                try
+                {
+                    replayLogCollector = new ReplayLogCollector(
+                        windowSeconds: settings.maxAllowedBufferSeconds > 0
+                            ? (double)settings.maxAllowedBufferSeconds
+                            : 180.0,
+                        maxBytes: 32L * 1024 * 1024);
+                }
+                catch (System.Exception replayInitEx)
+                {
+                    Debug.LogWarning($"[Rekon] ReplayLogCollector 조기 생성 실패: {replayInitEx.Message}");
+                    replayLogCollector = null;
+                }
+
+                // 이른 tap 으로 모은 로그를 두 컬렉터에 시간순 seed
+                if (earlyLogs.Length > 0)
+                {
+                    foreach (var e in earlyLogs) logRingBuffer.Add(e);
+                    if (replayLogCollector != null)
+                        foreach (var e in earlyLogs) replayLogCollector.AddEntry(e);
+                    Debug.Log($"[Rekon] 이른 로그 tap 인계: {earlyLogs.Length}건 seed");
+                }
 
                 // 로그 직렬화기: 마스킹 활성화
                 var logSerializer = new LogSerializer(enableMasking: true);
@@ -167,6 +250,9 @@ namespace RekonOps.Rekon
                     settings: settings,
                     screenshotQueue: screenshotQueue,
                     streamingRecorder: streamingRecorder); // null 허용 (FFmpeg 미설치 시)
+
+                // 코드에서 Rekon.Capture() 로 캡처를 발동할 수 있도록 오케스트레이터 핸들 주입
+                Rekon.Orchestrator = orchestrator;
 
                 // ── 7. PerformanceTimelineCollector 생성 및 수집 즉시 시작 ─
                 var timelineCollector = root.AddComponent<PerformanceTimelineCollector>();
@@ -247,29 +333,31 @@ namespace RekonOps.Rekon
                 // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
                 orchestrator.BindTokenStore(tokenStore);
 
-                // ── team_pro 전용: ReplayLogCollector 생성 (plan 확정 후) ───────
-                // free/team 플랜에서는 생성하지 않아 메모리·성능 영향 0.
+                // ── team_pro 전용: 조기 생성한 ReplayLogCollector 바인딩 (plan 확정 후) ───────
+                // 컬렉터는 위 line ~94 에서 이미 생성·구독·seed 됨(부트스트랩 시작부터 수집).
+                // free/team 플랜이면 여기서 dispose 하여 메모리 반환.
                 // _logCollector(LogRingBuffer)는 free/team fallback + CrashRecovery 의존성 보존.
-                if (settings.currentPlan == "team_pro")
+                if (settings.currentPlan == "team_pro" && replayLogCollector != null)
                 {
                     try
                     {
-                        var replayLogCollector = new ReplayLogCollector(
-                            windowSeconds: settings.maxAllowedBufferSeconds > 0
-                                ? (double)settings.maxAllowedBufferSeconds
-                                : 180.0,
-                            maxBytes: 32L * 1024 * 1024);
                         orchestrator.BindReplayLogCollector(replayLogCollector);
                         // 스크린샷 전용 리포트도 같은 컬렉터 인스턴스를 공유 — 영상·스크린샷이
                         // 동일 로그 풀을 사용해 중복 구독을 방지한다. 이 바인딩이 없으면 스크린샷
                         // 경로가 logs.txt fallback 으로 떨어져 web 시점마커(2-pane)가 비활성된다.
                         orchestrator.BindScreenshotReplayLogCollector(replayLogCollector);
-                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 생성 + 바인딩 완료 (영상+스크린샷 시간 윈도우 로그 수집 시작)");
+                        Debug.Log("[Rekon] team_pro: ReplayLogCollector 바인딩 완료 (부트스트랩 시작부터 수집, 영상+스크린샷 시간 윈도우)");
                     }
                     catch (System.Exception replayEx)
                     {
-                        Debug.LogWarning($"[Rekon] ReplayLogCollector 초기화 실패 (기존 LogRingBuffer로 fallback): {replayEx.Message}");
+                        Debug.LogWarning($"[Rekon] ReplayLogCollector 바인딩 실패 (기존 LogRingBuffer로 fallback): {replayEx.Message}");
                     }
+                }
+                else
+                {
+                    // 비-team_pro(또는 생성 실패): 조기 생성한 컬렉터 정리(구독 해제 + 메모리 반환)
+                    replayLogCollector?.Dispose();
+                    replayLogCollector = null;
                 }
 
                 var silentSubmitManager = new SilentSubmitManager(settings, bundleWriter, tokenStore, submitService);

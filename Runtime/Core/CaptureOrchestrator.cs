@@ -247,6 +247,13 @@ namespace RekonOps.Rekon
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(effectiveTimeout));
             var result = new CaptureResult { Timestamp = DateTime.UtcNow };
 
+            // 영상-로그 싱크용 스냅샷(realtime 단일 축):
+            //   캡처 트리거 시각과, 그 시점까지 인코딩된 프레임 수를 여기서 고정한다.
+            //   videoTask 의 Restart() 가 FramesWritten 을 0으로 리셋하므로, 병렬 logsTask 가
+            //   읽기 전에 트리거 시점 값을 스냅샷해야 race-free 하다.
+            double captureTriggerT = Time.realtimeSinceStartupAsDouble;
+            long videoFramesAtTrigger = _streamingRecorder?.FramesWritten ?? 0L;
+
             // 임시 디렉토리 생성
             string captureDir = CreateCaptureDirectory(result.Timestamp);
 
@@ -259,7 +266,7 @@ namespace RekonOps.Rekon
                 var screenshotTask = _settings.videoEnabled
                     ? Task.CompletedTask
                     : CaptureScreenshotAsync(captureDir, result, cts.Token);
-                var logsTask = CaptureLogsAsync(captureDir, result, cts.Token);
+                var logsTask = CaptureLogsAsync(captureDir, result, captureTriggerT, videoFramesAtTrigger, cts.Token);
                 var stateTask = CaptureStateAsync(captureDir, result, cts.Token);
                 var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);
 
@@ -529,7 +536,7 @@ namespace RekonOps.Rekon
             }
         }
 
-        private async Task CaptureLogsAsync(string dir, CaptureResult result, CancellationToken token)
+        private async Task CaptureLogsAsync(string dir, CaptureResult result, double captureTriggerT, long videoFramesAtTrigger, CancellationToken token)
         {
             try
             {
@@ -545,20 +552,36 @@ namespace RekonOps.Rekon
                     await _logSerializer.SaveAsJsonlAsync(entries, jsonlPath);
                     result.LogsPath = jsonlPath;
 
-                    // 영상 시작/길이 실측 (frames 비었으면 fallback 0)
-                    FrameData[] frames = _frameBuffer?.GetFrames();
-                    double videoStartT    = (frames != null && frames.Length > 0) ? frames[0].Timestamp : 0.0;
-                    double videoDurationS = (frames != null && frames.Length > 0)
-                        ? frames[frames.Length - 1].Timestamp - frames[0].Timestamp : 0.0;
+                    // 영상 시작/길이 산출 (realtime 단일 축, clock_offset=0).
+                    //   스트리밍 모드(프로덕션 기본)에선 레거시 링버퍼(_frameBuffer)가 항상 비므로,
+                    //   인코딩 길이(FramesWritten/fps)로 역산한다. -sseof 로 마지막 N초만 추출하므로
+                    //   min(buffer, encoded) 사용. 인코딩 길이 기준이라 클립 "끝"(=캡처 트리거 시점)이
+                    //   정확히 맞는다(프레임 드랍 시 시작쪽만 어긋남 — 감수).
+                    //   비스트리밍(FFmpeg 미설치) 경로만 기존 링버퍼 실측(unscaled)으로 fallback.
+                    double videoStartT;
+                    double videoDurationS;
+                    if (_streamingRecorder != null && _settings != null && _settings.videoEnabled)
+                    {
+                        int fps = Mathf.Max(1, _settings.videoFps);
+                        int bufferSeconds = _settings.videoBufferSeconds; // StopAndExtractAsync 에 넘기는 값과 동일
+                        double encodedSeconds = videoFramesAtTrigger / (double)fps;
+                        videoDurationS = System.Math.Min(bufferSeconds, encodedSeconds);
+                        videoStartT    = captureTriggerT - videoDurationS; // realtime 축
+                    }
+                    else
+                    {
+                        FrameData[] frames = _frameBuffer?.GetFrames();
+                        videoStartT    = (frames != null && frames.Length > 0) ? frames[0].Timestamp : 0.0;
+                        videoDurationS = (frames != null && frames.Length > 0)
+                            ? frames[frames.Length - 1].Timestamp - frames[0].Timestamp : 0.0;
+                    }
 
-                    // 시간축 보정: realtime − unscaled (캡처 시점 1회 측정)
-                    double clockOffset = Time.realtimeSinceStartupAsDouble - Time.unscaledTimeAsDouble;
+                    // realtime 단일 축이라 시계 보정 불필요
+                    double clockOffset = 0.0;
 
-                    double captureTriggerT = Time.realtimeSinceStartupAsDouble;
-
-                    // 로그 수 분류 (로그는 realtime 축, 영상은 unscaled 축 → clock_offset 보정)
-                    int countInVideo    = CountLogsInRange(entries, videoStartT,                  videoStartT + videoDurationS, clockOffset);
-                    int countBeforeVideo = CountLogsInRange(entries, double.NegativeInfinity,      videoStartT,                  clockOffset);
+                    // 로그 수 분류 (로그·영상 모두 realtime 축, clock_offset=0)
+                    int countInVideo     = CountLogsInRange(entries, videoStartT,             videoStartT + videoDurationS, clockOffset);
+                    int countBeforeVideo = CountLogsInRange(entries, double.NegativeInfinity, videoStartT,                  clockOffset);
 
                     result.ReplayMetadata = new ReplayMetadata
                     {
@@ -566,7 +589,7 @@ namespace RekonOps.Rekon
                         video_duration_s       = videoDurationS,
                         capture_trigger_t_abs  = captureTriggerT,
                         play_mode_start_t_abs  = 0.0,   // Play Mode 시작 = 0 기준
-                        clock_offset           = clockOffset,
+                        clock_offset           = clockOffset, // realtime 단일 축이라 0
                         log_count_total        = entries.Length,
                         log_count_in_video     = countInVideo,
                         log_count_before_video = countBeforeVideo,

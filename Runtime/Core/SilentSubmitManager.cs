@@ -205,6 +205,14 @@ namespace RekonOps.Rekon
         /// </summary>
         internal string GenerateTitle(DateTime timestamp)
         {
+            // 코드 트리거(Rekon.Capture(title))로 지정된 제목이 있으면 1회 우선 사용
+            if (!string.IsNullOrEmpty(Rekon.PendingReportTitle))
+            {
+                string custom = Rekon.PendingReportTitle;
+                Rekon.PendingReportTitle = null; // 1회성 소비
+                return custom;
+            }
+
             string prefix = string.IsNullOrEmpty(_settings.reportTitlePrefix)
                 ? "Bug"
                 : _settings.reportTitlePrefix;

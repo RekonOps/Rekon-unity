@@ -9,6 +9,20 @@
 
 ---
 
+## [0.5.0] - 2026-06-21
+
+### 추가
+
+- **`Rekon.Capture(title)` 코드 캡처 API**: 코드에서 버그 리포트 캡처(영상+로그+스크린샷)를 발동하는 public 진입점. 캡처 핫키(Ctrl/Cmd+Shift+B)와 동일 경로(`CaptureOrchestrator.StartAsync`)이며 완료 시 Silent Submit 자동 제출. 제목 지정 가능(미지정 시 자동 생성).
+
+### 수정
+
+- **영상-로그 시점 싱크 보정**: 스트리밍 녹화 모드에서 `video_start_t_abs`/`video_duration_s`가 항상 빈 레거시 링버퍼를 읽어 `0`으로 기록돼, 웹 리플레이에서 로그가 영상과 전혀 정렬되지 않던 문제. 인코딩 길이(`FramesWritten/fps`)로 `video_start = capture_trigger − duration` 역산 + `clock_offset = 0`(로그·영상 realtime 단일 축 통일). 트리거 시점 프레임수 스냅샷으로 `Restart()` 리셋 레이스 회피.
+- **로그 전량 수집(플레이 진입부터)**: team_pro `ReplayLogCollector`를 부트스트랩 초반에 조기 생성·구독(window 180s 유지, 비-team_pro는 dispose) + `SubsystemRegistration` 이른 tap으로 컬렉터 생성 전(부트스트랩 이전 포함) 구간까지 버퍼링 후 seed. 기존엔 늦은 구독으로 초기 로그가 리포트에서 누락되던 문제 해결. 멱등 구독으로 Domain Reload OFF 누적 방지.
+- **웹 연동 해제가 저장되지 않던 IMGUI 버그**: 연동 해제 클릭 시 같은 `OnGUI` 패스 중 `isLinked` 변경이 하위 섹션 컨트롤 수를 Layout↔Repaint 간 불일치시켜 예외가 발생, 저장(`ApplyModifiedProperties`) 직전에 중단되던 문제. 즉시 영속화 + `GUIUtility.ExitGUI()`로 수정.
+
+---
+
 ## [0.4.1] - 2026-06-01
 
 ### 수정

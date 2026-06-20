@@ -7,10 +7,12 @@ namespace RekonOps.Rekon
     /// team_pro 플랜 전용 리플레이 메타데이터.
     /// 영상·로그·성능 타임라인 3축 동기 재생에 필요한 시간 보정 정보를 담습니다.
     ///
-    /// 시간축:
+    /// 시간축 (스트리밍 녹화 경로 = 프로덕션 기본):
     ///   - 로그(LogEntry.Timestamp) = Time.realtimeSinceStartup 기준
-    ///   - 영상 프레임(FrameData.Timestamp) = Time.unscaledTime 기준
-    ///   - clock_offset = realtime − unscaled → 두 시계 보정값
+    ///   - 영상 시작/길이 = 인코딩 길이(FramesWritten/fps)로 realtime 축에서 역산
+    ///     (video_start_t_abs = capture_trigger_t_abs − video_duration_s)
+    ///   - 로그·영상이 동일 realtime 축 → clock_offset = 0
+    /// (레거시 비스트리밍 링버퍼 경로에서만 영상이 unscaled 축이라 clock_offset 보정이 필요했음)
     ///
     /// 모든 시간 필드는 double (float 다운캐스팅 금지 — 로그가 double이므로 정밀도 보존).
     ///
@@ -25,13 +27,16 @@ namespace RekonOps.Rekon
         // ── 영상 구간 ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 영상 ring buffer 첫 프레임 timestamp 실측값 (Time.unscaledTime 축).
-        /// FrameRingBuffer.GetFrames()[0].Timestamp 값.
+        /// 영상 클립 시작 시각 (realtime 축).
+        /// 스트리밍 경로: capture_trigger_t_abs − video_duration_s.
+        /// (레거시 링버퍼 경로: frames[0].Timestamp, unscaled 축)
         /// </summary>
         public double video_start_t_abs;
 
         /// <summary>
-        /// 실제 영상 길이 (초). frames[last].Timestamp − frames[0].Timestamp.
+        /// 영상 길이 (초).
+        /// 스트리밍 경로: min(videoBufferSeconds, FramesWritten/fps) = 인코딩된 클립 길이.
+        /// (레거시 링버퍼 경로: frames[last].Timestamp − frames[0].Timestamp)
         /// 즉시 캡처 edge case 시 0.0 가능.
         /// </summary>
         public double video_duration_s;
@@ -51,10 +56,11 @@ namespace RekonOps.Rekon
         // ── 시간축 보정값 ─────────────────────────────────────────────────────
 
         /// <summary>
-        /// 캡처 시점 1회 측정한 시계 오프셋.
-        /// clock_offset = Time.realtimeSinceStartupAsDouble − Time.unscaledTimeAsDouble
+        /// 로그 ↔ 영상 시계 보정 오프셋.
+        /// 스트리밍 경로(현재 기본): 로그·영상 모두 realtime 축이라 0.
+        /// (레거시 링버퍼 경로: realtime − unscaled)
         ///
-        /// 로그(realtime 축) → 영상(unscaled 축) 환산:
+        /// 웹 변환공식 (clock_offset=0 이면 단순 오프셋 제거):
         ///   logToVideoTime = (logTAbs − clock_offset) − video_start_t_abs
         ///   videoTimeToLogAbs = video_start_t_abs + videoCurrentTime + clock_offset
         /// </summary>

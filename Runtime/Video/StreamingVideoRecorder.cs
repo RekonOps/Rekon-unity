@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,6 +47,12 @@ namespace RekonOps.Rekon
         private long _framesWritten;
         private long _framesDropped;
 
+        // 영상-로그 싱크: 현재 rolling 세션이 시작된 realtime 시각.
+        //   Start() 단일 지점에서만 갱신(호출처 모두 메인스레드: FrameCapturer.Update / 해상도변경 / Restart 연속체).
+        //   에디터 저캡처(예: 30fps 목표인데 실제 ~16fps)로 인코딩 길이가 wall 시간보다 짧아지는 문제를
+        //   추출 시 itsscale 로 보정하기 위한 기준점.
+        private double _recordingStartRealtime;
+
         // FFmpeg stderr 수집 (디버깅용)
         private readonly Queue<string> _stderrLines = new Queue<string>();
         private const int StderrTailLines = 10;
@@ -61,6 +68,9 @@ namespace RekonOps.Rekon
         public bool IsRecording => _isRecording;
         public long FramesWritten => _framesWritten;
         public long FramesDropped => _framesDropped;
+
+        /// <summary>현재 rolling 세션이 시작된 realtime 시각(로그 t_abs 와 동일 축). 영상-로그 싱크용.</summary>
+        public double RecordingStartRealtime => _recordingStartRealtime;
 
         public StreamingVideoRecorder(int fps, string gpuEncoder = null)
         {
@@ -149,6 +159,8 @@ namespace RekonOps.Rekon
             _isRecording = true;
             _framesWritten = 0;
             _framesDropped = 0;
+            // rolling 세션 시작 시각 기록(메인스레드). 추출 시 wall 길이 = trigger - 이 값.
+            _recordingStartRealtime = Time.realtimeSinceStartupAsDouble;
             _writerThread = new Thread(WriterLoop) { IsBackground = true, Name = "RekonVideoWriter" };
             _writerThread.Start();
 
@@ -198,7 +210,13 @@ namespace RekonOps.Rekon
         /// 녹화를 중지하고 FFmpeg를 종료합니다.
         /// 마지막 N초를 추출한 파일 경로를 반환합니다.
         /// </summary>
-        public async Task<string> StopAndExtractAsync(int lastSeconds)
+        /// <param name="lastSeconds">추출할 마지막 구간 길이(초). 0 이하면 전체 파일 반환.</param>
+        /// <param name="wallSpanSeconds">
+        ///   rolling 세션의 실제 wall 시간(초). &gt;0 이고 lastSeconds 이내이면 itsscale 로
+        ///   인코딩 길이를 wall 길이에 맞게 늘려(재인코딩 0) 에디터 저캡처 빨리감기를 보정한다.
+        ///   0 이면 기존 -sseof 추출(보정 없음).
+        /// </param>
+        public async Task<string> StopAndExtractAsync(int lastSeconds, double wallSpanSeconds = 0)
         {
             if (!_isRecording) return null;
             _isRecording = false;
@@ -261,12 +279,41 @@ namespace RekonOps.Rekon
                 Path.GetDirectoryName(_rollingFilePath),
                 $"capture_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
 
-            bool trimSuccess = await TrimLastSecondsAsync(_rollingFilePath, outputPath, lastSeconds);
+            // 인코딩 길이(초): 고정 framerate(CFR) 인코딩이라 프레임수/fps = 컨테이너 nominal duration.
+            //   ffprobe 없이 메모리 카운터로 결정적으로 산출(외부 프로세스 0, 실패 경로 없음).
+            double encodedSeconds = _framesWritten / (double)Mathf.Max(1, _fps);
+
+            // 스트레치 적용 조건(메타데이터 산출부와 동일한 공유 기준):
+            //   wall 길이가 유효(>0.5s)하고 buffer(lastSeconds) 이내일 때만 whole-file itsscale.
+            //   (세션이 buffer 보다 길면 마지막 N초만 필요 → whole-file 스트레치 불가 → 기존 -sseof 폴백)
+            //   encodedSeconds>0.1 은 프레임 0 인 degenerate 케이스 방어.
+            bool canStretch = wallSpanSeconds > 0.5
+                              && wallSpanSeconds <= lastSeconds + 1.0
+                              && encodedSeconds > 0.1;
+
+            bool extractSuccess;
+            if (canStretch)
+            {
+                // K = wall / encoded (저캡처면 encoded < wall → K ≥ 1, 영상이 느려져 실시간 길이로 복원).
+                double k = wallSpanSeconds / encodedSeconds;
+                Debug.Log($"[Rekon] 영상 스트레치 보정: wall={wallSpanSeconds:F2}s, encoded={encodedSeconds:F2}s, K={k:F3}");
+                extractSuccess = await StretchAndExtractAsync(_rollingFilePath, outputPath, k);
+                if (!extractSuccess)
+                {
+                    // fail-safe: itsscale 실패/무효 mp4 → 기존 -sseof 추출로 폴백
+                    Debug.LogWarning("[Rekon] itsscale 스트레치 실패 — -sseof 추출로 폴백");
+                    extractSuccess = await TrimLastSecondsAsync(_rollingFilePath, outputPath, lastSeconds);
+                }
+            }
+            else
+            {
+                extractSuccess = await TrimLastSecondsAsync(_rollingFilePath, outputPath, lastSeconds);
+            }
 
             // rolling 파일 정리
             try { File.Delete(_rollingFilePath); } catch { }
 
-            return trimSuccess ? outputPath : null;
+            return extractSuccess ? outputPath : null;
         }
 
         /// <summary>
@@ -485,6 +532,56 @@ namespace RekonOps.Rekon
                 catch (Exception ex)
                 {
                     Debug.LogError($"[Rekon] FFmpeg trim 실패: {ex.Message}");
+                    return false;
+                }
+            });
+        }
+
+        /// <summary>
+        /// rolling 파일 전체를 -itsscale 로 K배 늘려 추출합니다(재인코딩 없음, stream copy).
+        ///   에디터 저캡처로 인코딩 길이가 wall 시간보다 짧을 때 실시간 속도로 복원하는 용도.
+        ///   whole-file 대상이라 -sseof 는 사용하지 않습니다(세션 ≤ buffer 일 때만 호출됨).
+        ///   K 는 로케일 무관하게 InvariantCulture(소수점) 로 포맷합니다.
+        /// </summary>
+        private static async Task<bool> StretchAndExtractAsync(string inputPath, string outputPath, double k)
+        {
+            string ffmpegPath = FfmpegHelper.GetPath();
+            if (string.IsNullOrEmpty(ffmpegPath)) return false;
+
+            // -itsscale: 입력 타임스탬프를 K배로 스케일(컨테이너 duration 만 늘림, 프레임 데이터 무변경).
+            string kStr = k.ToString("0.000000", CultureInfo.InvariantCulture);
+            string args = $"-y -itsscale {kStr} -i \"{inputPath}\" -c copy \"{outputPath}\"";
+
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = args,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardError = true,
+                    };
+
+                    using var process = Process.Start(startInfo);
+                    process.BeginErrorReadLine();
+                    bool exited = process.WaitForExit(30000);
+                    if (!exited)
+                    {
+                        try { process.Kill(); } catch { }
+                        return false;
+                    }
+
+                    // 정상 종료 + 유효한 출력(존재 + 비어있지 않음) 까지 확인 → 무효 mp4 면 false(폴백 유도)
+                    if (process.ExitCode != 0) return false;
+                    try { return File.Exists(outputPath) && new FileInfo(outputPath).Length > 0; }
+                    catch { return false; }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[Rekon] FFmpeg itsscale 실패: {ex.Message}");
                     return false;
                 }
             });

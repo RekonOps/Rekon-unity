@@ -253,6 +253,14 @@ namespace RekonOps.Rekon
             //   읽기 전에 트리거 시점 값을 스냅샷해야 race-free 하다.
             double captureTriggerT = Time.realtimeSinceStartupAsDouble;
             long videoFramesAtTrigger = _streamingRecorder?.FramesWritten ?? 0L;
+            //   rolling 세션 시작 realtime(메인스레드 스냅샷). videoTask 의 Restart() 가 이 값을
+            //   다음 세션으로 리셋하기 전에 고정해야 병렬 logsTask 와 race-free.
+            double recordingStartT = _streamingRecorder?.RecordingStartRealtime ?? 0.0;
+            //   영상의 실제 wall 길이(초). 추출(itsscale)·메타데이터가 같은 값을 공유해
+            //   mp4 duration == video_duration_s == wallSpan 불변식을 정확히 충족시킨다.
+            double videoWallSpan = (recordingStartT > 0.0 && captureTriggerT > recordingStartT)
+                ? captureTriggerT - recordingStartT
+                : 0.0;
 
             // 임시 디렉토리 생성
             string captureDir = CreateCaptureDirectory(result.Timestamp);
@@ -266,9 +274,9 @@ namespace RekonOps.Rekon
                 var screenshotTask = _settings.videoEnabled
                     ? Task.CompletedTask
                     : CaptureScreenshotAsync(captureDir, result, cts.Token);
-                var logsTask = CaptureLogsAsync(captureDir, result, captureTriggerT, videoFramesAtTrigger, cts.Token);
+                var logsTask = CaptureLogsAsync(captureDir, result, captureTriggerT, videoFramesAtTrigger, recordingStartT, videoWallSpan, cts.Token);
                 var stateTask = CaptureStateAsync(captureDir, result, cts.Token);
-                var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);
+                var videoTask = CaptureVideoAsync(captureDir, result, videoWallSpan, cts.Token);
 
                 await Task.WhenAll(screenshotTask, logsTask, stateTask, videoTask);
 
@@ -536,7 +544,7 @@ namespace RekonOps.Rekon
             }
         }
 
-        private async Task CaptureLogsAsync(string dir, CaptureResult result, double captureTriggerT, long videoFramesAtTrigger, CancellationToken token)
+        private async Task CaptureLogsAsync(string dir, CaptureResult result, double captureTriggerT, long videoFramesAtTrigger, double recordingStartT, double videoWallSpan, CancellationToken token)
         {
             try
             {
@@ -553,11 +561,13 @@ namespace RekonOps.Rekon
                     result.LogsPath = jsonlPath;
 
                     // 영상 시작/길이 산출 (realtime 단일 축, clock_offset=0).
-                    //   스트리밍 모드(프로덕션 기본)에선 레거시 링버퍼(_frameBuffer)가 항상 비므로,
-                    //   인코딩 길이(FramesWritten/fps)로 역산한다. -sseof 로 마지막 N초만 추출하므로
-                    //   min(buffer, encoded) 사용. 인코딩 길이 기준이라 클립 "끝"(=캡처 트리거 시점)이
-                    //   정확히 맞는다(프레임 드랍 시 시작쪽만 어긋남 — 감수).
-                    //   비스트리밍(FFmpeg 미설치) 경로만 기존 링버퍼 실측(unscaled)으로 fallback.
+                    //   스트리밍 모드(프로덕션 기본)에선 레거시 링버퍼(_frameBuffer)가 항상 비므로
+                    //   wall 길이/인코딩 길이로 산출한다.
+                    //   ── B1 스트레치 경로(canStretch): 추출 시 itsscale 로 mp4 를 wall 길이로 펴므로
+                    //      mp4 duration == video_duration_s == wallSpan, video_start == 녹화시작.
+                    //      추출부(StopAndExtractAsync)와 동일한 공유 기준(wallSpan, buffer)으로 판정 → 정확 일치.
+                    //   ── 비스트레치(세션>buffer 등): 기존 Tier-1 식 유지(인코딩 길이 역산, 클립 끝 정렬).
+                    //   ── 비스트리밍(FFmpeg 미설치): 기존 링버퍼 실측(unscaled)으로 fallback.
                     double videoStartT;
                     double videoDurationS;
                     if (_streamingRecorder != null && _settings != null && _settings.videoEnabled)
@@ -565,8 +575,20 @@ namespace RekonOps.Rekon
                         int fps = Mathf.Max(1, _settings.videoFps);
                         int bufferSeconds = _settings.videoBufferSeconds; // StopAndExtractAsync 에 넘기는 값과 동일
                         double encodedSeconds = videoFramesAtTrigger / (double)fps;
-                        videoDurationS = System.Math.Min(bufferSeconds, encodedSeconds);
-                        videoStartT    = captureTriggerT - videoDurationS; // realtime 축
+                        // 추출부와 동일한 공유 조건(wallSpan>0.5 && wallSpan<=buffer+1 && encoded>0.1)
+                        bool canStretch = videoWallSpan > 0.5
+                                          && videoWallSpan <= bufferSeconds + 1.0
+                                          && encodedSeconds > 0.1;
+                        if (canStretch)
+                        {
+                            videoDurationS = videoWallSpan;          // itsscale 로 펴진 실제 mp4 길이
+                            videoStartT    = recordingStartT;         // = captureTriggerT - wallSpan
+                        }
+                        else
+                        {
+                            videoDurationS = System.Math.Min(bufferSeconds, encodedSeconds);
+                            videoStartT    = captureTriggerT - videoDurationS; // realtime 축
+                        }
                     }
                     else
                     {
@@ -737,7 +759,7 @@ namespace RekonOps.Rekon
             }
         }
 
-        private async Task CaptureVideoAsync(string dir, CaptureResult result, CancellationToken token)
+        private async Task CaptureVideoAsync(string dir, CaptureResult result, double videoWallSpan, CancellationToken token)
         {
             try
             {
@@ -754,7 +776,8 @@ namespace RekonOps.Rekon
                 if (_streamingRecorder != null && _streamingRecorder.IsRecording)
                 {
                     int bufferSeconds = _settings != null ? _settings.videoBufferSeconds : 60;
-                    string videoPath = await _streamingRecorder.StopAndExtractAsync(bufferSeconds);
+                    // wall 길이를 함께 전달 → 추출 시 itsscale 로 저캡처 빨리감기 보정(메타데이터와 동일 기준).
+                    string videoPath = await _streamingRecorder.StopAndExtractAsync(bufferSeconds, videoWallSpan);
 
                     if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))
                     {

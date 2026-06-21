@@ -1,9 +1,10 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using UnityEditor;
-using UnityEditor.PackageManager;
 using UnityEngine;
 using RekonSdk = RekonOps.Rekon.Rekon;
+// PackageInfo 는 UnityEditor.PackageInfo 와 이름이 충돌하므로 alias 로 명시.
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace RekonOps.Rekon.Editor
 {

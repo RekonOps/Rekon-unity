@@ -3,8 +3,8 @@
 > Unity 게임 개발자를 위한 원클릭 버그 리포팅 플러그인 -- 플레이 모드에서 영상/스크린샷/로그를 자동 캡처하여 **웹 대시보드에 저장**하고, Jira 이슈 등록은 웹 대시보드에서 수행합니다.
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.5.0-brightgreen.svg)](CHANGELOG.md)
 
 ---
 
@@ -218,6 +218,6 @@ if ($expected -eq $actual) { "OK" } else { "FAIL" }
 
 ## 라이선스
 
-이 프로젝트는 **MIT 라이선스**로 제공됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+이 프로젝트는 **Apache License 2.0**으로 제공됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 
 Copyright 2026 RekonOps

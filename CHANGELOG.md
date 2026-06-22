@@ -7,6 +7,9 @@
 
 ## [Unreleased]
 
+### 변경
+- **라이선스 변경**: Business Source License 1.1 → **Apache License 2.0** (OSI 오픈소스). Unity SDK 클라이언트를 OpenUPM 등 공개 레지스트리로 배포 가능하게 함. 백엔드/제품은 별도 라이선스 유지.
+
 ---
 
 ## [0.5.0] - 2026-06-21

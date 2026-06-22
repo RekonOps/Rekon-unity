@@ -181,8 +181,7 @@ Runtime/           # 핵심 런타임 모듈
   Video/           # 프레임 캡처, 링 버퍼, MP4 인코딩
 Editor/            # 에디터 UI (Settings 패널, Bundle Manager)
 Tests/             # EditMode / PlayMode 테스트
-Samples~/          # 사용 예제 (커스텀 컨텍스트)
-docs/              # 사용자 가이드, API 레퍼런스
+Samples~/          # 사용 예제 (Rekon.Capture + 콘솔 로그 캡처)
 ```
 
 ---

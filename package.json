@@ -19,5 +19,12 @@
   "changelogUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/LICENSE",
   "documentationUrl": "https://github.com/RekonOps/Rekon-unity#readme",
+  "samples": [
+    {
+      "displayName": "Basic Demo",
+      "description": "Rekon.Capture 트리거 + 콘솔 로그 자동 캡처 예제",
+      "path": "Samples~/BasicDemo"
+    }
+  ],
   "dependencies": {}
 }

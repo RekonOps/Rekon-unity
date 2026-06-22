@@ -15,3 +15,6 @@ CLAUDE.md.meta
 .claude.meta
 .github/
 .github.meta
+# 백엔드 이관 후 남은 잔여 — SDK 사용자와 무관 (배포 제외)
+.env.example
+.env.example.meta

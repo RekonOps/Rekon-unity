@@ -18,5 +18,6 @@
   },
   "changelogUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/RekonOps/Rekon-unity#readme",
   "dependencies": {}
 }

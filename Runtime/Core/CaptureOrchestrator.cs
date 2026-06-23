@@ -277,10 +277,9 @@ namespace RekonOps.Rekon
                 // 성능 타임라인은 부트스트랩에서 이미 수집 중 (StartCollecting은 Bootstrap에서 호출)
 
                 // 병렬 수집
-                // 영상 캡처 트리거 시에는 스크린샷을 캡처하지 않음 (별도 스크린샷 트리거 사용)
-                var screenshotTask = _settings.videoEnabled
-                    ? Task.CompletedTask
-                    : CaptureScreenshotAsync(captureDir, result, cts.Token);
+                // 메인 캡처는 스크린샷을 직접 찍지 않는다(영상 on/off 무관). 스크린샷은 전용 큐
+                // (스크린샷 핫키)에서만 수집되어 아래 DrainAll 로 리포트에 동봉된다.
+                var screenshotTask = Task.CompletedTask;
                 var logsTask = CaptureLogsAsync(captureDir, result, captureTriggerT, videoFramesAtTrigger, cts.Token);
                 var stateTask = CaptureStateAsync(captureDir, result, cts.Token);
                 var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);
@@ -401,13 +400,8 @@ namespace RekonOps.Rekon
                 return;
             }
 
-            // 영상 캡처 진행 중이면 스크린샷 캡처 스킵
-            if (Interlocked.CompareExchange(ref _isCapturingFlag, 0, 0) != 0)
-            {
-                Debug.LogWarning("[Rekon] 영상 캡처 진행 중 — 스크린샷 캡처를 건너뜁니다.");
-                return;
-            }
-
+            // 스크린샷 큐는 메인 캡처(영상 등) 진행 여부·videoEnabled 와 무관하게 항상 적재한다.
+            //   (ScreenshotQueue 는 lock 기반 thread-safe — 메인 캡처의 DrainAll 과 동시 enqueue 안전)
             try
             {
                 // team_pro 싱크: 캡처 직전 realtimeSinceStartupAsDouble 을 기록 (로그 t_abs 와 동일한 시간축)

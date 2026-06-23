@@ -107,6 +107,21 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
+        /// 플랜별 영상 버퍼 상한을 적용한 실효(effective) 버퍼 시간을 계산합니다.
+        /// 사용자가 설정한 <paramref name="videoBufferSeconds"/> 가 플랜이 허용하는
+        /// <paramref name="maxAllowedBufferSeconds"/> 를 넘으면 플랜값으로 clamp 합니다.
+        ///   free 60 / team·team_pro 90 (백엔드 validate-license 가 maxAllowedBufferSeconds 로 내려줌).
+        /// maxAllowedBufferSeconds 가 0 이하(=플랜값 미수신)면 clamp 하지 않고 설정값을 그대로 사용합니다.
+        /// 순수 함수 — 테스트 가능하도록 public static 으로 노출합니다.
+        /// </summary>
+        public static int ResolveEffectiveBufferSeconds(int videoBufferSeconds, int maxAllowedBufferSeconds)
+        {
+            return maxAllowedBufferSeconds > 0
+                ? Mathf.Min(videoBufferSeconds, maxAllowedBufferSeconds)
+                : videoBufferSeconds;
+        }
+
+        /// <summary>
         /// SessionTokenStore를 런타임에 바인딩합니다.
         /// 부트스트랩에서 tokenStore 생성 후 오케스트레이터에 주입할 때 사용합니다.
         /// 이미 생성자에서 주입된 경우에도 교체할 수 있습니다.
@@ -408,7 +423,7 @@ namespace RekonOps.Rekon
                 bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow, captureRealtime);
                 int newCount = _screenshotQueue.Count;
 
-                Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{ScreenshotQueue.MaxCapacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
+                Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{_screenshotQueue.Capacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
                 OnScreenshotQueued?.Invoke(newCount, evicted);
             }
             catch (Exception ex)
@@ -563,7 +578,9 @@ namespace RekonOps.Rekon
                     if (_streamingRecorder != null && _settings != null && _settings.videoEnabled)
                     {
                         int fps = Mathf.Max(1, _settings.videoFps);
-                        int bufferSeconds = _settings.videoBufferSeconds; // StopAndExtractAsync 에 넘기는 값과 동일
+                        // 플랜 상한 적용(free 60 / team·pro 90) — StopAndExtractAsync 에 넘기는 값과 동일하게 clamp.
+                        int bufferSeconds = ResolveEffectiveBufferSeconds(
+                            _settings.videoBufferSeconds, _settings.maxAllowedBufferSeconds);
                         double encodedSeconds = videoFramesAtTrigger / (double)fps;
                         videoDurationS = System.Math.Min(bufferSeconds, encodedSeconds);
                         videoStartT    = captureTriggerT - videoDurationS; // realtime 축
@@ -753,7 +770,10 @@ namespace RekonOps.Rekon
                 // ── 스트리밍 모드 ──────────────────────────────────────────────────
                 if (_streamingRecorder != null && _streamingRecorder.IsRecording)
                 {
-                    int bufferSeconds = _settings != null ? _settings.videoBufferSeconds : 60;
+                    // 플랜 상한 적용(free 60 / team·pro 90) — 추출 길이도 동일하게 clamp.
+                    int bufferSeconds = _settings != null
+                        ? ResolveEffectiveBufferSeconds(_settings.videoBufferSeconds, _settings.maxAllowedBufferSeconds)
+                        : 60;
                     string videoPath = await _streamingRecorder.StopAndExtractAsync(bufferSeconds);
 
                     if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))

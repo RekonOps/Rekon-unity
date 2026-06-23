@@ -147,7 +147,7 @@ namespace RekonOps.Rekon
                 var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
 
                 // team_pro 리플레이 로그 컬렉터를 여기서 조기 생성·구독 → 부트스트랩 시작부터 수집.
-                //   (plan 확정 전이라 window 는 기본 180s = team_pro 값. team_pro 아니면 아래 plan 분기에서 dispose)
+                //   (plan 확정 전이라 window 는 maxAllowedBufferSeconds, 미수신 시 free 폴백 60s. team_pro 아니면 아래 plan 분기에서 dispose)
                 //   LogRingBuffer 와 연속 생성(사이 로그 없음)한 뒤, 둘 다 earlyLogs 로 seed 한다.
                 ReplayLogCollector replayLogCollector = null;
                 try
@@ -155,7 +155,7 @@ namespace RekonOps.Rekon
                     replayLogCollector = new ReplayLogCollector(
                         windowSeconds: settings.maxAllowedBufferSeconds > 0
                             ? (double)settings.maxAllowedBufferSeconds
-                            : 180.0,
+                            : 60.0,
                         maxBytes: 32L * 1024 * 1024);
                 }
                 catch (System.Exception replayInitEx)
@@ -235,7 +235,10 @@ namespace RekonOps.Rekon
                 }
 
                 // ── 5. ScreenshotQueue 생성 ───────────────────────────────────────
-                var screenshotQueue = new ScreenshotQueue();
+                // 플랜별 스크린샷 보관 장수 주입(free 3 / team 5 / team_pro 10).
+                //   maxAllowedScreenshotCount 미수신(0 이하)이면 free 기준 3 으로 폴백.
+                var screenshotQueue = new ScreenshotQueue(
+                    Mathf.Max(1, settings.maxAllowedScreenshotCount > 0 ? settings.maxAllowedScreenshotCount : 3));
                 _screenshotQueue = screenshotQueue;
 
                 // ── 6. CaptureOrchestrator 생성 ───────────────────────────────────

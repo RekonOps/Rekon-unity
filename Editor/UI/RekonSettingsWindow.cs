@@ -855,8 +855,8 @@ namespace RekonOps.Rekon.Editor
                     SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
                     EditorGUILayout.IntSlider(
                         bufferSeconds,
-                        10, 180,
-                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~180초)"));
+                        10, 90,
+                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~90초)"));
                 }
             }
 

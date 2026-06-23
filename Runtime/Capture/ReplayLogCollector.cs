@@ -22,7 +22,7 @@ namespace RekonOps.Rekon
     public class ReplayLogCollector : ILogCollector, IDisposable
     {
         // ── 보관 정책 기본값 ────────────────────────────────────────────────
-        private const double DefaultWindowSeconds = 180.0;
+        private const double DefaultWindowSeconds = 60.0;
         private const long   DefaultMaxBytes      = 32L * 1024 * 1024; // 32 MB
 
         // ── 내부 상태 ────────────────────────────────────────────────────────

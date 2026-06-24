@@ -68,7 +68,7 @@ namespace RekonOps.Rekon.Tests
         [Test]
         public void Enqueue_5장_초과_시_가장_오래된_항목_삭제()
         {
-            // 1~5번째 추가 (MaxCapacity 채움)
+            // 1~5번째 추가 (Capacity 채움)
             _queue.Enqueue(SampleBytes1, DateTime.UtcNow);
             _queue.Enqueue(SampleBytes2, DateTime.UtcNow);
             _queue.Enqueue(SampleBytes3, DateTime.UtcNow);
@@ -79,7 +79,7 @@ namespace RekonOps.Rekon.Tests
             _queue.Enqueue(SampleBytes6, DateTime.UtcNow);
 
             var entries = _queue.PeekAll();
-            Assert.AreEqual(ScreenshotQueue.MaxCapacity, entries.Length);
+            Assert.AreEqual(_queue.Capacity, entries.Length);
             Assert.AreNotSame(SampleBytes1, entries[0].PngBytes, "가장 오래된 항목이 삭제되어야 합니다.");
         }
 
@@ -93,7 +93,7 @@ namespace RekonOps.Rekon.Tests
             _queue.Enqueue(SampleBytes5, DateTime.UtcNow);
             _queue.Enqueue(SampleBytes6, DateTime.UtcNow);
 
-            Assert.AreEqual(ScreenshotQueue.MaxCapacity, _queue.Count);
+            Assert.AreEqual(_queue.Capacity, _queue.Count);
         }
 
         [Test]
@@ -199,13 +199,63 @@ namespace RekonOps.Rekon.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
-        // MaxCapacity 상수
+        // Capacity — 플랜별 주입 (free 3 / team 5 / team_pro 10)
         // ──────────────────────────────────────────────────────────────
 
         [Test]
-        public void MaxCapacity는_5()
+        public void Capacity_기본값은_5()
         {
-            Assert.AreEqual(5, ScreenshotQueue.MaxCapacity);
+            // 인자 없는 생성자 = 기존 동작(team 기준 5) 유지
+            Assert.AreEqual(5, new ScreenshotQueue().Capacity);
+        }
+
+        [Test]
+        public void Capacity_생성자_주입값_반영()
+        {
+            Assert.AreEqual(3, new ScreenshotQueue(3).Capacity);
+            Assert.AreEqual(10, new ScreenshotQueue(10).Capacity);
+        }
+
+        [Test]
+        public void Capacity_1미만_주입_시_5로_가드()
+        {
+            Assert.AreEqual(5, new ScreenshotQueue(0).Capacity);
+            Assert.AreEqual(5, new ScreenshotQueue(-1).Capacity);
+        }
+
+        [Test]
+        public void Capacity_10_team_pro_11번째에서_가장_오래된_항목_eviction()
+        {
+            var queue = new ScreenshotQueue(10);
+            for (int i = 0; i < 10; i++)
+                queue.Enqueue(new byte[] { 0x89, (byte)i }, DateTime.UtcNow);
+
+            Assert.AreEqual(10, queue.Count, "10장까지는 eviction 없이 채워져야 합니다.");
+
+            byte[] first = new byte[] { 0x89, 0x00 };
+            // 11번째 → eviction 발생, Count 는 10 유지
+            bool evicted = queue.Enqueue(new byte[] { 0x89, 0xAA }, DateTime.UtcNow);
+
+            Assert.IsTrue(evicted, "11번째 추가 시 eviction 이 발생해야 합니다.");
+            Assert.AreEqual(10, queue.Count);
+            Assert.AreNotSame(first, queue.PeekAll()[0].PngBytes, "가장 오래된 항목이 삭제되어야 합니다.");
+        }
+
+        [Test]
+        public void Capacity_3_free_4번째에서_eviction()
+        {
+            var queue = new ScreenshotQueue(3);
+            queue.Enqueue(SampleBytes1, DateTime.UtcNow);
+            queue.Enqueue(SampleBytes2, DateTime.UtcNow);
+            queue.Enqueue(SampleBytes3, DateTime.UtcNow);
+
+            Assert.AreEqual(3, queue.Count);
+
+            bool evicted = queue.Enqueue(SampleBytes4, DateTime.UtcNow);
+
+            Assert.IsTrue(evicted, "4번째 추가 시 eviction 이 발생해야 합니다.");
+            Assert.AreEqual(3, queue.Count);
+            Assert.AreNotSame(SampleBytes1, queue.PeekAll()[0].PngBytes, "가장 오래된 항목(SampleBytes1)이 삭제되어야 합니다.");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -332,7 +382,7 @@ namespace RekonOps.Rekon.Tests
             }
 
             Assert.DoesNotThrow(() => Task.WaitAll(tasks), "멀티스레드 동시 Enqueue에서 예외가 발생하지 않아야 합니다.");
-            Assert.LessOrEqual(_queue.Count, ScreenshotQueue.MaxCapacity, $"Count는 MaxCapacity({ScreenshotQueue.MaxCapacity})를 초과할 수 없습니다.");
+            Assert.LessOrEqual(_queue.Count, _queue.Capacity, $"Count는 Capacity({_queue.Capacity})를 초과할 수 없습니다.");
         }
     }
 }

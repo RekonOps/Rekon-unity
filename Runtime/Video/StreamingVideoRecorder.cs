@@ -360,7 +360,9 @@ namespace RekonOps.Rekon
             {
                 case "h264_nvenc": return "-c:v h264_nvenc -preset p4 -rc vbr -cq 23";
                 case "h264_amf": return "-c:v h264_amf -quality speed -rc cqp -qp_i 23 -qp_p 23";
-                case "h264_videotoolbox": return "-c:v h264_videotoolbox";
+                // videotoolbox 는 cap 미지정 시 기본 고비트레이트(~20Mbps)로 인코딩 → 90초 1080p 가 230MB+.
+                //   1080p 화질 유지하며 12Mbps 로 cap (90초 ≈ 135MB, 백엔드 한도 내). maxrate 로 피크 제한.
+                case "h264_videotoolbox": return "-c:v h264_videotoolbox -b:v 12M -maxrate 14M -bufsize 28M";
                 case "h264_qsv": return "-c:v h264_qsv -preset veryfast -global_quality 23";
                 default: return "-c:v libx264 -preset ultrafast -crf 23";
             }

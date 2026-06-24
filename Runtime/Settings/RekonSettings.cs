@@ -117,7 +117,7 @@ namespace RekonOps.Rekon
         public int videoFps = 30;
 
         [Tooltip("Video buffer duration in seconds")]
-        [Range(10, 180)]
+        [Range(10, 90)]
         public int videoBufferSeconds = 60;
 
         [Tooltip("Target bitrate in Mbps")]
@@ -256,7 +256,7 @@ namespace RekonOps.Rekon
         [NonSerialized] public string currentPlan = "free";
 
         /// <summary>플랜이 허용하는 최대 버퍼 시간(초). 라이선스 검증 후 갱신됩니다.</summary>
-        [NonSerialized] public int maxAllowedBufferSeconds = 180;
+        [NonSerialized] public int maxAllowedBufferSeconds = 60;
 
         /// <summary>플랜이 허용하는 최대 스크린샷 개수. 라이선스 검증 후 갱신됩니다.</summary>
         [NonSerialized] public int maxAllowedScreenshotCount = 3;

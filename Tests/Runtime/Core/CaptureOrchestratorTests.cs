@@ -657,6 +657,49 @@ namespace RekonOps.Rekon.Tests
         }
 
         // ──────────────────────────────────────────────────────────────
+        // 영상 버퍼 플랜 clamp — ResolveEffectiveBufferSeconds
+        // ──────────────────────────────────────────────────────────────
+
+        [Test]
+        public void ResolveEffectiveBufferSeconds_플랜상한_초과_시_플랜값으로_clamp()
+        {
+            // free(maxAllowed=60) 인데 설정이 90 → 60 으로 clamp
+            int effective = CaptureOrchestrator.ResolveEffectiveBufferSeconds(
+                videoBufferSeconds: 90, maxAllowedBufferSeconds: 60);
+
+            Assert.AreEqual(60, effective);
+        }
+
+        [Test]
+        public void ResolveEffectiveBufferSeconds_플랜상한_이내면_설정값_유지()
+        {
+            // team/pro(maxAllowed=90) 이고 설정이 90 → 90 그대로
+            int effective = CaptureOrchestrator.ResolveEffectiveBufferSeconds(
+                videoBufferSeconds: 90, maxAllowedBufferSeconds: 90);
+
+            Assert.AreEqual(90, effective);
+        }
+
+        [Test]
+        public void ResolveEffectiveBufferSeconds_설정이_상한보다_작으면_설정값_유지()
+        {
+            int effective = CaptureOrchestrator.ResolveEffectiveBufferSeconds(
+                videoBufferSeconds: 30, maxAllowedBufferSeconds: 90);
+
+            Assert.AreEqual(30, effective);
+        }
+
+        [Test]
+        public void ResolveEffectiveBufferSeconds_상한_미수신_0이면_clamp_안함()
+        {
+            // maxAllowedBufferSeconds 미수신(0) → 설정값을 그대로 사용
+            int effective = CaptureOrchestrator.ResolveEffectiveBufferSeconds(
+                videoBufferSeconds: 90, maxAllowedBufferSeconds: 0);
+
+            Assert.AreEqual(90, effective);
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // 헬퍼
         // ──────────────────────────────────────────────────────────────
 

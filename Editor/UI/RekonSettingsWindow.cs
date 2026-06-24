@@ -13,7 +13,7 @@ namespace RekonOps.Rekon.Editor
     ///
     /// 단일 스크롤 윈도우 + 접이식(Foldout) 섹션 구조:
     ///   웹 연동       - 연동 상태 표시, 웹 대시보드 연동 버튼
-    ///   캡처 설정     - 영상(활성화/버퍼 시간), 공통(미니 바 위치), 로그
+    ///   캡처 설정     - 영상(활성화/버퍼 시간), 스크린샷 미니바(위치), 로그
     ///   리포트 설정   - 제목 접두어, 타임스탬프 형식, 메타데이터 토글
     ///   단축키        - 캡처 핫키 (Mac/Windows 플랫폼별)
     ///   고급          - 디버그 로그, 팀 ID (디버그 시에만)
@@ -753,17 +753,17 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUILayout.Space(4f);
 
-            // ── 공통 (캡처 공통 설정) 박스 ──────────────────────────────────────
+            // ── 스크린샷 미니바 박스 ──────────────────────────────────────
             BeginSectionBox();
-            DrawSectionHeader("공통");
+            DrawSectionHeader("스크린샷 미니바");
 
-            // 미니 바 위치 (영상/스크린샷 공통 오버레이)
+            // 스크린샷 큐 잔량 인디케이터(📸 N/N) 표시 위치
             if (_screenshotMiniBarPosition == null)
                 _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
             if (_screenshotMiniBarPosition != null)
                 EditorGUILayout.PropertyField(
                     _screenshotMiniBarPosition,
-                    new GUIContent("미니 바 위치", "캡처 미니 바 표시 위치"));
+                    new GUIContent("미니 바 위치", "스크린샷 캡처 큐(📸 N/N) 미니바 표시 위치"));
 
             EndSectionBox();
 

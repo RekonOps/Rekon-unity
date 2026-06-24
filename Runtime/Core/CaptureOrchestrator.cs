@@ -107,6 +107,21 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
+        /// 플랜별 영상 버퍼 상한을 적용한 실효(effective) 버퍼 시간을 계산합니다.
+        /// 사용자가 설정한 <paramref name="videoBufferSeconds"/> 가 플랜이 허용하는
+        /// <paramref name="maxAllowedBufferSeconds"/> 를 넘으면 플랜값으로 clamp 합니다.
+        ///   free 60 / team·team_pro 90 (백엔드 validate-license 가 maxAllowedBufferSeconds 로 내려줌).
+        /// maxAllowedBufferSeconds 가 0 이하(=플랜값 미수신)면 clamp 하지 않고 설정값을 그대로 사용합니다.
+        /// 순수 함수 — 테스트 가능하도록 public static 으로 노출합니다.
+        /// </summary>
+        public static int ResolveEffectiveBufferSeconds(int videoBufferSeconds, int maxAllowedBufferSeconds)
+        {
+            return maxAllowedBufferSeconds > 0
+                ? Mathf.Min(videoBufferSeconds, maxAllowedBufferSeconds)
+                : videoBufferSeconds;
+        }
+
+        /// <summary>
         /// SessionTokenStore를 런타임에 바인딩합니다.
         /// 부트스트랩에서 tokenStore 생성 후 오케스트레이터에 주입할 때 사용합니다.
         /// 이미 생성자에서 주입된 경우에도 교체할 수 있습니다.
@@ -262,10 +277,9 @@ namespace RekonOps.Rekon
                 // 성능 타임라인은 부트스트랩에서 이미 수집 중 (StartCollecting은 Bootstrap에서 호출)
 
                 // 병렬 수집
-                // 영상 캡처 트리거 시에는 스크린샷을 캡처하지 않음 (별도 스크린샷 트리거 사용)
-                var screenshotTask = _settings.videoEnabled
-                    ? Task.CompletedTask
-                    : CaptureScreenshotAsync(captureDir, result, cts.Token);
+                // 메인 캡처는 스크린샷을 직접 찍지 않는다(영상 on/off 무관). 스크린샷은 전용 큐
+                // (스크린샷 핫키)에서만 수집되어 아래 DrainAll 로 리포트에 동봉된다.
+                var screenshotTask = Task.CompletedTask;
                 var logsTask = CaptureLogsAsync(captureDir, result, captureTriggerT, videoFramesAtTrigger, cts.Token);
                 var stateTask = CaptureStateAsync(captureDir, result, cts.Token);
                 var videoTask = CaptureVideoAsync(captureDir, result, cts.Token);
@@ -386,13 +400,8 @@ namespace RekonOps.Rekon
                 return;
             }
 
-            // 영상 캡처 진행 중이면 스크린샷 캡처 스킵
-            if (Interlocked.CompareExchange(ref _isCapturingFlag, 0, 0) != 0)
-            {
-                Debug.LogWarning("[Rekon] 영상 캡처 진행 중 — 스크린샷 캡처를 건너뜁니다.");
-                return;
-            }
-
+            // 스크린샷 큐는 메인 캡처(영상 등) 진행 여부·videoEnabled 와 무관하게 항상 적재한다.
+            //   (ScreenshotQueue 는 lock 기반 thread-safe — 메인 캡처의 DrainAll 과 동시 enqueue 안전)
             try
             {
                 // team_pro 싱크: 캡처 직전 realtimeSinceStartupAsDouble 을 기록 (로그 t_abs 와 동일한 시간축)
@@ -408,7 +417,7 @@ namespace RekonOps.Rekon
                 bool evicted = _screenshotQueue.Enqueue(pngBytes, DateTime.UtcNow, captureRealtime);
                 int newCount = _screenshotQueue.Count;
 
-                Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{ScreenshotQueue.MaxCapacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
+                Debug.Log($"[Rekon] 스크린샷 큐 추가 완료 ({newCount}/{_screenshotQueue.Capacity}){(evicted ? " — 오래된 항목 교체됨" : "")}");
                 OnScreenshotQueued?.Invoke(newCount, evicted);
             }
             catch (Exception ex)
@@ -563,7 +572,9 @@ namespace RekonOps.Rekon
                     if (_streamingRecorder != null && _settings != null && _settings.videoEnabled)
                     {
                         int fps = Mathf.Max(1, _settings.videoFps);
-                        int bufferSeconds = _settings.videoBufferSeconds; // StopAndExtractAsync 에 넘기는 값과 동일
+                        // 플랜 상한 적용(free 60 / team·pro 90) — StopAndExtractAsync 에 넘기는 값과 동일하게 clamp.
+                        int bufferSeconds = ResolveEffectiveBufferSeconds(
+                            _settings.videoBufferSeconds, _settings.maxAllowedBufferSeconds);
                         double encodedSeconds = videoFramesAtTrigger / (double)fps;
                         videoDurationS = System.Math.Min(bufferSeconds, encodedSeconds);
                         videoStartT    = captureTriggerT - videoDurationS; // realtime 축
@@ -753,7 +764,10 @@ namespace RekonOps.Rekon
                 // ── 스트리밍 모드 ──────────────────────────────────────────────────
                 if (_streamingRecorder != null && _streamingRecorder.IsRecording)
                 {
-                    int bufferSeconds = _settings != null ? _settings.videoBufferSeconds : 60;
+                    // 플랜 상한 적용(free 60 / team·pro 90) — 추출 길이도 동일하게 clamp.
+                    int bufferSeconds = _settings != null
+                        ? ResolveEffectiveBufferSeconds(_settings.videoBufferSeconds, _settings.maxAllowedBufferSeconds)
+                        : 60;
                     string videoPath = await _streamingRecorder.StopAndExtractAsync(bufferSeconds);
 
                     if (!string.IsNullOrEmpty(videoPath) && File.Exists(videoPath))

@@ -11,7 +11,7 @@ namespace RekonOps.Rekon
     {
         // ⚠️ package.json 의 version 과 자동 동기화됩니다(Editor/RekonVersionSync.cs).
         //    직접 수정하지 마세요 — 에디터 로드 시 자동 갱신됩니다(immutable 설치면 릴리스 값 유지).
-        public const string Version = "0.5.0";
+        public const string Version = "0.5.1";
         public const string DisplayName = "Rekon";
 
         /// <summary>

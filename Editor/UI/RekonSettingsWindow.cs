@@ -13,7 +13,7 @@ namespace RekonOps.Rekon.Editor
     ///
     /// 단일 스크롤 윈도우 + 접이식(Foldout) 섹션 구조:
     ///   웹 연동       - 연동 상태 표시, 웹 대시보드 연동 버튼
-    ///   캡처 설정     - 영상 프리셋, 해상도/FPS/비트레이트/버퍼, 스크린샷, 로그
+    ///   캡처 설정     - 영상(활성화/버퍼 시간), 스크린샷 미니바(위치), 로그
     ///   리포트 설정   - 제목 접두어, 타임스탬프 형식, 메타데이터 토글
     ///   단축키        - 캡처 핫키 (Mac/Windows 플랫폼별)
     ///   고급          - 디버그 로그, 팀 ID (디버그 시에만)
@@ -71,10 +71,6 @@ namespace RekonOps.Rekon.Editor
             KeyCode.Backslash, KeyCode.Slash,
             KeyCode.Pause, KeyCode.ScrollLock,
         };
-
-        // ─── 영상 프리셋 레이블 ─────────────────────────────────────────────────
-
-        private static readonly string[] s_PresetLabels = { "권장", "고화질", "경량", "커스텀" };
 
         private static readonly string[] s_TimestampLabels =
         {
@@ -757,22 +753,17 @@ namespace RekonOps.Rekon.Editor
 
             EditorGUILayout.Space(4f);
 
-            // ── 스크린샷 캡처 설정 박스 ──────────────────────────────────────
+            // ── 스크린샷 미니바 박스 ──────────────────────────────────────
             BeginSectionBox();
-            DrawSectionHeader("스크린샷 캡처 설정");
-            SerializedProperty downscale = _serializedSettings.FindProperty("screenshotDownscale");
-            EditorGUILayout.IntSlider(
-                downscale,
-                1, 4,
-                new GUIContent("다운스케일 배율", "1 = 원본 해상도, 2 = 절반, 4 = 1/4 크기"));
+            DrawSectionHeader("스크린샷 미니바");
 
-            // 미니 바 위치 드롭다운
+            // 스크린샷 큐 잔량 인디케이터(📸 N/N) 표시 위치
             if (_screenshotMiniBarPosition == null)
                 _screenshotMiniBarPosition = _serializedSettings.FindProperty("screenshotMiniBarPosition");
             if (_screenshotMiniBarPosition != null)
                 EditorGUILayout.PropertyField(
                     _screenshotMiniBarPosition,
-                    new GUIContent("미니 바 위치", "스크린샷 미니 바 표시 위치"));
+                    new GUIContent("미니 바 위치", "스크린샷 캡처 큐(📸 N/N) 미니바 표시 위치"));
 
             EndSectionBox();
 
@@ -802,64 +793,34 @@ namespace RekonOps.Rekon.Editor
                 videoEnabled,
                 new GUIContent("영상 캡처 활성화", "Play Mode에서 영상 링 버퍼 녹화 활성화"));
 
+            // 프리셋은 '권장'으로 고정한다. 해상도/FPS/비트레이트는 UI에 노출하지 않고
+            // 권장값을 사용하며, 사용자가 조정하는 값은 버퍼 시간뿐이다(상한은 플랜에 따름).
+            NormalizeToRecommendedSpec();
+
             bool enabled = videoEnabled.boolValue;
             using (new EditorGUI.DisabledScope(!enabled))
             {
-                // 프리셋 드롭다운
-                SerializedProperty presetProp = _serializedSettings.FindProperty("videoPreset");
-                EditorGUI.BeginChangeCheck();
-                int newPreset = EditorGUILayout.Popup(
-                    new GUIContent("영상 프리셋", "프리셋 선택 시 해상도/FPS/비트레이트/버퍼가 자동 설정됩니다"),
-                    presetProp.intValue,
-                    s_PresetLabels);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    presetProp.intValue = newPreset;
-                    ApplyVideoPreset((VideoPreset)newPreset);
-                }
-
-                EditorGUILayout.Space(4f);
-
-                // 커스텀이 아닐 때는 읽기 전용으로 표시, 커스텀일 때만 편집 가능
-                bool isCustom = (VideoPreset)presetProp.intValue == VideoPreset.Custom;
-
-                using (new EditorGUI.DisabledScope(!isCustom))
-                {
-                    SerializedProperty videoWidth  = _serializedSettings.FindProperty("videoWidth");
-                    SerializedProperty videoHeight = _serializedSettings.FindProperty("videoHeight");
-
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        EditorGUILayout.PrefixLabel("해상도 (W x H)");
-                        videoWidth.intValue  = EditorGUILayout.IntField(videoWidth.intValue);
-                        EditorGUILayout.LabelField("x", GUILayout.Width(14f));
-                        videoHeight.intValue = EditorGUILayout.IntField(videoHeight.intValue);
-                    }
-
-                    // 해상도 값 클램프
-                    videoWidth.intValue  = Mathf.Clamp(videoWidth.intValue,  320, 7680);
-                    videoHeight.intValue = Mathf.Clamp(videoHeight.intValue, 240, 4320);
-
-                    SerializedProperty videoFps = _serializedSettings.FindProperty("videoFps");
-                    EditorGUILayout.IntSlider(
-                        videoFps,
-                        15, 60,
-                        new GUIContent("FPS", "초당 프레임 수 (15~60)"));
-
-                    SerializedProperty bitrate = _serializedSettings.FindProperty("videoBitrateMbps");
-                    EditorGUILayout.Slider(
-                        bitrate,
-                        1f, 20f,
-                        new GUIContent("비트레이트 (Mbps)", "목표 영상 비트레이트 (1~20Mbps)"));
-
-                    SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
-                    EditorGUILayout.IntSlider(
-                        bufferSeconds,
-                        10, 180,
-                        new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이 (10~180초)"));
-                }
+                SerializedProperty bufferSeconds = _serializedSettings.FindProperty("videoBufferSeconds");
+                EditorGUILayout.IntSlider(
+                    bufferSeconds,
+                    10, 90,
+                    new GUIContent("버퍼 시간 (초)", "링 버퍼에 보관하는 영상 길이. 상한은 플랜에 따름 (Free 60 / Team·Pro 90)."));
             }
+        }
 
+        /// <summary>
+        /// 영상 프리셋을 '권장'으로 고정합니다. 권장이 아니면 정규화하면서 해상도/FPS/비트레이트를
+        /// 권장값으로 맞추되, 사용자 설정인 버퍼 시간은 보존합니다.
+        /// </summary>
+        private void NormalizeToRecommendedSpec()
+        {
+            SerializedProperty preset = _serializedSettings.FindProperty("videoPreset");
+            if (preset.intValue == (int)VideoPreset.Recommended) return;
+
+            int userBuffer = _serializedSettings.FindProperty("videoBufferSeconds").intValue;
+            preset.intValue = (int)VideoPreset.Recommended;
+            ApplyVideoPreset(VideoPreset.Recommended);   // 해상도/FPS/비트레이트(+버퍼) 권장값 적용
+            _serializedSettings.FindProperty("videoBufferSeconds").intValue = userBuffer; // 버퍼는 사용자값 보존
         }
 
         /// <summary>

@@ -365,10 +365,11 @@ namespace RekonOps.Rekon
         /// </summary>
         private void HandleScreenshotQueued(int count, bool evicted)
         {
+            int cap = _screenshotQueue != null ? _screenshotQueue.Capacity : count;
             if (evicted)
-                _toastText = $"캡처 완료 ({count}/{ScreenshotQueue.MaxCapacity}) — 가장 오래된 스크린샷이 교체됨";
+                _toastText = $"캡처 완료 ({count}/{cap}) — 가장 오래된 스크린샷이 교체됨";
             else
-                _toastText = $"캡처 완료 ({count}/{ScreenshotQueue.MaxCapacity})";
+                _toastText = $"캡처 완료 ({count}/{cap})";
             _toastTimer = ToastDuration;
         }
 
@@ -632,7 +633,7 @@ namespace RekonOps.Rekon
 
             GUI.Label(
                 labelRect,
-                $"\ud83d\udcf8 {count}/{ScreenshotQueue.MaxCapacity}장",
+                $"\ud83d\udcf8 {count}/{_screenshotQueue.Capacity}장",
                 _miniBarLabelStyle ?? GUI.skin.label);
 
             // 세로 구분선

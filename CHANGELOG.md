@@ -9,6 +9,24 @@
 
 ---
 
+## [0.5.1] - 2026-06-28
+
+### 추가
+- **영상 길이 플랜 clamp**: free 60초 / team·team_pro 90초로 캡처 길이 제한 (라이선스 캐시 `maxAllowedBufferSeconds` 기반). 스크린샷 큐 capacity 플랜 배선(free 3 / team 5 / team_pro 10).
+- **Rekon.Version 자동 동기화**: package.json version 을 정본으로 `Runtime/Rekon.cs` Version 리터럴을 에디터 로드 시 자동 갱신(`Editor/RekonVersionSync.cs`).
+
+### 변경
+- **라이선스 변경**: Business Source License 1.1 → **Apache License 2.0** (OSI 오픈소스). Unity SDK 클라이언트를 OpenUPM 등 공개 레지스트리로 배포 가능하게 함. 백엔드/제품은 별도 라이선스 유지.
+- **캡처 설정 UI 단순화(B안)**: 프리셋을 권장값으로 고정, 해상도/FPS/비트레이트/다운스케일 노출 제거 — 활성화 + 버퍼만 노출. 스크린샷 미니바 위치 설정 섹션명 정정.
+- **OpenUPM 배포 준비**: package.json `documentationUrl` 추가 + `.upmignore` 에 잔여 `.env.example` 제외. BasicDemo 샘플을 Capture + 콘솔 로그 캡처 중심으로 슬림화.
+
+### 수정
+- **videotoolbox 비트레이트 12Mbps cap**: 1080p 유지하면서 90초 영상이 백엔드 한도(300MB)를 넘던 413 file_too_large 방지 (`-b:v 12M -maxrate 14M -bufsize 28M`).
+- **스크린샷 큐를 메인 캡처와 완전 분리**: videoEnabled 와 무관하게 스크린샷 독립 스택(롱프레스 전송) + 큐 capacity 플랜 적용.
+- **RekonVersionSync PackageInfo 모호성(CS0104) 수정**: `UnityEditor.PackageManager.PackageInfo` alias 명시.
+
+---
+
 ## [0.5.0] - 2026-06-21
 
 ### 추가

@@ -143,11 +143,38 @@ namespace RekonOps.Rekon
                 // 이른 tap 버퍼 회수: 컬렉터 구독 직전에 unsubscribe → 중복/누락 없이 인계.
                 LogEntry[] earlyLogs = DrainEarlyLogs();
 
+                // 토큰 스토어 + 라이선스 캐시 플랜 복원 — 컬렉터/큐 생성보다 먼저 수행해야
+                //   maxAllowedBufferSeconds(replay window) / maxAllowedScreenshotCount(큐 capacity)가
+                //   플랜값(free/team/team_pro)으로 반영된다. (빌드: NonSerialized 기본값으로 시작하므로 필수)
+                var tokenStore = new SessionTokenStore();
+                if (settings.isLinked)
+                {
+                    try
+                    {
+                        var licenseValidator = new LicenseValidator(
+                            RekonSettings.WEB_DASHBOARD_URL, tokenStore);
+                        var cached = licenseValidator.GetCachedLicense();
+                        if (cached != null && cached.Valid && !string.IsNullOrEmpty(cached.Plan))
+                        {
+                            settings.currentPlan               = cached.Plan;
+                            settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
+                            settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
+                            Debug.Log($"[Rekon] 캐시에서 플랜 복원: plan={cached.Plan}, " +
+                                      $"maxBuffer={cached.MaxBufferSeconds}초, " +
+                                      $"maxScreenshot={cached.MaxScreenshotCount}개");
+                        }
+                    }
+                    catch (System.Exception licEx)
+                    {
+                        Debug.LogWarning($"[Rekon] 라이선스 캐시 복원 실패 (free 플랜으로 유지): {licEx.Message}");
+                    }
+                }
+
                 // 로그 링버퍼: Application.logMessageReceivedThreaded 구독 시작
                 var logRingBuffer = new LogRingBuffer(settings.logBufferSize);
 
                 // team_pro 리플레이 로그 컬렉터를 여기서 조기 생성·구독 → 부트스트랩 시작부터 수집.
-                //   (plan 확정 전이라 window 는 기본 180s = team_pro 값. team_pro 아니면 아래 plan 분기에서 dispose)
+                //   (plan 확정 전이라 window 는 maxAllowedBufferSeconds, 미수신 시 free 폴백 60s. team_pro 아니면 아래 plan 분기에서 dispose)
                 //   LogRingBuffer 와 연속 생성(사이 로그 없음)한 뒤, 둘 다 earlyLogs 로 seed 한다.
                 ReplayLogCollector replayLogCollector = null;
                 try
@@ -155,7 +182,7 @@ namespace RekonOps.Rekon
                     replayLogCollector = new ReplayLogCollector(
                         windowSeconds: settings.maxAllowedBufferSeconds > 0
                             ? (double)settings.maxAllowedBufferSeconds
-                            : 180.0,
+                            : 60.0,
                         maxBytes: 32L * 1024 * 1024);
                 }
                 catch (System.Exception replayInitEx)
@@ -235,7 +262,10 @@ namespace RekonOps.Rekon
                 }
 
                 // ── 5. ScreenshotQueue 생성 ───────────────────────────────────────
-                var screenshotQueue = new ScreenshotQueue();
+                // 플랜별 스크린샷 보관 장수 주입(free 3 / team 5 / team_pro 10).
+                //   maxAllowedScreenshotCount 미수신(0 이하)이면 free 기준 3 으로 폴백.
+                var screenshotQueue = new ScreenshotQueue(
+                    Mathf.Max(1, settings.maxAllowedScreenshotCount > 0 ? settings.maxAllowedScreenshotCount : 3));
                 _screenshotQueue = screenshotQueue;
 
                 // ── 6. CaptureOrchestrator 생성 ───────────────────────────────────
@@ -301,35 +331,8 @@ namespace RekonOps.Rekon
                     }
                 }
 
-                var tokenStore = new SessionTokenStore();
-
-                // ── 라이선스 캐시에서 currentPlan 복원 (플레이어 빌드 대응) ──────────
-                // RekonSettingsWindow는 에디터 전용이므로 플레이어 빌드에서는
-                // currentPlan이 기본값 "free"로 고정될 수 있습니다.
-                // LicenseValidator 캐시(PlayerPrefs)에서 플랜 정보를 읽어 즉시 반영합니다.
-                if (settings.isLinked)
-                {
-                    try
-                    {
-                        var licenseValidator = new LicenseValidator(
-                            RekonSettings.WEB_DASHBOARD_URL, tokenStore);
-                        var cached = licenseValidator.GetCachedLicense();
-                        if (cached != null && cached.Valid && !string.IsNullOrEmpty(cached.Plan))
-                        {
-                            settings.currentPlan               = cached.Plan;
-                            settings.maxAllowedBufferSeconds   = cached.MaxBufferSeconds;
-                            settings.maxAllowedScreenshotCount = cached.MaxScreenshotCount;
-                            Debug.Log($"[Rekon] 캐시에서 플랜 복원: plan={cached.Plan}, " +
-                                      $"maxBuffer={cached.MaxBufferSeconds}초, " +
-                                      $"maxScreenshot={cached.MaxScreenshotCount}개");
-                        }
-                    }
-                    catch (System.Exception licEx)
-                    {
-                        Debug.LogWarning($"[Rekon] 라이선스 캐시 복원 실패 (free 플랜으로 유지): {licEx.Message}");
-                    }
-                }
-
+                // tokenStore 생성 + 라이선스 캐시 플랜 복원은 컬렉터/큐 생성 전(위)으로 이동됨
+                //   (그래야 ReplayLogCollector window / ScreenshotQueue capacity 가 플랜값으로 반영).
                 // tokenStore를 CaptureOrchestrator에도 주입 — 캡처 전 사용량 사전 체크에 사용
                 orchestrator.BindTokenStore(tokenStore);
 

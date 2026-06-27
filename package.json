@@ -1,6 +1,6 @@
 {
   "name": "dev.rekonops.rekon",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "displayName": "Rekon",
   "description": "Bug reporting infrastructure for Unity game dev teams. Auto-capture video/screenshots/logs → web dashboard → Jira. | Unity 게임 개발팀을 위한 버그 리포팅 인프라.",
   "unity": "2022.3",
@@ -11,12 +11,20 @@
     "url": "https://www.rekonops.dev"
   },
   "keywords": ["bug-report", "jira", "qa", "testing", "capture", "screenshot", "video"],
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/RekonOps/Rekon-unity.git"
   },
   "changelogUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/RekonOps/Rekon-unity/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/RekonOps/Rekon-unity#readme",
+  "samples": [
+    {
+      "displayName": "Basic Demo",
+      "description": "Rekon.Capture 트리거 + 콘솔 로그 자동 캡처 예제",
+      "path": "Samples~/BasicDemo"
+    }
+  ],
   "dependencies": {}
 }

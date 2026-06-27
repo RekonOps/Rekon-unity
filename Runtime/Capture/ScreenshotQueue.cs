@@ -43,16 +43,32 @@ namespace RekonOps.Rekon
     /// </summary>
     public class ScreenshotQueue
     {
-        public const int MaxCapacity = 5;
+        /// <summary>
+        /// 큐가 보관할 수 있는 최대 스크린샷 장수. 생성자에서 플랜값으로 주입됩니다.
+        ///   free 3 / team 5 / team_pro 10 (백엔드 validate-license 의 maxAllowedScreenshotCount).
+        /// </summary>
+        public int Capacity { get; }
 
         private readonly List<ScreenshotEntry> _entries = new List<ScreenshotEntry>();
         private readonly object _lock = new object();
 
-        /// <summary>현재 큐 크기 (0~5)</summary>
+        /// <summary>
+        /// 스크린샷 큐를 생성합니다.
+        /// </summary>
+        /// <param name="capacity">
+        /// 최대 보관 장수(플랜값). 1 미만이면 기본값 5 로 가드합니다.
+        /// 기본값 5 — 인자 미지정 시 기존 동작(team 기준)을 유지합니다.
+        /// </param>
+        public ScreenshotQueue(int capacity = 5)
+        {
+            Capacity = capacity < 1 ? 5 : capacity;
+        }
+
+        /// <summary>현재 큐 크기 (0~Capacity)</summary>
         public int Count { get { lock(_lock) { return _entries.Count; } } }
 
         /// <summary>
-        /// 큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
+        /// 큐에 스크린샷을 추가합니다. Capacity 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
         /// (기존 오버로드 — 하위 호환 유지, CaptureRealtime = 0.0)
         /// </summary>
         /// <returns>eviction이 발생하면 true, 그렇지 않으면 false</returns>
@@ -62,7 +78,7 @@ namespace RekonOps.Rekon
         }
 
         /// <summary>
-        /// 큐에 스크린샷을 추가합니다. 5장 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
+        /// 큐에 스크린샷을 추가합니다. Capacity 초과 시 가장 오래된 항목을 삭제(FIFO eviction)합니다.
         /// team_pro 싱크용 오버로드 — captureRealtime: Time.realtimeSinceStartupAsDouble.
         /// </summary>
         /// <param name="pngBytes">PNG 바이트</param>
@@ -74,7 +90,7 @@ namespace RekonOps.Rekon
             if (pngBytes == null || pngBytes.Length == 0) return false;
             lock (_lock)
             {
-                bool evicted = _entries.Count >= MaxCapacity;
+                bool evicted = _entries.Count >= Capacity;
                 if (evicted)
                     _entries.RemoveAt(0);
                 _entries.Add(new ScreenshotEntry(pngBytes, timestamp, captureRealtime));

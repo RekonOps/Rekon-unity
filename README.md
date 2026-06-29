@@ -4,24 +4,14 @@
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.1-brightgreen.svg)](CHANGELOG.md)
 
 ---
 
 ## 개요
 
-Rekon는 **JAM.dev 패턴**을 채택합니다.
-
-- **Unity 플러그인**: 버그 캡처 → 웹 백엔드를 통해 Cloudflare R2에 파일 업로드 → 웹 대시보드에 저장 (primary)
-- **Jira 등록**: Unity 플러그인이 Jira에 직접 연결하지 않습니다. Jira 이슈 등록은 **웹 대시보드**(`/workspace/[id]`)에서 수행됩니다.
-
-```
-Unity 플러그인
-    └─> 웹 백엔드 (Web Proxy API)
-            └─> Cloudflare R2 (파일 저장)
-            └─> Supabase DB (메타데이터)
-                            └─> (웹 대시보드에서) Jira Cloud
-```
+- **Unity 플러그인**: 플레이 모드에서 버그를 캡처해 영상/스크린샷/로그를 웹 대시보드에 저장합니다.
+- **Jira 등록**: Unity 플러그인은 Jira에 직접 연결하지 않습니다. Jira 이슈 등록은 웹 대시보드에서 수행합니다.
 
 ---
 
@@ -60,7 +50,7 @@ Unity 플러그인
 3. 아래 URL 입력:
 
 ```
-https://github.com/RekonOps/Rekon-unity.git#v1.0.0
+https://github.com/RekonOps/Rekon-unity.git#v0.5.1
 ```
 
 4. **Add** 클릭 -- Unity가 패키지를 자동으로 다운로드합니다.
@@ -70,7 +60,7 @@ https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```json
 {
   "dependencies": {
-    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v1.0.0"
+    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v0.5.1"
   }
 }
 ```
@@ -129,31 +119,6 @@ Unity 에디터에서 **Project Settings > Rekon** 열기 > **[웹 로그인]** 
 
 ---
 
-## 아키텍처
-
-### JAM.dev 패턴 (Web Proxy 방식)
-
-Unity 플러그인은 Supabase나 Jira에 직접 연결하지 않습니다. **모든 통신은 웹 백엔드(Next.js API Routes)를 경유**합니다.
-
-```
-[Unity 플러그인]
-    │
-    ├─ POST /api/unity/reports        ← 리포트 생성 + R2 Presigned URL 요청
-    ├─ PUT  <R2 Presigned URL>        ← 파일 직접 업로드 (R2)
-    ├─ POST /api/unity/reports/confirm ← 업로드 완료 알림
-    ├─ POST /api/unity/auth/start     ← 웹 로그인 시작
-    └─ GET  /api/unity/auth/status    ← 웹 로그인 상태 폴링
-
-[웹 백엔드 (Next.js API Routes)]
-    └─> Supabase Edge Functions → PostgreSQL DB
-    └─> Cloudflare R2 (파일 저장)
-
-[웹 대시보드]
-    └─> Jira Cloud API (push-to-jira, 서버 경유)
-```
-
----
-
 ## 오프라인 동작
 
 네트워크 오류 또는 웹 로그인이 되어있지 않은 경우:
@@ -164,28 +129,6 @@ Unity 플러그인은 Supabase나 Jira에 직접 연결하지 않습니다. **�
 
 ---
 
-## 프로젝트 구조
-
-```
-Runtime/           # 핵심 런타임 모듈
-  Auth/            # 웹 로그인, 라이선스 검증, OAuth, 세션 저장
-  Bundle/          # 번들 패키징, 로컬 저장소, 제출 대기열
-  Capture/         # 스크린샷, 로그 수집, 게임 상태 스냅샷
-  CrashRecovery/   # 크래시 감지 및 복구
-  Input/           # 핫키 관리
-  Jira/            # Jira REST API 클라이언트, 이슈 생성
-  Network/         # R2 업로드 클라이언트
-  Security/        # 토큰 암호화, 로그 마스킹, 레이트 리미터
-  Settings/        # ScriptableObject 기반 설정
-  UI/              # 인게임 오버레이 UI
-  Video/           # 프레임 캡처, 링 버퍼, MP4 인코딩
-Editor/            # 에디터 UI (Settings 패널, Bundle Manager)
-Tests/             # EditMode / PlayMode 테스트
-Samples~/          # 사용 예제 (Rekon.Capture + 콘솔 로그 캡처)
-```
-
----
-
 ## SDK 무결성 검증
 
 모든 GitHub Release에는 SHA-256 체크섬 파일과 CycloneDX SBOM이 첨부됩니다.
@@ -193,12 +136,12 @@ Samples~/          # 사용 예제 (Rekon.Capture + 콘솔 로그 캡처)
 
 ```bash
 # macOS / Linux
-sha256sum -c rekon-unity-v1.0.0.tgz.sha256
-# 출력: rekon-unity-v1.0.0.tgz: OK
+sha256sum -c rekon-unity-v0.5.1.tgz.sha256
+# 출력: rekon-unity-v0.5.1.tgz: OK
 
 # Windows (PowerShell)
-$expected = (Get-Content "rekon-unity-v1.0.0.tgz.sha256" -Raw).Split(" ")[0].Trim()
-$actual   = (Get-FileHash "rekon-unity-v1.0.0.tgz" -Algorithm SHA256).Hash.ToLower()
+$expected = (Get-Content "rekon-unity-v0.5.1.tgz.sha256" -Raw).Split(" ")[0].Trim()
+$actual   = (Get-FileHash "rekon-unity-v0.5.1.tgz" -Algorithm SHA256).Hash.ToLower()
 if ($expected -eq $actual) { "OK" } else { "FAIL" }
 ```
 

@@ -17,14 +17,14 @@
 
 ## 주요 기능
 
-- **원클릭 인게임 버그 리포팅** -- 플레이 중 F12 핫키(변경 가능)로 버그 리포트 UI를 열고, 한 번의 클릭으로 제출
+- **원클릭 인게임 버그 리포팅** -- 플레이 중 캡처 단축키(기본 `Ctrl/Cmd+Shift+B`, 변경 가능)로 버그 리포트 UI를 열고, 한 번의 클릭으로 제출
 - **자동 영상 캡처** -- 링 버퍼 기반 프레임 녹화 (기본 15fps, 1280x720) + FFmpeg MP4 인코딩
 - **스크린샷/로그/게임 상태 자동 수집** -- 씬 이름, 디바이스 정보, Unity 버전, 프레임레이트, 최근 로그 자동 첨부
 - **[웹 저장] 원클릭 제출** -- 웹 로그인만 되어있으면 항상 사용 가능. Jira 등록은 웹 대시보드에서 수행
 - **Supabase Auth 웹 로그인** -- 브라우저 기반 인증 플로우 (auth-unity-start 폴링 방식)
 - **Cloudflare R2 파일 업로드** -- 영상/스크린샷/로그 파일을 R2에 업로드 (재시도 3회, 실패 시 로컬 저장)
 - **오프라인 동작** -- 네트워크 오류 시 `pending/` 디렉토리에 로컬 저장 후 복구 시 자동 재시도
-- **라이선스 검증** -- 서버 기반 라이선스 키 검증 + 오프라인 Grace Period 72시간
+- **라이선스 검증** -- 웹 로그인(JWT) 기반 플랜 검증 + 오프라인 Grace Period 72시간
 - **AES-256-CBC 세션 암호화** -- OAuth 토큰 및 세션 데이터 로컬 암호화 저장
 - **크래시 복구** -- Memory-Mapped File 기반 비정상 종료 감지 및 데이터 복구
 - **민감 정보 자동 마스킹** -- 로그 내 이메일, IP, 토큰 등 자동 마스킹
@@ -82,21 +82,16 @@ Unity 에디터에서 **Project Settings > Rekon** 열기 > **[웹 로그인]** 
 4. 완료 감지 시 `access_token`과 `workspace_id`를 자동으로 Settings에 저장합니다.
 5. Settings Window에 **"연동됨 (워크스페이스명)"** 상태가 표시됩니다.
 
-### 2. 라이선스 키 입력 (팀 사용 시)
-
-관리자가 [웹 대시보드](https://rekonops.dev)에서 발급한 라이선스 키를 Settings에 입력:
-- **Project Settings > Rekon > License Key** 에 `BOT-XXXX-XXXX-XXXX-XXXX` 입력
-
-### 3. 버그 캡처
+### 2. 버그 캡처
 
 1. **플레이 모드** 진입
-2. 버그 발생 시 **F12** (기본 핫키) 누르기
+2. 버그 발생 시 **캡처 단축키**(기본 `Ctrl/Cmd + Shift + B`, Settings에서 변경 가능) 누르기
 3. 제목과 설명 입력
 4. **[웹 저장]** 버튼 클릭하여 제출 (웹 대시보드에 저장됨)
 
 > **Jira 이슈 등록**: Unity 플러그인에서 Jira에 직접 등록하지 않습니다. 버그 리포트가 웹 대시보드에 저장된 후, [웹 대시보드](https://rekonops.dev)의 **워크스페이스 > 이슈 상세** 페이지에서 [Jira 등록] 버튼을 클릭하여 Jira 이슈를 생성하세요.
 
-### 4. Jira 연동 (웹 대시보드에서)
+### 3. Jira 연동 (웹 대시보드에서)
 
 웹 대시보드의 **설정 > Jira 연동** (`/settings/jira`)에서 Jira Cloud OAuth 인증을 진행합니다.
 - 연동 완료 후 이슈 상세 페이지에서 [Jira 등록] 버튼이 활성화됩니다.
@@ -109,12 +104,11 @@ Unity 에디터에서 **Project Settings > Rekon** 열기 > **[웹 로그인]** 
 
 | 설정 | 설명 | 기본값 |
 |------|------|--------|
-| 핫키 | 버그 리포트 UI 열기 | F12 |
+| 핫키 | 버그 리포트 UI 열기 | Ctrl/Cmd+Shift+B |
 | 영상 FPS | 프레임 캡처 속도 | 15 |
 | 영상 해상도 | 캡처 해상도 | 1280x720 |
 | 로그 버퍼 크기 | 최근 로그 보관 개수 | 최근 N개 |
 | 번들 보관 한도 | 로컬 번들 최대 개수/용량 | 자동 정리 |
-| License Key | 팀 라이선스 키 (`BOT-XXXX-XXXX-XXXX-XXXX`) | -- |
 | 웹 연동 상태 | 웹 로그인 연결 여부 및 워크스페이스명 표시 | 미연동 |
 
 ---
@@ -146,15 +140,6 @@ if ($expected -eq $actual) { "OK" } else { "FAIL" }
 ```
 
 > 자세한 검증 방법 및 SBOM 확인은 [SECURITY.md](./SECURITY.md) 참조.
-
----
-
-## 관련 저장소
-
-| 저장소 | 설명 |
-|--------|------|
-| [Rekon-backend](https://github.com/RekonOps/Rekon-backend) | Supabase 백엔드 (Edge Functions, DB) |
-| [Rekon-web](https://github.com/RekonOps/Rekon-web) | 웹 대시보드 (Next.js) |
 
 ---
 

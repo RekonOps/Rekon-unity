@@ -1,19 +1,21 @@
-# Rekon — Unity 버그 캡처 SDK
+# Rekon — Bug Capture SDK for Unity
 
-### 버그가 터졌을 때, 이미 녹화 중이었다.
+**English** | [한국어](./README.ko.md)
 
-핫키를 누르는 순간, 직전 **~60초의 영상·로그·성능**이 이미 디스크에 있다.
-롤링 버퍼로 항상 돌고 있기 때문에 — 버그가 터진 *뒤에* 눌러도 늦지 않는다.
+### When the bug hit, it was already recording.
+
+The moment you press the hotkey, the last **~60 seconds of video, logs, and performance data** are already on disk.
+A rolling buffer is always running — so pressing it *after* the bug happens is never too late.
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.5.1-brightgreen.svg)](CHANGELOG.md)
 
-<!-- DEMO GIF (배포 전 교체 필수): 핫키 → 직전 60초 영상 + FPS 그래프 + Console 에러가 한 시점에 정렬되는 30초 캡처 -->
-<!-- GIF 준비 전까지는 아래 스펙 텍스트가 fallback 으로 남는다 -->
+<!-- DEMO GIF (replace before launch): 30s capture of hotkey → last-60s video + FPS graph + Console error aligned on one timeline -->
+<!-- Until the GIF is ready, the spec text below stands in as the fallback -->
 
-> 플레이 모드에서 `Ctrl/Cmd + Shift + B` → 직전 ~60초 영상 + 스크린샷 + 로그 + 게임 상태(Scene/FPS/메모리)가
-> 한 번에 캡처돼 웹 대시보드에 도착한다. Jira 이슈 등록은 대시보드에서 클릭 한 번.
+> In Play Mode, press `Ctrl/Cmd + Shift + B` → the last ~60s of video + screenshots + logs + game state (Scene/FPS/memory)
+> is captured in one shot and lands on the web dashboard. Filing a Jira issue from there is one click.
 
 ```
 # UPM Git URL (Package Manager > Add package from git URL...)
@@ -22,59 +24,59 @@ https://github.com/RekonOps/Rekon-unity.git#v0.5.1
 
 ---
 
-## 이런 적 있나
+## Sound familiar?
 
-비기술자 QA가 티켓에 이렇게 쓴다 — **"캐릭터가 이상해요."**
+A non-technical QA writes in the ticket — **"The character looks weird."**
 
-스크린샷 한 장과 그 한 줄을 들고, 당신은 추측으로 디버깅을 시작한다.
-어느 씬이었는지, 그때 FPS가 떨어졌는지, Console에 뭐가 찍혔는지 — 아무것도 없이.
-재현은 안 되고, 티켓은 "재현 불가"로 닫힌다.
+Holding one screenshot and that single line, you start debugging on guesswork.
+Which scene it was, whether the FPS dropped, what hit the Console — nothing.
+It won't reproduce, and the ticket gets closed as "cannot reproduce."
 
-Rekon은 추측으로 시작하던 디버깅을, **증거로 시작하는 디버깅**으로 바꾼다.
-
----
-
-## 왜 다른가
-
-기존 도구는 "버그가 터진 시점"을 다시 찾으려 한다. Rekon은 그 순간이 **이미 잡혀 있다**는 전제에서 출발한다.
-
-### 1. 사후에 눌러도 직전 60초가 남는다
-
-녹화 버튼이 없다. 플레이 모드 동안 롤링(링) 버퍼가 항상 직전 구간을 돌고 있다.
-버그를 보고 *나서* 핫키를 눌러도, 직전 ~60초 영상이 이미 디스크에 있다. (기본 15fps · 1280×720)
-
-> "녹화를 깜빡했다"가 구조적으로 불가능하다.
-
-### 2. 영상과 성능이 같은 타임라인에 있다
-
-캡처된 영상의 한 시점에 — 그 순간의 **FPS 급락**, **메모리 스파이크**, **Console 에러 한 줄**이 함께 정렬된다.
-영상에서 "여기서 끊겼다" 싶은 프레임이, 그래프에서 무슨 일이 있었는지와 곧장 맞물린다.
-
-"1/100으로 터지는 간헐 크래시", "특정 기기에서만"의 그 순간을 — 화면과 수치로 동시에 본다.
-
-### 3. Unity의 맥락을 통째로
-
-씬 이름, 디바이스 정보, Unity 버전, 프레임레이트, 직전 로그 — 캡처 시점의 게임 상태가 자동으로 함께 첨부된다.
-범용 SDK가 모르는, Unity 플레이 모드만의 컨텍스트다.
+Rekon turns debugging that starts with guesses into **debugging that starts with evidence**.
 
 ---
 
-## 안 보이는 것이 기능이다
+## Why it's different
 
-Rekon은 평소엔 존재를 잊게 설계됐다. 상시 떠 있는 오버레이도, 봐야 할 대시보드도 게임 안에 없다.
-핫키로만 소환되고, 그 외엔 조용히 직전 구간만 돌린다. 개발 흐름을 끊지 않는다.
+Existing tools try to find "the moment the bug happened" after the fact. Rekon starts from the premise that the moment is **already captured**.
+
+### 1. Press after the fact — the last 60 seconds are still there
+
+There is no record button. While you're in Play Mode, a rolling (ring) buffer keeps the most recent window at all times.
+Even if you press the hotkey *after* seeing the bug, the last ~60 seconds of video are already on disk. (default 15fps · 1280×720)
+
+> "I forgot to hit record" is structurally impossible.
+
+### 2. Video and performance share one timeline
+
+At any point in the captured video — that instant's **FPS drop**, **memory spike**, and **Console error** line up together.
+The frame where the video "hitched" maps straight onto what the graphs were doing at that moment.
+
+The 1-in-100 intermittent crash, the "only on that one device" bug — you see the moment on screen and in numbers, at the same time.
+
+### 3. Unity context, in full
+
+Scene name, device info, Unity version, frame rate, recent logs — the game state at the moment of capture is attached automatically.
+This is Play Mode context that generic SDKs don't have.
 
 ---
 
-## 설치
+## Invisible by design
 
-Unity에서 **Window > Package Manager > +  > Add package from git URL...** 에 입력:
+Rekon is designed to be forgotten. No always-on overlay, no dashboard living inside your game.
+It only appears when summoned by hotkey; otherwise it quietly keeps the rolling buffer turning. It doesn't break your flow.
+
+---
+
+## Installation
+
+In Unity, open **Window > Package Manager > +  > Add package from git URL...** and enter:
 
 ```
 https://github.com/RekonOps/Rekon-unity.git#v0.5.1
 ```
 
-또는 `Packages/manifest.json`에 직접:
+Or add it directly to `Packages/manifest.json`:
 
 ```json
 {
@@ -84,93 +86,93 @@ https://github.com/RekonOps/Rekon-unity.git#v0.5.1
 }
 ```
 
-> 최신 버전은 [GitHub Releases](https://github.com/RekonOps/Rekon-unity/releases)에서 확인.
+> Check [GitHub Releases](https://github.com/RekonOps/Rekon-unity/releases) for the latest version.
 
 ---
 
-## 사용법
+## Usage
 
-영상 캡처는 **FFmpeg**로 인코딩한다. 패키지에 번들되지 않으니, 영상 캡처를 쓰려면 OS에 맞게 한 번만 설치한다 (PC/Mac, 모바일 미지원):
+Video capture is encoded with **FFmpeg**. It is not bundled with the package, so install it once per OS if you want video capture (PC/Mac — not supported on mobile):
 
-| OS | 설치 |
-|----|------|
+| OS | Install |
+|----|---------|
 | **macOS** | `brew install ffmpeg` |
-| **Windows** | `choco install ffmpeg` 또는 `winget install ffmpeg` |
-| **Linux** | `sudo apt install ffmpeg` (배포판에 맞게) |
+| **Windows** | `choco install ffmpeg` or `winget install ffmpeg` |
+| **Linux** | `sudo apt install ffmpeg` (per your distro) |
 
-> Rekon은 PATH와 brew/choco/winget 기본 설치 경로를 자동으로 찾는다 (Unity 에디터가 셸 PATH를 상속하지 않아도 동작). FFmpeg가 없으면 영상 없이 스크린샷·로그만 캡처된다.
+> Rekon automatically searches PATH plus the default brew/choco/winget install locations (works even when the Unity editor doesn't inherit your shell PATH). Without FFmpeg, capture still works — screenshots and logs, just no video.
 
-설치했다면, 그 다음은 핫키 하나다.
+Once that's done, all you need is the hotkey.
 
-1. **플레이 모드**에서 버그 발생
-2. **`Ctrl/Cmd + Shift + B`** — 직전 ~60초가 캡처된다 (Settings에서 변경 가능)
-3. 제목·설명 입력 → **[웹 저장]** → 웹 대시보드에 도착
+1. A bug happens in **Play Mode**
+2. **`Ctrl/Cmd + Shift + B`** — the last ~60 seconds are captured (configurable in Settings)
+3. Enter a title and description → **[Save to Web]** → it lands on the web dashboard
 
-대시보드에서 리포트를 열고 **[Jira 등록]** 버튼으로 이슈를 만든다.
+Open the report on the dashboard and create the issue with the **[Send to Jira]** button.
 
-> **경계는 정직하게**: Unity 플러그인은 *캡처와 저장*만 한다. Jira 연결은 웹 대시보드에서 한 번 인증해두면 된다 (`/settings/jira`). Unity가 Jira에 직접 붙지 않는다.
+> **Honest boundaries**: the Unity plugin only does *capture and save*. Connect Jira once from the web dashboard (`/settings/jira`). Unity never talks to Jira directly.
 
 <details>
-<summary>웹 로그인 / Jira 연동 내부 흐름 (펼치기)</summary>
+<summary>Web login / Jira integration internals (expand)</summary>
 
-**웹 로그인** — `Project Settings > Rekon > [웹 로그인]`
-1. 플러그인이 `device_id`를 백엔드에 보내 일회용 로그인 URL을 받는다.
-2. 브라우저가 자동으로 열리고 로그인을 진행한다.
-3. 완료를 감지하면 토큰과 워크스페이스가 Settings에 자동 저장된다.
-4. Settings에 **"연동됨 (워크스페이스명)"** 표시.
+**Web login** — `Project Settings > Rekon > [Web Login]`
+1. The plugin sends a `device_id` to the backend and receives a one-time login URL.
+2. Your browser opens automatically and you sign in.
+3. On completion, the token and workspace are saved to Settings automatically.
+4. Settings shows **"Connected (workspace name)"**.
 
-**Jira** — 웹 대시보드 `설정 > Jira 연동`에서 Jira Cloud OAuth 인증.
-연동 후 리포트 상세 페이지의 [Jira 등록] 버튼이 활성화된다.
+**Jira** — authenticate Jira Cloud OAuth in the web dashboard under `Settings > Jira`.
+After that, the [Send to Jira] button is enabled on report detail pages.
 
 </details>
 
 ---
 
-## 설정 (`Project Settings > Rekon`)
+## Settings (`Project Settings > Rekon`)
 
-| 설정 | 설명 | 기본값 |
-|------|------|--------|
-| 핫키 | 캡처 단축키 | `Ctrl/Cmd+Shift+B` |
-| 영상 FPS | 프레임 캡처 속도 | 15 |
-| 영상 해상도 | 캡처 해상도 | 1280×720 |
-| 로그 버퍼 | 최근 로그 보관 개수 | 최근 N개 |
-| 번들 보관 한도 | 로컬 번들 최대 개수/용량 | 자동 정리 |
-| 웹 연동 상태 | 로그인 여부 및 워크스페이스명 | 미연동 |
-
----
-
-## 왜 만들었나
-
-재현이 안 돼서 티켓을 못 닫아본 적이 있다.
-QA가 "캐릭터가 이상해요"라고 쓴 그 장면을, 끝내 한 번도 못 보고 닫은 적이 있다.
-
-그 순간의 진실은 60초면 증발한다. 그래서 그 증거가 죽지 않게 만들었다.
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Hotkey | Capture shortcut | `Ctrl/Cmd+Shift+B` |
+| Video FPS | Frame capture rate | 15 |
+| Video resolution | Capture resolution | 1280×720 |
+| Log buffer | Number of recent logs kept | last N |
+| Bundle retention | Max local bundle count/size | auto-pruned |
+| Web connection | Login status and workspace name | disconnected |
 
 ---
 
-## 잃지 않는다
+## Why we built this
 
-- **오프라인 자동 재시도** — 네트워크가 끊기면 캡처는 로컬(`pending/`)에 저장되고, 복구되면 백그라운드에서 자동 재시도한다 (최대 3회, 지수 백오프). 데이터를 흘리지 않는다.
-- **민감 정보 마스킹** — 로그 내 이메일·IP·토큰 등은 자동으로 마스킹된다.
-- **무결성 검증** — 모든 Release에 SHA-256 체크섬과 CycloneDX SBOM이 첨부된다. 받은 tarball이 변조되지 않았는지 직접 확인할 수 있다 → [SECURITY.md](./SECURITY.md).
-- **Apache 2.0 OSS** — 코드는 열려 있다. 당신의 증거를 누군가의 벽 안에 가두지 않는다.
+We've had tickets we couldn't close because the bug wouldn't reproduce.
+We've closed tickets where QA wrote "the character looks weird" — without ever once seeing that moment.
+
+The truth of that moment evaporates in 60 seconds. So we built something that keeps the evidence alive.
 
 ---
 
-## 요구사항
+## Nothing gets lost
 
-| 항목 | 조건 |
-|------|------|
-| Unity | 2022.3 LTS 이상 |
+- **Offline auto-retry** — if the network drops, captures are stored locally (`pending/`) and retried in the background once you're back online (up to 3 attempts, exponential backoff). No data slips through the cracks.
+- **Sensitive data masking** — emails, IPs, and tokens in logs are masked automatically.
+- **Integrity verification** — every Release ships with SHA-256 checksums and a CycloneDX SBOM. You can verify the tarball yourself → [SECURITY.md](./SECURITY.md).
+- **Apache 2.0 OSS** — the code is open. Your evidence is never locked behind someone else's wall.
+
+---
+
+## Requirements
+
+| Item | Requirement |
+|------|-------------|
+| Unity | 2022.3 LTS or newer |
 | .NET | Standard 2.1 |
-| FFmpeg | PC/Mac 영상 캡처 시 필수 — **모바일 미지원** |
+| FFmpeg | Required for video capture on PC/Mac — **not supported on mobile** |
 
-> 모바일 빌드에서는 영상 캡처가 동작하지 않는다. 숨기지 않고 적어둔다.
+> Video capture does not work in mobile builds. We're telling you up front.
 
 ---
 
-## 라이선스
+## License
 
-**Apache License 2.0** — [LICENSE](LICENSE) 참조.
+**Apache License 2.0** — see [LICENSE](LICENSE).
 
 Copyright 2026 RekonOps

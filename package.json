@@ -1,6 +1,6 @@
 {
   "name": "dev.rekonops.rekon",
-  "version": "0.5.1",
+  "version": "1.0.0",
   "displayName": "Rekon",
   "description": "Bug reporting infrastructure for Unity game dev teams. Auto-capture video/screenshots/logs → web dashboard → Jira. | Unity 게임 개발팀을 위한 버그 리포팅 인프라.",
   "unity": "2022.3",
@@ -11,7 +11,7 @@
     "url": "https://www.rekonops.dev"
   },
   "keywords": ["bug-report", "jira", "qa", "testing", "capture", "screenshot", "video"],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/RekonOps/Rekon-unity.git"

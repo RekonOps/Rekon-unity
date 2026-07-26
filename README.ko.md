@@ -8,8 +8,8 @@
 롤링 버퍼로 항상 돌고 있기 때문에 — 버그가 터진 *뒤에* 눌러도 늦지 않는다.
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.1-brightgreen.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](CHANGELOG.md)
 
 <!-- DEMO GIF (배포 전 교체 필수): 핫키 → 직전 60초 영상 + FPS 그래프 + Console 에러가 한 시점에 정렬되는 30초 캡처 -->
 <!-- GIF 준비 전까지는 아래 스펙 텍스트가 fallback 으로 남는다 -->
@@ -19,7 +19,7 @@
 
 ```
 # UPM Git URL (Package Manager > Add package from git URL...)
-https://github.com/RekonOps/Rekon-unity.git#v0.5.1
+https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```
 
 ---
@@ -73,7 +73,7 @@ Rekon은 평소엔 존재를 잊게 설계됐다. 상시 떠 있는 오버레이
 Unity에서 **Window > Package Manager > +  > Add package from git URL...** 에 입력:
 
 ```
-https://github.com/RekonOps/Rekon-unity.git#v0.5.1
+https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```
 
 또는 `Packages/manifest.json`에 직접:
@@ -81,7 +81,7 @@ https://github.com/RekonOps/Rekon-unity.git#v0.5.1
 ```json
 {
   "dependencies": {
-    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v0.5.1"
+    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v1.0.0"
   }
 }
 ```
@@ -155,7 +155,7 @@ QA가 "캐릭터가 이상해요"라고 쓴 그 장면을, 끝내 한 번도 못
 - **오프라인 자동 재시도** — 네트워크가 끊기면 캡처는 로컬(`pending/`)에 저장되고, 복구되면 백그라운드에서 자동 재시도한다 (최대 3회, 지수 백오프). 데이터를 흘리지 않는다.
 - **민감 정보 마스킹** — 로그 내 이메일·IP·토큰 등은 자동으로 마스킹된다.
 - **무결성 검증** — 모든 Release에 SHA-256 체크섬과 CycloneDX SBOM이 첨부된다. 받은 tarball이 변조되지 않았는지 직접 확인할 수 있다 → [SECURITY.md](./SECURITY.md).
-- **Apache 2.0 OSS** — 코드는 열려 있다. 당신의 증거를 누군가의 벽 안에 가두지 않는다.
+- **MIT OSS** — 코드는 열려 있다. 당신의 증거를 누군가의 벽 안에 가두지 않는다.
 
 ---
 
@@ -173,6 +173,6 @@ QA가 "캐릭터가 이상해요"라고 쓴 그 장면을, 끝내 한 번도 못
 
 ## 라이선스
 
-**Apache License 2.0** — [LICENSE](LICENSE) 참조.
+**MIT License** — [LICENSE](LICENSE) 참조.
 
 Copyright 2026 RekonOps

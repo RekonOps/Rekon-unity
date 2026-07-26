@@ -8,8 +8,8 @@ The moment you press the hotkey, the last **~60 seconds of video, logs, and perf
 A rolling buffer is always running — so pressing it *after* the bug happens is never too late.
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B-black?logo=unity)](https://unity.com)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.1-brightgreen.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](CHANGELOG.md)
 
 <!-- DEMO GIF (replace before launch): 30s capture of hotkey → last-60s video + FPS graph + Console error aligned on one timeline -->
 <!-- Until the GIF is ready, the spec text below stands in as the fallback -->
@@ -19,7 +19,7 @@ A rolling buffer is always running — so pressing it *after* the bug happens is
 
 ```
 # UPM Git URL (Package Manager > Add package from git URL...)
-https://github.com/RekonOps/Rekon-unity.git#v0.5.1
+https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```
 
 ---
@@ -73,7 +73,7 @@ It only appears when summoned by hotkey; otherwise it quietly keeps the rolling 
 In Unity, open **Window > Package Manager > +  > Add package from git URL...** and enter:
 
 ```
-https://github.com/RekonOps/Rekon-unity.git#v0.5.1
+https://github.com/RekonOps/Rekon-unity.git#v1.0.0
 ```
 
 Or add it directly to `Packages/manifest.json`:
@@ -81,7 +81,7 @@ Or add it directly to `Packages/manifest.json`:
 ```json
 {
   "dependencies": {
-    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v0.5.1"
+    "dev.rekonops.rekon": "https://github.com/RekonOps/Rekon-unity.git#v1.0.0"
   }
 }
 ```
@@ -155,7 +155,7 @@ The truth of that moment evaporates in 60 seconds. So we built something that ke
 - **Offline auto-retry** — if the network drops, captures are stored locally (`pending/`) and retried in the background once you're back online (up to 3 attempts, exponential backoff). No data slips through the cracks.
 - **Sensitive data masking** — emails, IPs, and tokens in logs are masked automatically.
 - **Integrity verification** — every Release ships with SHA-256 checksums and a CycloneDX SBOM. You can verify the tarball yourself → [SECURITY.md](./SECURITY.md).
-- **Apache 2.0 OSS** — the code is open. Your evidence is never locked behind someone else's wall.
+- **MIT OSS** — the code is open. Your evidence is never locked behind someone else's wall.
 
 ---
 
@@ -173,6 +173,6 @@ The truth of that moment evaporates in 60 seconds. So we built something that ke
 
 ## License
 
-**Apache License 2.0** — see [LICENSE](LICENSE).
+**MIT License** — see [LICENSE](LICENSE).
 
 Copyright 2026 RekonOps

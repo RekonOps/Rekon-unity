@@ -8,6 +8,7 @@
 
 보안 취약점을 발견하셨으면 **공개 이슈 대신** 아래 채널로 제보해 주세요.
 
+- **GitHub 비공개 취약점 제보** (권장): [Security 탭 → Report a vulnerability](https://github.com/RekonOps/Rekon-unity/security/advisories/new)
 - **이메일**: rekonops.dev@gmail.com (제목: `[SECURITY] 간단 설명`)
 - **응답 목표**: 영업일 3일 이내 초기 응답, 14일 이내 처리 계획 공유
 

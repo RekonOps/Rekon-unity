@@ -171,6 +171,12 @@ The truth of that moment evaporates in 60 seconds. So we built something that ke
 
 ---
 
+## Contributing
+
+Rekon is open source for transparency and distribution. **We're not accepting external pull requests at this time** — but bug reports and feature requests via [Issues](https://github.com/RekonOps/Rekon-unity/issues) are very welcome.
+
+For security vulnerabilities, please use the private channels described in [SECURITY.md](SECURITY.md) instead of public issues.
+
 ## License
 
 **MIT License** — see [LICENSE](LICENSE).

@@ -171,6 +171,12 @@ QA가 "캐릭터가 이상해요"라고 쓴 그 장면을, 끝내 한 번도 못
 
 ---
 
+## 기여에 대하여
+
+Rekon 은 투명성과 배포를 위해 소스를 공개하고 있습니다. **현재 외부 Pull Request 는 받지 않습니다** — 대신 버그 리포트와 기능 제안은 [Issues](https://github.com/RekonOps/Rekon-unity/issues) 로 언제든 환영합니다.
+
+보안 취약점은 공개 이슈 대신 [SECURITY.md](SECURITY.md) 의 비공개 채널로 알려주세요.
+
 ## 라이선스
 
 **MIT License** — [LICENSE](LICENSE) 참조.

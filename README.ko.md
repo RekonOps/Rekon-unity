@@ -11,8 +11,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](CHANGELOG.md)
 
-<!-- DEMO GIF (배포 전 교체 필수): 핫키 → 직전 60초 영상 + FPS 그래프 + Console 에러가 한 시점에 정렬되는 30초 캡처 -->
-<!-- GIF 준비 전까지는 아래 스펙 텍스트가 fallback 으로 남는다 -->
+![Rekon 동작 화면 — 핫키를 누르면 직전 60초 영상·FPS 그래프·콘솔 로그가 한 타임라인에 정렬되어 남는다](./Documentation~/images/rekon-demo.gif)
 
 > 플레이 모드에서 `Ctrl/Cmd + Shift + B` → 직전 ~60초 영상 + 스크린샷 + 로그 + 게임 상태(Scene/FPS/메모리)가
 > 한 번에 캡처돼 웹 대시보드에 도착한다. Jira 이슈 등록은 대시보드에서 클릭 한 번.

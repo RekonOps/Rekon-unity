@@ -13,6 +13,8 @@
 
 ![Rekon 동작 화면 — 핫키를 누르면 직전 60초 영상·FPS 그래프·콘솔 로그가 한 타임라인에 정렬되어 남는다](./Documentation~/images/rekon-demo.gif)
 
+▶ [전체 60초 데모 영상 보기 (YouTube)](https://youtu.be/67jy1jBXn2c)
+
 > 플레이 모드에서 `Ctrl/Cmd + Shift + B` → 직전 ~60초 영상 + 스크린샷 + 로그 + 게임 상태(Scene/FPS/메모리)가
 > 한 번에 캡처돼 웹 대시보드에 도착한다. Jira 이슈 등록은 대시보드에서 클릭 한 번.
 

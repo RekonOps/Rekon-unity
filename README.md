@@ -11,8 +11,7 @@ A rolling buffer is always running — so pressing it *after* the bug happens is
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](CHANGELOG.md)
 
-<!-- DEMO GIF (replace before launch): 30s capture of hotkey → last-60s video + FPS graph + Console error aligned on one timeline -->
-<!-- Until the GIF is ready, the spec text below stands in as the fallback -->
+![Rekon in action — press the hotkey, and the last 60s of video, the FPS graph, and console logs land aligned on one timeline](./Documentation~/images/rekon-demo.gif)
 
 > In Play Mode, press `Ctrl/Cmd + Shift + B` → the last ~60s of video + screenshots + logs + game state (Scene/FPS/memory)
 > is captured in one shot and lands on the web dashboard. Filing a Jira issue from there is one click.
